@@ -540,6 +540,14 @@
     left: var(--sidebar-width);
   }
 
+  // OllieAI wide mode support
+  .ollie-wide-open .comet-content-inset {
+    --comet-content-width: calc(
+      100vw - var(--sidebar-width) - var(--ollie-width)
+    );
+    right: var(--ollie-width);
+  }
+
   .comet-table-row-best td {
     background-color: var(--table-best-row-bg) !important;
   }

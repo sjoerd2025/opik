@@ -10,6 +10,9 @@ import useWelcomeWizardStatus from "@/api/welcome-wizard/useWelcomeWizardStatus"
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import QuickstartDialog from "@/components/pages-shared/onboarding/QuickstartDialog/QuickstartDialog";
+import OllieTriggerButton from "@/components/layout/OllieAI/OllieTriggerButton";
+import OlliePanel from "@/components/layout/OllieAI/OlliePanel";
+import useOllieStore from "@/store/OllieStore";
 
 const MOBILE_BREAKPOINT = 1024; // lg breakpoint in Tailwind
 
@@ -28,6 +31,10 @@ const PageLayout = () => {
   });
 
   const RetentionBanner = usePluginsStore((state) => state.RetentionBanner);
+
+  // OllieAI panel state
+  const { isOpen: ollieIsOpen, mode: ollieMode } = useOllieStore();
+  const ollieWideOpen = ollieIsOpen && ollieMode === "wide";
 
   // Force sidebar collapsed on mobile, use stored preference on desktop
   const isMobile =
@@ -61,11 +68,13 @@ const PageLayout = () => {
         "relative flex h-screen min-h-0 w-screen min-w-0 flex-col",
         {
           "comet-expanded": expanded,
+          "ollie-wide-open": ollieWideOpen,
         },
       )}
       style={
         {
           "--banner-height": `${bannerHeight}px`,
+          "--ollie-width": ollieWideOpen ? "500px" : "0px",
         } as React.CSSProperties
       }
     >
@@ -89,6 +98,10 @@ const PageLayout = () => {
 
       {/* Quickstart Dialog */}
       <QuickstartDialog />
+
+      {/* OllieAI Components */}
+      <OllieTriggerButton />
+      <OlliePanel />
     </section>
   );
 };
