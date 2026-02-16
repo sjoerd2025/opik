@@ -34,6 +34,7 @@ export const WORKSPACES_REST_ENDPOINT = "/v1/private/workspaces/";
 export const WORKSPACE_CONFIG_REST_ENDPOINT =
   "/v1/private/workspaces/configurations/";
 export const TRACE_ANALYZER_REST_ENDPOINT = "/trace-analyzer/session/";
+export const COPILOT_REST_ENDPOINT = "/opik-copilot/session";
 export const PLAYGROUND_EVALUATION_REST_ENDPOINT =
   "/v1/private/playground/evaluations/";
 export const DASHBOARDS_REST_ENDPOINT = "/v1/private/dashboards/";
@@ -54,6 +55,7 @@ export const ANNOTATION_QUEUES_KEY = "annotation-queues";
 export const ANNOTATION_QUEUE_KEY = "annotation-queue";
 export const WORKSPACE_CONFIG_KEY = "workspace-config";
 export const TRACE_AI_ASSISTANT_KEY = "trace-analyzer-history";
+export const COPILOT_KEY = "copilot-history";
 export const DASHBOARDS_KEY = "dashboards";
 export const DASHBOARD_KEY = "dashboard";
 

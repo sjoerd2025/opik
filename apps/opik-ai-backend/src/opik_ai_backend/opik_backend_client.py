@@ -160,6 +160,32 @@ class OpikBackendClient:
                 spans.append(json_module.loads(line))
         return spans
 
+    async def list_projects(self, size: int = 25, page: int = 1) -> dict:
+        """
+        List projects for the current user/workspace.
+
+        Args:
+            size: Number of projects per page (default: 25)
+            page: Page number (default: 1)
+
+        Returns:
+            Projects list response as dict
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/projects"
+        params = {"size": size, "page": page}
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
     async def get_project_name_from_trace(self, trace_id: str) -> str:
         """
         Get project name from trace ID.

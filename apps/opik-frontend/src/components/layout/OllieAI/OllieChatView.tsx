@@ -12,6 +12,7 @@ import {
   Info,
   AlertCircle,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import { useToast } from "@/components/ui/use-toast";
@@ -21,18 +22,18 @@ import { TEXT_AREA_CLASSES } from "@/components/ui/textarea";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import MarkdownPreview from "@/components/shared/MarkdownPreview/MarkdownPreview";
 import useOllieStore, { OllieMessage } from "@/store/OllieStore";
-import useOllieStreaming from "@/api/ollie/useOllieStreaming";
+import useCopilotRunStreaming from "@/api/copilot/useCopilotRunStreaming";
+import useCopilotHistory from "@/api/copilot/useCopilotHistory";
+import useCopilotDeleteSession from "@/api/copilot/useCopilotDeleteSession";
 import { useChatScroll } from "@/components/pages-shared/traces/TraceDetailsPanel/TraceAIViewer/useChatScroll";
-import useAppStore from "@/store/AppStore";
 import { LLM_MESSAGE_ROLE } from "@/types/llm";
-import { LLMAnthropicConfigsType } from "@/types/providers";
+import { MESSAGE_TYPE } from "@/types/ai-assistant";
 import { cn } from "@/lib/utils";
 
 const RUN_HOT_KEYS = ["⌘", "⏎"];
 
 const OllieChatView: React.FC = () => {
   const { toast } = useToast();
-  const { activeWorkspaceName: workspaceName } = useAppStore();
   const {
     messages,
     inputValue,
@@ -41,12 +42,19 @@ const OllieChatView: React.FC = () => {
     updateMessage,
     setInputValue,
     setIsStreaming,
+    clearMessages,
   } = useOllieStore();
 
   const [isThinking, setIsThinking] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const abortControllerRef = useRef<AbortController>();
 
-  const runStreaming = useOllieStreaming({ workspaceName });
+  const runStreaming = useCopilotRunStreaming();
+  const { data: historyData } = useCopilotHistory({
+    enabled: isLoadingHistory,
+  });
+  const { mutate: deleteSession, isPending: isDeletingSession } =
+    useCopilotDeleteSession();
 
   const totalContentLength = useMemo(
     () => messages.reduce((acc, msg) => acc + msg.content.length, 0),
@@ -83,6 +91,22 @@ const OllieChatView: React.FC = () => {
     setIsThinking(false);
   }, [setIsStreaming]);
 
+  // Load conversation history on mount
+  useEffect(() => {
+    if (historyData?.content && isLoadingHistory) {
+      clearMessages();
+      historyData.content.forEach((msg) => {
+        addMessage({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          toolCalls: msg.toolCalls,
+        });
+      });
+      setIsLoadingHistory(false);
+    }
+  }, [historyData, isLoadingHistory, clearMessages, addMessage]);
+
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -104,109 +128,138 @@ const OllieChatView: React.FC = () => {
 
       const abortController = startStreaming();
 
-      const assistantMessageId = `assistant-${Date.now()}`;
-      const toolCallMessageId = `tool-call-${Date.now()}`;
-      let hasStartedStreaming = false;
+      // Track current in-progress text message with accumulated content
+      type TextMessageState = {
+        messageId: string;
+        accumulatedContent: string;
+        finalized: boolean;
+      };
+      const textMessageState: { current: TextMessageState | null } = {
+        current: null,
+      };
+      // Track tool call messages by tool call id
+      const toolCallMessages = new Map<string, string>();
 
       try {
-        // Simulate a "documentation search" tool call
-        const toolCallMessage: OllieMessage = {
-          id: toolCallMessageId,
-          role: LLM_MESSAGE_ROLE.assistant,
-          content: "",
-          toolCalls: [
-            {
-              id: `tool-${Date.now()}`,
-              name: "documentation_search",
-              display_name: "Searching Opik documentation",
-              completed: false,
-            },
-          ],
-        };
-        addMessage(toolCallMessage);
+        const { error } = await runStreaming({
+          message: content,
+          signal: abortController.signal,
+          onAddChunk: (data) => {
+            setIsThinking(false);
 
-        // Simulate tool execution delay
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+            if (data.messageType === MESSAGE_TYPE.response) {
+              const text = data.content || "";
+              const isPartial = data.partial === true;
+              const needsNewMessage =
+                !textMessageState.current || textMessageState.current.finalized;
 
-        // Mark tool as completed
-        updateMessage(toolCallMessageId, {
-          toolCalls: [
-            {
-              id: toolCallMessage.toolCalls![0].id,
-              name: "documentation_search",
-              display_name: "Searching Opik documentation",
-              completed: true,
-            },
-          ],
-        });
-
-        const conversationHistory = messages
-          .filter((m) => !m.isError && !m.toolCalls)
-          .map((m) => ({
-            role: m.role,
-            content: m.content,
-          }));
-
-        const { providerError, opikError, pythonProxyError } =
-          await runStreaming({
-            userMessage: content,
-            conversationHistory,
-            configs: {
-              temperature: 0.7,
-              maxCompletionTokens: 2000,
-            } as LLMAnthropicConfigsType,
-            onAddChunk: (accumulatedValue) => {
-              setIsThinking(false);
-
-              if (!hasStartedStreaming) {
-                hasStartedStreaming = true;
-                const assistantMessage: OllieMessage = {
-                  id: assistantMessageId,
-                  role: LLM_MESSAGE_ROLE.assistant,
-                  content: accumulatedValue,
-                  isLoading: true,
-                };
-                addMessage(assistantMessage);
+              if (isPartial) {
+                if (needsNewMessage) {
+                  const messageId = `assistant-${Date.now()}`;
+                  textMessageState.current = {
+                    messageId,
+                    accumulatedContent: text,
+                    finalized: false,
+                  };
+                  const assistantMessage: OllieMessage = {
+                    id: messageId,
+                    role: LLM_MESSAGE_ROLE.assistant,
+                    content: text,
+                    isLoading: true,
+                  };
+                  addMessage(assistantMessage);
+                } else {
+                  textMessageState.current!.accumulatedContent += text;
+                  updateMessage(textMessageState.current!.messageId, {
+                    content: textMessageState.current!.accumulatedContent,
+                    isLoading: true,
+                  });
+                }
               } else {
-                updateMessage(assistantMessageId, {
-                  content: accumulatedValue,
-                  isLoading: true,
+                // Final message (partial: false) - contains complete text
+                if (needsNewMessage) {
+                  const messageId = `assistant-${Date.now()}`;
+                  textMessageState.current = {
+                    messageId,
+                    accumulatedContent: text,
+                    finalized: true,
+                  };
+                  const assistantMessage: OllieMessage = {
+                    id: messageId,
+                    role: LLM_MESSAGE_ROLE.assistant,
+                    content: text,
+                    isLoading: false,
+                  };
+                  addMessage(assistantMessage);
+                } else {
+                  textMessageState.current!.accumulatedContent = text;
+                  textMessageState.current!.finalized = true;
+                  updateMessage(textMessageState.current!.messageId, {
+                    content: text,
+                    isLoading: false,
+                  });
+                }
+              }
+            } else if (data.messageType === MESSAGE_TYPE.tool_call) {
+              const toolCall = data.toolCall!;
+              const toolCallId = toolCall.id;
+
+              if (!toolCallMessages.has(toolCallId)) {
+                // Create new tool call message
+                const messageId = `tool-${toolCallId}`;
+                toolCallMessages.set(toolCallId, messageId);
+                const toolCallMessage: OllieMessage = {
+                  id: messageId,
+                  role: LLM_MESSAGE_ROLE.assistant,
+                  content: "",
+                  toolCalls: [
+                    {
+                      id: toolCallId,
+                      name: toolCall.name,
+                      display_name: toolCall.display_name,
+                      completed: false,
+                    },
+                  ],
+                };
+                addMessage(toolCallMessage);
+              }
+            } else if (data.messageType === MESSAGE_TYPE.tool_complete) {
+              const toolResponse = data.toolResponse!;
+              const toolCallId = toolResponse.id;
+
+              if (toolCallMessages.has(toolCallId)) {
+                // Mark tool as completed
+                const messageId = toolCallMessages.get(toolCallId)!;
+                updateMessage(messageId, {
+                  toolCalls: [
+                    {
+                      id: toolCallId,
+                      name: toolResponse.name,
+                      display_name: toolResponse.name,
+                      completed: true,
+                    },
+                  ],
                 });
               }
-            },
-            signal: abortController.signal,
-          });
+            }
+          },
+        });
 
-        if (hasStartedStreaming) {
-          updateMessage(assistantMessageId, {
-            isLoading: false,
-          });
-        }
-
-        const errorMessage = providerError || opikError || pythonProxyError;
-        if (errorMessage) {
-          throw new Error(errorMessage);
+        if (error) {
+          throw new Error(error);
         }
       } catch (error) {
         const typedError = error as Error;
         const isStopped = typedError.name === "AbortError";
 
         if (!isStopped) {
-          if (hasStartedStreaming) {
-            updateMessage(assistantMessageId, {
-              content: typedError.message,
-              isLoading: false,
-              isError: true,
-            });
-          } else {
-            const errorMessage: OllieMessage = {
-              id: assistantMessageId,
-              role: LLM_MESSAGE_ROLE.assistant,
-              content: typedError.message,
-              isError: true,
-            };
-            addMessage(errorMessage);
-          }
+          const errorMessage: OllieMessage = {
+            id: `error-${Date.now()}`,
+            role: LLM_MESSAGE_ROLE.assistant,
+            content: typedError.message,
+            isError: true,
+          };
+          addMessage(errorMessage);
 
           toast({
             title: "Error",
@@ -215,12 +268,17 @@ const OllieChatView: React.FC = () => {
           });
         }
       } finally {
+        // Mark current message as complete if still loading
+        if (textMessageState.current && !textMessageState.current.finalized) {
+          updateMessage(textMessageState.current.messageId, {
+            isLoading: false,
+          });
+        }
         setIsThinking(false);
         stopStreaming();
       }
     },
     [
-      messages,
       addMessage,
       updateMessage,
       runStreaming,
@@ -256,6 +314,25 @@ const OllieChatView: React.FC = () => {
     },
     [sendMessage],
   );
+
+  const handleClearConversation = useCallback(() => {
+    deleteSession(undefined, {
+      onSuccess: () => {
+        clearMessages();
+        toast({
+          title: "Conversation cleared",
+          description: "Your conversation history has been deleted.",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          variant: "destructive",
+          description: `Failed to clear conversation: ${error.message}`,
+        });
+      },
+    });
+  }, [deleteSession, clearMessages, toast]);
 
   const renderEmptyState = () => {
     return (
@@ -409,9 +486,23 @@ const OllieChatView: React.FC = () => {
           </TooltipWrapper>
         </div>
 
-        <div className="comet-body-xs relative mt-2 pl-4 text-light-slate">
-          <Info className="absolute left-0 top-0.5 size-3 shrink-0" />
-          OllieAI is a prototype. Responses may not always be accurate.
+        <div className="mt-2 flex items-center justify-between">
+          <div className="comet-body-xs relative pl-4 text-light-slate">
+            <Info className="absolute left-0 top-0.5 size-3 shrink-0" />
+            OllieAI is a prototype. Responses may not always be accurate.
+          </div>
+          {!noMessages && (
+            <TooltipWrapper content="Clear conversation">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={handleClearConversation}
+                disabled={isDeletingSession || isStreaming}
+              >
+                <Trash2 className="size-3" />
+              </Button>
+            </TooltipWrapper>
+          )}
         </div>
       </div>
     </div>

@@ -36,6 +36,13 @@ from google.adk.sessions.session import Session
 from google.genai import types
 
 from ._agent import APP_NAME, create_session, get_agent, get_runner
+from ._copilot_agent import (
+    COPILOT_APP_NAME,
+    create_copilot_session,
+    get_copilot_agent,
+    get_copilot_runner,
+    get_session_id_from_user,
+)
 from .analytics import track_conversation_resumed, track_conversation_started
 from .auth_dependencies import UserContext, get_current_user
 from .logger_config import logger
@@ -855,6 +862,144 @@ def get_fast_api_app(
             opik_metadata=None,
         )
         runner = get_runner(agent=root_agent, session_service=session_service)
+        return runner
+
+    # Copilot endpoints (user-scoped sessions)
+    @app.get(
+        f"{url_prefix}/opik-copilot/session",
+        response_model_exclude_none=True,
+    )
+    async def get_copilot_session_history(
+        current_user: UserContext = Depends(get_current_user),
+    ) -> HistoryResponse:
+        session_id = get_session_id_from_user(current_user.user_id)
+        session = await session_service.get_session(
+            app_name=COPILOT_APP_NAME, user_id=current_user.user_id, session_id=session_id
+        )
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        messages = extract_messages_from_session(session)
+
+        return HistoryResponse(content=messages)
+
+    @app.delete(f"{url_prefix}/opik-copilot/session")
+    async def delete_copilot_session(
+        current_user: UserContext = Depends(get_current_user),
+    ):
+        session_id = get_session_id_from_user(current_user.user_id)
+        await session_service.delete_session(
+            app_name=COPILOT_APP_NAME, user_id=current_user.user_id, session_id=session_id
+        )
+
+    @app.post(f"{url_prefix}/opik-copilot/session")
+    async def copilot_run_sse(
+        req: AgentRunRequest,
+        current_user: UserContext = Depends(get_current_user),
+    ) -> StreamingResponse:
+        logger.info(
+            f"[COPILOT] POST /opik-copilot/session - user_id={current_user.user_id}, "
+            f"workspace={current_user.workspace_name}, message_length={len(req.message)}, "
+            f"streaming={req.streaming}"
+        )
+        
+        # Check if the session exists
+        session_id = get_session_id_from_user(current_user.user_id)
+        logger.debug(f"[COPILOT] Generated session_id={session_id}")
+        
+        session = await session_service.get_session(
+            app_name=COPILOT_APP_NAME, user_id=current_user.user_id, session_id=session_id
+        )
+
+        opik_client = create_opik_client(current_user)
+
+        if not session:
+            logger.info(f"[COPILOT] Creating new session for user {current_user.user_id}")
+            # Create a new session
+            _, _, session = await create_copilot_session(
+                user_id=current_user.user_id,
+                session_service=session_service,
+                session_id=session_id,
+            )
+        else:
+            logger.info(f"[COPILOT] Reusing existing session for user {current_user.user_id}")
+
+        # Convert the events to properly formatted SSE
+        async def event_generator():
+            try:
+                stream_mode = StreamingMode.SSE if req.streaming else StreamingMode.NONE
+                logger.debug(f"[COPILOT] Stream mode: {stream_mode}")
+                
+                runner = await _get_runner_for_copilot_agent(
+                    opik_client=opik_client,
+                    current_user=current_user,
+                )
+                logger.info(f"[COPILOT] Runner created successfully")
+
+                message = types.Content(
+                    role="user", parts=[types.Part(text=req.message)]
+                )
+                logger.info(f"[COPILOT] Starting runner.run_async for user {current_user.user_id}")
+                event_count = 0
+                async for event in runner.run_async(
+                    user_id=current_user.user_id,
+                    session_id=session_id,
+                    new_message=message,
+                    run_config=RunConfig(streaming_mode=stream_mode),
+                ):
+                    event_count += 1
+                    logger.debug(
+                        f"[COPILOT] Event #{event_count}: author={event.author}, "
+                        f"partial={event.partial}, has_content={event.content is not None}"
+                    )
+                    
+                    # Process the event for SSE streaming
+                    sse_event_str = process_event_for_sse(event)
+                    if sse_event_str:
+                        logger.debug(f"[COPILOT] Yielding SSE event: {sse_event_str[:200]}...")
+                        yield sse_event_str
+                    else:
+                        logger.debug(f"[COPILOT] Event #{event_count} produced no SSE output (filtered)")
+                        
+            except openai.OpenAIError as e:
+                logger.exception("[COPILOT] LLM provider error in event_generator: %s", e)
+                error_msg = json.dumps({"error": str(e)})
+                yield f"data: {error_msg}\n\n"
+            except Exception as e:
+                logger.exception("[COPILOT] Error in event_generator: %s", e)
+                error_msg = json.dumps(
+                    {
+                        "error": "An internal error occurred while processing the request."
+                    }
+                )
+                yield f"data: {error_msg}\n\n"
+
+            logger.info(
+                f"[COPILOT] Runner completed for user {current_user.user_id}, "
+                f"total events processed: {event_count}"
+            )
+
+        # Returns a streaming response with the proper media type for SSE
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    async def _get_runner_for_copilot_agent(
+        opik_client: OpikBackendClient,
+        current_user: UserContext,
+    ) -> Runner:
+        """Returns the runner for the copilot agent."""
+        copilot_agent = await get_copilot_agent(
+            opik_client=opik_client,
+            current_user=current_user,
+            opik_metadata=None,
+        )
+        runner = get_copilot_runner(agent=copilot_agent, session_service=session_service)
         return runner
 
     return app
