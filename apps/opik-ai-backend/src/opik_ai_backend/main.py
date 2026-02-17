@@ -1023,6 +1023,8 @@ def get_fast_api_app(
                 runner = await _get_runner_for_copilot_agent(
                     opik_client=opik_client,
                     current_user=current_user,
+                    page_id=req.page_id,
+                    page_params=req.page_params,
                 )
                 logger.info(f"[COPILOT] Runner created successfully")
 
@@ -1088,11 +1090,15 @@ def get_fast_api_app(
     async def _get_runner_for_copilot_agent(
         opik_client: OpikBackendClient,
         current_user: UserContext,
+        page_id: str,
+        page_params: dict[str, str],
     ) -> Runner:
-        """Returns the runner for the copilot agent."""
+        """Returns the runner for the copilot agent with page-specific tools."""
         copilot_agent = await get_copilot_agent(
             opik_client=opik_client,
             current_user=current_user,
+            page_id=page_id,
+            page_params=page_params,
             opik_metadata=None,
         )
         runner = get_copilot_runner(agent=copilot_agent, session_service=session_service)

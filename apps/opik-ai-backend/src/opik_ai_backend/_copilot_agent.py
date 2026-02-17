@@ -29,14 +29,25 @@ You help users with:
 - Debugging issues in their LLM pipelines
 - Optimizing prompts and model configurations
 - Analyzing evaluation results
-- Managing projects and datasets
+- Managing projects, datasets, prompts, and experiments
 - General questions about using Opik
 
 Be concise, helpful, and technical when appropriate. If you don't know something specific about Opik, say so.
 
-Each user message begins with a [Current page: ...] tag indicating which page of the Opik UI the user is currently viewing, along with a brief description of that page. Use this context to tailor your responses and provide page-specific guidance. For example, focus on trace-related help when the user is viewing project traces, or dataset-related help when on the datasets page. Do not mention this tag to the user.
+## Page Context Awareness
 
-You have access to tools that can help you retrieve information about the user's Opik workspace."""
+Each user message begins with a [Current page: ...] tag indicating which page of the Opik UI the user is currently viewing, along with a brief description of that page. Use this context to tailor your responses and provide page-specific guidance. Do not mention this tag to the user.
+
+**IMPORTANT**: You have access to tools that are dynamically selected based on the page the user is viewing. When the user asks questions about what they're currently looking at, proactively use the available tools to fetch relevant data. For example:
+
+- **On project traces pages**: Use `list_traces` to see recent traces, or `get_trace` to examine specific traces
+- **On datasets pages**: Use `list_datasets` to see available datasets, or `list_dataset_items` to inspect dataset contents
+- **On prompts pages**: Use `list_prompts` to see saved prompts
+- **On experiments pages**: Use `list_experiments` to see evaluation runs
+
+When users ask "what do I have here?" or "show me my data" or similar questions about the current page, immediately use the appropriate tools to fetch and present the information. Don't ask for clarification if the page context makes it clear what they want to see.
+
+You have access to tools that can help you retrieve information about the user's Opik workspace. Use them proactively when the user's question relates to the data they're viewing."""
 
 
 def get_session_id_from_user(user_id: str) -> str:
@@ -51,16 +62,15 @@ def get_session_id_from_user(user_id: str) -> str:
     return f"opik-copilot-{user_id}"
 
 
-def get_copilot_tools(opik_client: OpikBackendClient) -> list[Callable[..., Any]]:
-    """Return the tools for the copilot agent.
+def _make_list_projects(opik_client: OpikBackendClient) -> Callable[..., Any]:
+    """Create a list_projects tool.
     
     Args:
         opik_client: Client for fetching data from Opik backend
         
     Returns:
-        List of tool functions wrapped with safe_wrapper
+        Tool function for listing projects
     """
-
     async def list_projects(size: int = 25, page: int = 1) -> dict[str, Any]:
         """List projects in the user's workspace.
         
@@ -75,8 +85,225 @@ def get_copilot_tools(opik_client: OpikBackendClient) -> list[Callable[..., Any]
         result = await opik_client.list_projects(size=size, page=page)
         logger.debug(f"[COPILOT_TOOL] list_projects returned {len(result.get('content', []))} projects")
         return result
+    
+    return list_projects
 
-    return [safe_wrapper(list_projects)]
+
+def _make_list_traces(opik_client: OpikBackendClient, project_id: str) -> Callable[..., Any]:
+    """Create a list_traces tool for a specific project.
+    
+    Args:
+        opik_client: Client for fetching data from Opik backend
+        project_id: The project ID to list traces for
+        
+    Returns:
+        Tool function for listing traces
+    """
+    async def list_traces(size: int = 25, page: int = 1) -> dict[str, Any]:
+        """List traces in the current project.
+        
+        Args:
+            size: Number of traces to return per page (default: 25)
+            page: Page number to return (default: 1)
+            
+        Returns:
+            Dictionary containing traces list and pagination info
+        """
+        logger.info(f"[COPILOT_TOOL] list_traces called for project={project_id}, size={size}, page={page}")
+        result = await opik_client.list_traces(project_id=project_id, size=size, page=page)
+        logger.debug(f"[COPILOT_TOOL] list_traces returned {len(result.get('content', []))} traces")
+        return result
+    
+    return list_traces
+
+
+def _make_get_trace(opik_client: OpikBackendClient) -> Callable[..., Any]:
+    """Create a get_trace tool.
+    
+    Args:
+        opik_client: Client for fetching data from Opik backend
+        
+    Returns:
+        Tool function for getting a trace by ID
+    """
+    async def get_trace(trace_id: str) -> dict[str, Any]:
+        """Get detailed information about a specific trace.
+        
+        Args:
+            trace_id: The trace ID to retrieve
+            
+        Returns:
+            Dictionary containing trace details
+        """
+        logger.info(f"[COPILOT_TOOL] get_trace called for trace_id={trace_id}")
+        result = await opik_client.get_trace(trace_id)
+        logger.debug(f"[COPILOT_TOOL] get_trace returned trace with name={result.get('name')}")
+        return result
+    
+    return get_trace
+
+
+def _make_list_datasets(opik_client: OpikBackendClient) -> Callable[..., Any]:
+    """Create a list_datasets tool.
+    
+    Args:
+        opik_client: Client for fetching data from Opik backend
+        
+    Returns:
+        Tool function for listing datasets
+    """
+    async def list_datasets(size: int = 25, page: int = 1) -> dict[str, Any]:
+        """List datasets in the user's workspace.
+        
+        Args:
+            size: Number of datasets to return per page (default: 25)
+            page: Page number to return (default: 1)
+            
+        Returns:
+            Dictionary containing datasets list and pagination info
+        """
+        logger.info(f"[COPILOT_TOOL] list_datasets called with size={size}, page={page}")
+        result = await opik_client.list_datasets(size=size, page=page)
+        logger.debug(f"[COPILOT_TOOL] list_datasets returned {len(result.get('content', []))} datasets")
+        return result
+    
+    return list_datasets
+
+
+def _make_list_dataset_items(opik_client: OpikBackendClient, dataset_id: str) -> Callable[..., Any]:
+    """Create a list_dataset_items tool for a specific dataset.
+    
+    Args:
+        opik_client: Client for fetching data from Opik backend
+        dataset_id: The dataset ID to list items for
+        
+    Returns:
+        Tool function for listing dataset items
+    """
+    async def list_dataset_items(size: int = 25, page: int = 1) -> dict[str, Any]:
+        """List items in the current dataset.
+        
+        Args:
+            size: Number of items to return per page (default: 25)
+            page: Page number to return (default: 1)
+            
+        Returns:
+            Dictionary containing dataset items list and pagination info
+        """
+        logger.info(f"[COPILOT_TOOL] list_dataset_items called for dataset={dataset_id}, size={size}, page={page}")
+        result = await opik_client.list_dataset_items(dataset_id=dataset_id, size=size, page=page)
+        logger.debug(f"[COPILOT_TOOL] list_dataset_items returned {len(result.get('content', []))} items")
+        return result
+    
+    return list_dataset_items
+
+
+def _make_list_prompts(opik_client: OpikBackendClient) -> Callable[..., Any]:
+    """Create a list_prompts tool.
+    
+    Args:
+        opik_client: Client for fetching data from Opik backend
+        
+    Returns:
+        Tool function for listing prompts
+    """
+    async def list_prompts(size: int = 25, page: int = 1) -> dict[str, Any]:
+        """List prompts in the user's workspace.
+        
+        Args:
+            size: Number of prompts to return per page (default: 25)
+            page: Page number to return (default: 1)
+            
+        Returns:
+            Dictionary containing prompts list and pagination info
+        """
+        logger.info(f"[COPILOT_TOOL] list_prompts called with size={size}, page={page}")
+        result = await opik_client.list_prompts(size=size, page=page)
+        logger.debug(f"[COPILOT_TOOL] list_prompts returned {len(result.get('content', []))} prompts")
+        return result
+    
+    return list_prompts
+
+
+def _make_list_experiments(opik_client: OpikBackendClient) -> Callable[..., Any]:
+    """Create a list_experiments tool.
+    
+    Args:
+        opik_client: Client for fetching data from Opik backend
+        
+    Returns:
+        Tool function for listing experiments
+    """
+    async def list_experiments(size: int = 25, page: int = 1) -> dict[str, Any]:
+        """List experiments in the user's workspace.
+        
+        Args:
+            size: Number of experiments to return per page (default: 25)
+            page: Page number to return (default: 1)
+            
+        Returns:
+            Dictionary containing experiments list and pagination info
+        """
+        logger.info(f"[COPILOT_TOOL] list_experiments called with size={size}, page={page}")
+        result = await opik_client.list_experiments(size=size, page=page)
+        logger.debug(f"[COPILOT_TOOL] list_experiments returned {len(result.get('content', []))} experiments")
+        return result
+    
+    return list_experiments
+
+
+def get_copilot_tools(
+    opik_client: OpikBackendClient,
+    page_id: str,
+    page_params: dict[str, str],
+) -> list[Callable[..., Any]]:
+    """Return the tools for the copilot agent based on the current page context.
+    
+    Args:
+        opik_client: Client for fetching data from Opik backend
+        page_id: The current page ID (e.g., "project_traces_table", "datasets")
+        page_params: Dictionary of page parameters (e.g., {"projectId": "...", "datasetId": "..."})
+        
+    Returns:
+        List of tool functions wrapped with safe_wrapper
+    """
+    tools = []
+    
+    logger.info(f"[COPILOT_TOOLS] Building tools for page_id={page_id}, params={page_params}")
+    
+    # Always available: list projects
+    tools.append(_make_list_projects(opik_client))
+    
+    # Project-related pages: add trace tools
+    if page_id in ("project_traces_table", "project_spans_table", "project_threads_table", "project_metrics"):
+        project_id = page_params.get("projectId")
+        if project_id:
+            logger.debug(f"[COPILOT_TOOLS] Adding trace tools for project {project_id}")
+            tools.append(_make_list_traces(opik_client, project_id))
+            tools.append(_make_get_trace(opik_client))
+    
+    # Dataset-related pages: add dataset tools
+    if page_id in ("datasets", "dataset_detail", "dataset_items"):
+        logger.debug("[COPILOT_TOOLS] Adding dataset list tool")
+        tools.append(_make_list_datasets(opik_client))
+        dataset_id = page_params.get("datasetId")
+        if dataset_id:
+            logger.debug(f"[COPILOT_TOOLS] Adding dataset items tool for dataset {dataset_id}")
+            tools.append(_make_list_dataset_items(opik_client, dataset_id))
+    
+    # Prompt-related pages: add prompt tools
+    if page_id in ("prompts", "prompt_detail"):
+        logger.debug("[COPILOT_TOOLS] Adding prompts list tool")
+        tools.append(_make_list_prompts(opik_client))
+    
+    # Experiment-related pages: add experiment tools
+    if page_id in ("experiments", "compare_experiments"):
+        logger.debug("[COPILOT_TOOLS] Adding experiments list tool")
+        tools.append(_make_list_experiments(opik_client))
+    
+    logger.info(f"[COPILOT_TOOLS] Built {len(tools)} tools for page {page_id}")
+    
+    return [safe_wrapper(tool) for tool in tools]
 
 
 async def create_copilot_session(
@@ -140,16 +367,20 @@ def get_copilot_runner(agent: Agent, session_service: BaseSessionService) -> Run
 async def get_copilot_agent(
     opik_client: OpikBackendClient,
     current_user: UserContext,
+    page_id: str,
+    page_params: dict[str, str],
     opik_metadata: Optional[dict[str, Any]] = None,
 ) -> Agent:
     """Build an ADK Agent configured for general Opik assistance.
     
-    Creates a conversational agent with access to basic Opik operations like
-    listing projects. Uses the Opik backend proxy for LLM calls with user authentication.
+    Creates a conversational agent with access to page-specific Opik operations.
+    Uses the Opik backend proxy for LLM calls with user authentication.
     
     Args:
         opik_client: Client for fetching data from Opik backend
         current_user: User authentication context (session token + workspace)
+        page_id: The current page ID (e.g., "project_traces_table", "datasets")
+        page_params: Dictionary of page parameters (e.g., {"projectId": "...", "datasetId": "..."})
         opik_metadata: Optional metadata for internal Opik tracking
         
     Returns:
@@ -159,7 +390,7 @@ async def get_copilot_agent(
 
     logger.info(
         f"[COPILOT_AGENT] Creating copilot agent for user_id={current_user.user_id}, "
-        f"workspace={current_user.workspace_name}"
+        f"workspace={current_user.workspace_name}, page_id={page_id}"
     )
 
     # Ensure metadata exists
@@ -216,8 +447,8 @@ async def get_copilot_agent(
     )
     logger.debug("[COPILOT_AGENT] LiteLLM model configured")
 
-    # Build agent kwargs
-    tools = get_copilot_tools(opik_client)
+    # Build agent kwargs with page-specific tools
+    tools = get_copilot_tools(opik_client, page_id, page_params)
     logger.info(f"[COPILOT_AGENT] Configured {len(tools)} tools: {[t.__name__ for t in tools]}")
     
     agent_kwargs = {

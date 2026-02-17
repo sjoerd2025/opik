@@ -278,6 +278,142 @@ class OpikBackendClient:
             response.raise_for_status()
             return await response.json()
 
+    async def list_traces(
+        self, project_id: str, size: int = 25, page: int = 1
+    ) -> dict:
+        """
+        List traces for a specific project.
+
+        Args:
+            project_id: The project ID (UUID)
+            size: Number of traces per page (default: 25)
+            page: Page number (default: 1)
+
+        Returns:
+            Traces list response as dict with 'content', 'total', 'sortable_by'
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/traces"
+        params = {"project_id": project_id, "size": size, "page": page}
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def list_datasets(self, size: int = 25, page: int = 1) -> dict:
+        """
+        List datasets for the current user/workspace.
+
+        Args:
+            size: Number of datasets per page (default: 25)
+            page: Page number (default: 1)
+
+        Returns:
+            Datasets list response as dict with 'content', 'total', 'sortable_by'
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/datasets"
+        params = {"size": size, "page": page}
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def list_dataset_items(
+        self, dataset_id: str, size: int = 25, page: int = 1
+    ) -> dict:
+        """
+        List items in a specific dataset.
+
+        Args:
+            dataset_id: The dataset ID (UUID)
+            size: Number of items per page (default: 25)
+            page: Page number (default: 1)
+
+        Returns:
+            Dataset items response as dict with 'content', 'total', 'columns'
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = f"/v1/private/datasets/{dataset_id}/items"
+        params = {"size": size, "page": page}
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def list_prompts(self, size: int = 25, page: int = 1) -> dict:
+        """
+        List prompts for the current user/workspace.
+
+        Args:
+            size: Number of prompts per page (default: 25)
+            page: Page number (default: 1)
+
+        Returns:
+            Prompts list response as dict with 'content', 'total', 'sortable_by'
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/prompts"
+        params = {"size": size, "page": page}
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def list_experiments(self, size: int = 25, page: int = 1) -> dict:
+        """
+        List experiments for the current user/workspace.
+
+        Args:
+            size: Number of experiments per page (default: 25)
+            page: Page number (default: 1)
+
+        Returns:
+            Experiments list response as dict with 'content', 'total', 'sortable_by'
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/experiments"
+        params = {"size": size, "page": page}
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
     async def get_project_name_from_trace(self, trace_id: str) -> str:
         """
         Get project name from trace ID.
