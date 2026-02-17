@@ -71,10 +71,12 @@ else:
 
 url_prefix = settings.url_prefix
 
-
 class AgentRunRequest(common.BaseModel):
     message: str
     streaming: bool = False
+    page_id: str
+    page_description: str
+    page_params: dict[str, str] = {}
 
 
 class LLMMessage(common.BaseModel):
@@ -883,6 +885,94 @@ def get_fast_api_app(
 
         return HistoryResponse(content=messages)
 
+    async def resolve_page_context(
+        page_id: str,
+        page_params: dict[str, str],
+        page_description: str,
+        opik_client: OpikBackendClient,
+    ) -> str:
+        """
+        Resolve entity names from IDs in page_params and build a rich context string.
+        
+        Args:
+            page_id: The page ID
+            page_params: Dictionary of entity IDs extracted from URL
+            page_description: Static page description
+            opik_client: Client for fetching entity data
+            
+        Returns:
+            Formatted context string with resolved entity names
+        """
+        context_parts = [page_description]
+        
+        # Resolve entity names based on what params are present
+        try:
+            if "projectId" in page_params:
+                try:
+                    project = await opik_client.get_project(page_params["projectId"])
+                    project_name = project.get("name", page_params["projectId"])
+                    context_parts.append(f"viewing project '{project_name}' ({page_params['projectId']})")
+                except Exception as e:
+                    logger.warning(f"[COPILOT] Failed to resolve project name: {e}")
+                    context_parts.append(f"project ID: {page_params['projectId']}")
+            
+            if "datasetId" in page_params:
+                try:
+                    dataset = await opik_client.get_dataset(page_params["datasetId"])
+                    dataset_name = dataset.get("name", page_params["datasetId"])
+                    context_parts.append(f"dataset '{dataset_name}' ({page_params['datasetId']})")
+                except Exception as e:
+                    logger.warning(f"[COPILOT] Failed to resolve dataset name: {e}")
+                    context_parts.append(f"dataset ID: {page_params['datasetId']}")
+            
+            if "optimizationId" in page_params:
+                context_parts.append(f"optimization ID: {page_params['optimizationId']}")
+            
+            if "promptId" in page_params:
+                try:
+                    prompt = await opik_client.get_prompt(page_params["promptId"])
+                    prompt_name = prompt.get("name", page_params["promptId"])
+                    context_parts.append(f"prompt '{prompt_name}' ({page_params['promptId']})")
+                except Exception as e:
+                    logger.warning(f"[COPILOT] Failed to resolve prompt name: {e}")
+                    context_parts.append(f"prompt ID: {page_params['promptId']}")
+            
+            if "dashboardId" in page_params:
+                try:
+                    dashboard = await opik_client.get_dashboard(page_params["dashboardId"])
+                    dashboard_name = dashboard.get("name", page_params["dashboardId"])
+                    context_parts.append(f"dashboard '{dashboard_name}' ({page_params['dashboardId']})")
+                except Exception as e:
+                    logger.warning(f"[COPILOT] Failed to resolve dashboard name: {e}")
+                    context_parts.append(f"dashboard ID: {page_params['dashboardId']}")
+            
+            if "alertId" in page_params:
+                context_parts.append(f"alert ID: {page_params['alertId']}")
+            
+            if "annotationQueueId" in page_params:
+                try:
+                    queue = await opik_client.get_annotation_queue(page_params["annotationQueueId"])
+                    queue_name = queue.get("name", page_params["annotationQueueId"])
+                    context_parts.append(f"annotation queue '{queue_name}' ({page_params['annotationQueueId']})")
+                except Exception as e:
+                    logger.warning(f"[COPILOT] Failed to resolve annotation queue name: {e}")
+                    context_parts.append(f"annotation queue ID: {page_params['annotationQueueId']}")
+            
+            # Detail panel params (no API resolution needed, just IDs)
+            if "traceId" in page_params:
+                context_parts.append(f"viewing trace '{page_params['traceId']}'")
+            
+            if "spanId" in page_params:
+                context_parts.append(f"viewing span '{page_params['spanId']}'")
+            
+            if "threadId" in page_params:
+                context_parts.append(f"viewing thread '{page_params['threadId']}'")
+        
+        except Exception as e:
+            logger.exception(f"[COPILOT] Unexpected error in resolve_page_context: {e}")
+        
+        return " - ".join(context_parts)
+
     @app.delete(f"{url_prefix}/opik-copilot/session")
     async def delete_copilot_session(
         current_user: UserContext = Depends(get_current_user),
@@ -936,8 +1026,14 @@ def get_fast_api_app(
                 )
                 logger.info(f"[COPILOT] Runner created successfully")
 
+                resolved_context = await resolve_page_context(
+                    req.page_id, req.page_params, req.page_description, opik_client
+                )
+                user_text = f"[Current page: {resolved_context}]\n{req.message}"
+                logger.debug(f"[COPILOT] Injected page context: {resolved_context}")
+
                 message = types.Content(
-                    role="user", parts=[types.Part(text=req.message)]
+                    role="user", parts=[types.Part(text=user_text)]
                 )
                 logger.info(f"[COPILOT] Starting runner.run_async for user {current_user.user_id}")
                 event_count = 0

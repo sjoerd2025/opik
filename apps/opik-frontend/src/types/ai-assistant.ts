@@ -44,6 +44,9 @@ export type TraceLLMChatType = {
 
 export type TraceAnalyzerRunStreamingArgs = {
   message: string;
+  pageId?: string;
+  pageDescription?: string;
+  pageParams?: Record<string, string>;
   onAddChunk: (data: {
     messageType: MESSAGE_TYPE;
     eventId?: string;

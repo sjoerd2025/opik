@@ -93,6 +93,98 @@ class OpikBackendClient:
             response.raise_for_status()
             return await response.json()
 
+    async def get_dataset(self, dataset_id: str) -> dict:
+        """
+        Get dataset by ID.
+
+        Args:
+            dataset_id: The dataset ID (UUID)
+
+        Returns:
+            Dataset data as dict
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = f"/v1/private/datasets/{dataset_id}"
+        async with self._session.get(
+            url,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def get_prompt(self, prompt_id: str) -> dict:
+        """
+        Get prompt by ID.
+
+        Args:
+            prompt_id: The prompt ID (UUID)
+
+        Returns:
+            Prompt data as dict
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = f"/v1/private/prompts/{prompt_id}"
+        async with self._session.get(
+            url,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def get_dashboard(self, dashboard_id: str) -> dict:
+        """
+        Get dashboard by ID.
+
+        Args:
+            dashboard_id: The dashboard ID (UUID)
+
+        Returns:
+            Dashboard data as dict
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = f"/v1/private/dashboards/{dashboard_id}"
+        async with self._session.get(
+            url,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def get_annotation_queue(self, queue_id: str) -> dict:
+        """
+        Get annotation queue by ID.
+
+        Args:
+            queue_id: The annotation queue ID (UUID)
+
+        Returns:
+            Annotation queue data as dict
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = f"/v1/private/annotation-queues/{queue_id}"
+        async with self._session.get(
+            url,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
     async def get_span(self, span_id: str) -> dict:
         """
         Get a single span by ID.

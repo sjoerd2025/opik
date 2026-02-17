@@ -80,6 +80,9 @@ export default function useCopilotRunStreaming() {
   return useCallback(
     async ({
       message,
+      pageId,
+      pageDescription,
+      pageParams,
       signal,
       onAddChunk,
     }: TraceAnalyzerRunStreamingArgs): Promise<TraceAnalyzerRunStreamingReturn> => {
@@ -100,7 +103,13 @@ export default function useCopilotRunStreaming() {
               }
               return headers;
             })(),
-            body: JSON.stringify({ message, streaming: true }),
+            body: JSON.stringify({
+              message,
+              streaming: true,
+              page_id: pageId,
+              page_description: pageDescription,
+              page_params: pageParams,
+            }),
             credentials: "include",
             signal,
           },

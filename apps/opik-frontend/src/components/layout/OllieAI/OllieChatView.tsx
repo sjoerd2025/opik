@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
+import { useLocation } from "@tanstack/react-router";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,11 +30,13 @@ import { useChatScroll } from "@/components/pages-shared/traces/TraceDetailsPane
 import { LLM_MESSAGE_ROLE } from "@/types/llm";
 import { MESSAGE_TYPE } from "@/types/ai-assistant";
 import { cn } from "@/lib/utils";
+import { derivePageContext } from "@/constants/pageIds";
 
 const RUN_HOT_KEYS = ["⌘", "⏎"];
 
 const OllieChatView: React.FC = () => {
   const { toast } = useToast();
+  const location = useLocation();
   const {
     messages,
     inputValue,
@@ -49,6 +52,12 @@ const OllieChatView: React.FC = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const abortControllerRef = useRef<AbortController>();
 
+  const searchParams = new URLSearchParams(location.search);
+  const {
+    pageId,
+    description: pageDescription,
+    params,
+  } = derivePageContext(location.pathname, searchParams);
   const runStreaming = useCopilotRunStreaming();
   const { data: historyData } = useCopilotHistory({
     enabled: isLoadingHistory,
@@ -143,6 +152,9 @@ const OllieChatView: React.FC = () => {
       try {
         const { error } = await runStreaming({
           message: content,
+          pageId,
+          pageDescription,
+          pageParams: params,
           signal: abortController.signal,
           onAddChunk: (data) => {
             setIsThinking(false);
@@ -285,6 +297,9 @@ const OllieChatView: React.FC = () => {
       startStreaming,
       stopStreaming,
       toast,
+      pageId,
+      pageDescription,
+      params,
     ],
   );
 
