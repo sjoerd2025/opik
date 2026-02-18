@@ -42,11 +42,21 @@ export type TraceLLMChatType = {
   messages: TraceAnalyzerLLMMessage[];
 };
 
+export type TableState = {
+  filters?: string;
+  sorting?: string;
+  groups?: string;
+  page?: number;
+  size?: number;
+  search?: string;
+};
+
 export type TraceAnalyzerRunStreamingArgs = {
   message: string;
   pageId?: string;
   pageDescription?: string;
   pageParams?: Record<string, string>;
+  tableState?: TableState | null;
   onAddChunk: (data: {
     messageType: MESSAGE_TYPE;
     eventId?: string;

@@ -41,6 +41,7 @@ const OllieChatView: React.FC = () => {
     messages,
     inputValue,
     isStreaming,
+    tableState,
     addMessage,
     updateMessage,
     setInputValue,
@@ -162,6 +163,7 @@ const OllieChatView: React.FC = () => {
           pageId,
           pageDescription,
           pageParams: params,
+          tableState,
           signal: abortController.signal,
           onAddChunk: (data) => {
             setIsThinking(false);
@@ -307,6 +309,7 @@ const OllieChatView: React.FC = () => {
       pageId,
       pageDescription,
       params,
+      tableState,
     ],
   );
 

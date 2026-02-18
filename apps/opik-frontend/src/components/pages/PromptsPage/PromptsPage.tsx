@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -42,6 +48,9 @@ import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
 import ExplainerDescription from "@/components/shared/ExplainerDescription/ExplainerDescription";
 import { JsonParam, StringParam, useQueryParam } from "use-query-params";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
+import useOllieStore from "@/store/OllieStore";
+import { processFilters } from "@/lib/filters";
+import { processSorting } from "@/lib/sorting";
 
 export const getRowId = (p: Prompt) => p.id;
 
@@ -207,6 +216,18 @@ const PromptsPage: React.FunctionComponent = () => {
   });
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  const setTableState = useOllieStore((state) => state.setTableState);
+  useEffect(() => {
+    setTableState({
+      ...processFilters(filters),
+      ...processSorting(sortedColumns),
+      page: page as number,
+      size: size as number,
+      search: search as string,
+    });
+    return () => setTableState(null);
+  }, [filters, sortedColumns, page, size, search, setTableState]);
 
   const { data, isPending, isPlaceholderData, isFetching } = usePromptsList(
     {

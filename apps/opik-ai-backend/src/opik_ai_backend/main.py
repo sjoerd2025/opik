@@ -77,6 +77,7 @@ class AgentRunRequest(common.BaseModel):
     page_id: str
     page_description: str
     page_params: dict[str, str] = {}
+    table_state: dict[str, Any] = {}
 
 
 class LLMMessage(common.BaseModel):
@@ -890,6 +891,7 @@ def get_fast_api_app(
         page_params: dict[str, str],
         page_description: str,
         opik_client: OpikBackendClient,
+        table_state: dict[str, Any] | None = None,
     ) -> str:
         """
         Resolve entity names from IDs in page_params and build a rich context string.
@@ -971,6 +973,9 @@ def get_fast_api_app(
         except Exception as e:
             logger.exception(f"[COPILOT] Unexpected error in resolve_page_context: {e}")
         
+        if table_state:
+            context_parts.append(f"table state: {json.dumps(table_state)}")
+        
         return " - ".join(context_parts)
 
     @app.delete(f"{url_prefix}/opik-copilot/session")
@@ -1025,11 +1030,13 @@ def get_fast_api_app(
                     current_user=current_user,
                     page_id=req.page_id,
                     page_params=req.page_params,
+                    table_state=req.table_state or None,
                 )
                 logger.info(f"[COPILOT] Runner created successfully")
 
                 resolved_context = await resolve_page_context(
-                    req.page_id, req.page_params, req.page_description, opik_client
+                    req.page_id, req.page_params, req.page_description, opik_client,
+                    table_state=req.table_state or None,
                 )
                 user_text = f"[Current page: {resolved_context}]\n{req.message}"
                 logger.debug(f"[COPILOT] Injected page context: {resolved_context}")
@@ -1092,6 +1099,7 @@ def get_fast_api_app(
         current_user: UserContext,
         page_id: str,
         page_params: dict[str, str],
+        table_state: dict[str, Any] | None = None,
     ) -> Runner:
         """Returns the runner for the copilot agent with page-specific tools."""
         copilot_agent = await get_copilot_agent(
@@ -1099,6 +1107,7 @@ def get_fast_api_app(
             current_user=current_user,
             page_id=page_id,
             page_params=page_params,
+            table_state=table_state,
             opik_metadata=None,
         )
         runner = get_copilot_runner(agent=copilot_agent, session_service=session_service)

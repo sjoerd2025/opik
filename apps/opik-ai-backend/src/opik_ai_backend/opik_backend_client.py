@@ -279,7 +279,13 @@ class OpikBackendClient:
             return await response.json()
 
     async def list_traces(
-        self, project_id: str, size: int = 25, page: int = 1
+        self,
+        project_id: str,
+        size: int = 25,
+        page: int = 1,
+        filters: Optional[str] = None,
+        sorting: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> dict:
         """
         List traces for a specific project.
@@ -288,6 +294,9 @@ class OpikBackendClient:
             project_id: The project ID (UUID)
             size: Number of traces per page (default: 25)
             page: Page number (default: 1)
+            filters: JSON-stringified filter array (backend format)
+            sorting: JSON-stringified sorting array (backend format)
+            search: Search string to filter by name/id
 
         Returns:
             Traces list response as dict with 'content', 'total', 'sortable_by'
@@ -296,7 +305,13 @@ class OpikBackendClient:
             aiohttp.ClientResponseError: If the request fails
         """
         url = "/v1/private/traces"
-        params = {"project_id": project_id, "size": size, "page": page}
+        params: dict = {"project_id": project_id, "size": size, "page": page}
+        if filters:
+            params["filters"] = filters
+        if sorting:
+            params["sorting"] = sorting
+        if search:
+            params["name"] = search
         async with self._session.get(
             url,
             params=params,
@@ -307,13 +322,111 @@ class OpikBackendClient:
             response.raise_for_status()
             return await response.json()
 
-    async def list_datasets(self, size: int = 25, page: int = 1) -> dict:
+    async def list_spans(
+        self,
+        project_id: str,
+        size: int = 25,
+        page: int = 1,
+        filters: Optional[str] = None,
+        sorting: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> dict:
+        """
+        List spans for a specific project.
+
+        Args:
+            project_id: The project ID (UUID)
+            size: Number of spans per page (default: 25)
+            page: Page number (default: 1)
+            filters: JSON-stringified filter array (backend format)
+            sorting: JSON-stringified sorting array (backend format)
+            search: Search string to filter by id
+
+        Returns:
+            Spans list response as dict with 'content', 'total', 'sortable_by'
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/spans"
+        params: dict = {"project_id": project_id, "size": size, "page": page}
+        if filters:
+            params["filters"] = filters
+        if sorting:
+            params["sorting"] = sorting
+        if search:
+            params["id"] = search
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def list_threads(
+        self,
+        project_id: str,
+        size: int = 25,
+        page: int = 1,
+        filters: Optional[str] = None,
+        sorting: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> dict:
+        """
+        List threads for a specific project.
+
+        Args:
+            project_id: The project ID (UUID)
+            size: Number of threads per page (default: 25)
+            page: Page number (default: 1)
+            filters: JSON-stringified filter array (backend format)
+            sorting: JSON-stringified sorting array (backend format)
+            search: Search string to filter by id
+
+        Returns:
+            Threads list response as dict with 'content', 'total', 'sortable_by'
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/traces/threads"
+        params: dict = {"project_id": project_id, "size": size, "page": page}
+        if filters:
+            params["filters"] = filters
+        if sorting:
+            params["sorting"] = sorting
+        if search:
+            params["id"] = search
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def list_datasets(
+        self,
+        size: int = 25,
+        page: int = 1,
+        filters: Optional[str] = None,
+        sorting: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> dict:
         """
         List datasets for the current user/workspace.
 
         Args:
             size: Number of datasets per page (default: 25)
             page: Page number (default: 1)
+            filters: JSON-stringified filter array (backend format)
+            sorting: JSON-stringified sorting array (backend format)
+            search: Search string to filter by name
 
         Returns:
             Datasets list response as dict with 'content', 'total', 'sortable_by'
@@ -322,7 +435,13 @@ class OpikBackendClient:
             aiohttp.ClientResponseError: If the request fails
         """
         url = "/v1/private/datasets"
-        params = {"size": size, "page": page}
+        params: dict = {"size": size, "page": page}
+        if filters:
+            params["filters"] = filters
+        if sorting:
+            params["sorting"] = sorting
+        if search:
+            params["name"] = search
         async with self._session.get(
             url,
             params=params,
@@ -362,13 +481,23 @@ class OpikBackendClient:
             response.raise_for_status()
             return await response.json()
 
-    async def list_prompts(self, size: int = 25, page: int = 1) -> dict:
+    async def list_prompts(
+        self,
+        size: int = 25,
+        page: int = 1,
+        filters: Optional[str] = None,
+        sorting: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> dict:
         """
         List prompts for the current user/workspace.
 
         Args:
             size: Number of prompts per page (default: 25)
             page: Page number (default: 1)
+            filters: JSON-stringified filter array (backend format)
+            sorting: JSON-stringified sorting array (backend format)
+            search: Search string to filter by name
 
         Returns:
             Prompts list response as dict with 'content', 'total', 'sortable_by'
@@ -377,7 +506,13 @@ class OpikBackendClient:
             aiohttp.ClientResponseError: If the request fails
         """
         url = "/v1/private/prompts"
-        params = {"size": size, "page": page}
+        params: dict = {"size": size, "page": page}
+        if filters:
+            params["filters"] = filters
+        if sorting:
+            params["sorting"] = sorting
+        if search:
+            params["name"] = search
         async with self._session.get(
             url,
             params=params,
@@ -388,13 +523,23 @@ class OpikBackendClient:
             response.raise_for_status()
             return await response.json()
 
-    async def list_experiments(self, size: int = 25, page: int = 1) -> dict:
+    async def list_experiments(
+        self,
+        size: int = 25,
+        page: int = 1,
+        filters: Optional[str] = None,
+        sorting: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> dict:
         """
         List experiments for the current user/workspace.
 
         Args:
             size: Number of experiments per page (default: 25)
             page: Page number (default: 1)
+            filters: JSON-stringified filter array (backend format)
+            sorting: JSON-stringified sorting array (backend format)
+            search: Search string to filter by name
 
         Returns:
             Experiments list response as dict with 'content', 'total', 'sortable_by'
@@ -403,7 +548,53 @@ class OpikBackendClient:
             aiohttp.ClientResponseError: If the request fails
         """
         url = "/v1/private/experiments"
-        params = {"size": size, "page": page}
+        params: dict = {"size": size, "page": page}
+        if filters:
+            params["filters"] = filters
+        if sorting:
+            params["sorting"] = sorting
+        if search:
+            params["name"] = search
+        async with self._session.get(
+            url,
+            params=params,
+            cookies=self._get_cookies(),
+            headers=self._get_headers(),
+            timeout=aiohttp.ClientTimeout(total=settings.opik_backend_timeout),
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def list_experiment_groups(
+        self,
+        groups: str,
+        filters: Optional[str] = None,
+        search: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> dict:
+        """
+        List experiment groups (grouped view) for the current user/workspace.
+
+        Args:
+            groups: JSON-stringified groups array (backend format)
+            filters: JSON-stringified filter array (backend format)
+            search: Search string to filter by name
+            project_id: Optional project ID to filter by
+
+        Returns:
+            Experiment groups response as dict with 'content' (nested group map)
+
+        Raises:
+            aiohttp.ClientResponseError: If the request fails
+        """
+        url = "/v1/private/experiments/groups"
+        params: dict = {"groups": groups}
+        if filters:
+            params["filters"] = filters
+        if search:
+            params["name"] = search
+        if project_id:
+            params["project_id"] = project_id
         async with self._session.get(
             url,
             params=params,

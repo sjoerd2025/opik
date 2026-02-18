@@ -40,10 +40,12 @@ Each user message begins with a [Current page: ...] tag indicating which page of
 
 **IMPORTANT**: You have access to tools that are dynamically selected based on the page the user is viewing. When the user asks questions about what they're currently looking at, proactively use the available tools to fetch relevant data. For example:
 
-- **On project traces pages**: Use `list_traces` to see recent traces, or `get_trace` to examine specific traces
-- **On datasets pages**: Use `list_datasets` to see available datasets, or `list_dataset_items` to inspect dataset contents
+- **On project traces pages**: Use `get_current_table_view` to fetch the exact filtered/sorted data the user sees, `list_traces` to browse all traces, or `get_trace` to examine a specific trace
+- **On datasets pages**: Use `get_current_table_view` to fetch the exact filtered data the user sees, or `list_datasets` to browse all datasets
+- **On experiments pages**: Use `get_current_table_view` to fetch the exact filtered/grouped data the user sees (automatically uses the grouped view when the user has grouping enabled), or `list_experiments` to browse all experiments
 - **On prompts pages**: Use `list_prompts` to see saved prompts
-- **On experiments pages**: Use `list_experiments` to see evaluation runs
+
+When the `get_current_table_view` tool is available, prefer it over `list_traces`/`list_datasets`/`list_experiments` when the user asks about what they currently see -- it returns the same data as the table on screen, including any active filters and sorting. Use `list_*` tools when the user wants to browse outside the current view.
 
 When users ask "what do I have here?" or "show me my data" or similar questions about the current page, immediately use the appropriate tools to fetch and present the information. Don't ask for clarification if the page context makes it clear what they want to see.
 
@@ -87,6 +89,159 @@ def _make_list_projects(opik_client: OpikBackendClient) -> Callable[..., Any]:
         return result
     
     return list_projects
+
+
+def _make_get_current_table_view_traces(
+    opik_client: OpikBackendClient,
+    project_id: str,
+    table_state: dict[str, Any],
+) -> Callable[..., Any]:
+    """Create a get_current_table_view tool for the traces table.
+
+    The table state (filters, sorting, pagination) is captured in the closure so
+    the LLM cannot hallucinate parameters -- this tool takes no arguments.
+    """
+    async def get_current_table_view() -> dict[str, Any]:
+        """Get the traces currently visible in the user's table, respecting their
+        active filters, sorting, and pagination. Returns the same data the user sees."""
+        logger.info(f"[COPILOT_TOOL] get_current_table_view (traces) called for project={project_id}")
+        result = await opik_client.list_traces(
+            project_id=project_id,
+            size=table_state.get("size", 25),
+            page=table_state.get("page", 1),
+            filters=table_state.get("filters"),
+            sorting=table_state.get("sorting"),
+            search=table_state.get("search"),
+        )
+        logger.debug(f"[COPILOT_TOOL] get_current_table_view (traces) returned {len(result.get('content', []))} traces")
+        return result
+
+    return get_current_table_view
+
+
+def _make_get_current_table_view_datasets(
+    opik_client: OpikBackendClient,
+    table_state: dict[str, Any],
+) -> Callable[..., Any]:
+    """Create a get_current_table_view tool for the datasets table."""
+    async def get_current_table_view() -> dict[str, Any]:
+        """Get the datasets currently visible in the user's table, respecting their
+        active filters, sorting, and pagination. Returns the same data the user sees."""
+        logger.info("[COPILOT_TOOL] get_current_table_view (datasets) called")
+        result = await opik_client.list_datasets(
+            size=table_state.get("size", 25),
+            page=table_state.get("page", 1),
+            filters=table_state.get("filters"),
+            sorting=table_state.get("sorting"),
+            search=table_state.get("search"),
+        )
+        logger.debug(f"[COPILOT_TOOL] get_current_table_view (datasets) returned {len(result.get('content', []))} datasets")
+        return result
+
+    return get_current_table_view
+
+
+def _make_get_current_table_view_experiments(
+    opik_client: OpikBackendClient,
+    table_state: dict[str, Any],
+) -> Callable[..., Any]:
+    """Create a get_current_table_view tool for the experiments table."""
+    async def get_current_table_view() -> dict[str, Any]:
+        """Get the experiments currently visible in the user's table, respecting their
+        active filters, sorting, grouping, and pagination. Returns the same data the user sees.
+        When experiments are grouped (e.g. by dataset or project), returns the grouped structure."""
+        groups = table_state.get("groups")
+        if groups:
+            logger.info("[COPILOT_TOOL] get_current_table_view (experiments/groups) called")
+            result = await opik_client.list_experiment_groups(
+                groups=groups,
+                filters=table_state.get("filters"),
+                search=table_state.get("search"),
+            )
+            logger.debug(f"[COPILOT_TOOL] get_current_table_view (experiments/groups) returned {len(result.get('content', {}))} groups")
+        else:
+            logger.info("[COPILOT_TOOL] get_current_table_view (experiments) called")
+            result = await opik_client.list_experiments(
+                size=table_state.get("size", 25),
+                page=table_state.get("page", 1),
+                filters=table_state.get("filters"),
+                sorting=table_state.get("sorting"),
+                search=table_state.get("search"),
+            )
+            logger.debug(f"[COPILOT_TOOL] get_current_table_view (experiments) returned {len(result.get('content', []))} experiments")
+        return result
+
+    return get_current_table_view
+
+
+def _make_get_current_table_view_spans(
+    opik_client: OpikBackendClient,
+    project_id: str,
+    table_state: dict[str, Any],
+) -> Callable[..., Any]:
+    """Create a get_current_table_view tool for the spans table."""
+    async def get_current_table_view() -> dict[str, Any]:
+        """Get the spans currently visible in the user's table, respecting their
+        active filters, sorting, and pagination. Returns the same data the user sees."""
+        logger.info(f"[COPILOT_TOOL] get_current_table_view (spans) called for project={project_id}")
+        result = await opik_client.list_spans(
+            project_id=project_id,
+            size=table_state.get("size", 25),
+            page=table_state.get("page", 1),
+            filters=table_state.get("filters"),
+            sorting=table_state.get("sorting"),
+            search=table_state.get("search"),
+        )
+        logger.debug(f"[COPILOT_TOOL] get_current_table_view (spans) returned {len(result.get('content', []))} spans")
+        return result
+
+    return get_current_table_view
+
+
+def _make_get_current_table_view_threads(
+    opik_client: OpikBackendClient,
+    project_id: str,
+    table_state: dict[str, Any],
+) -> Callable[..., Any]:
+    """Create a get_current_table_view tool for the threads table."""
+    async def get_current_table_view() -> dict[str, Any]:
+        """Get the threads currently visible in the user's table, respecting their
+        active filters, sorting, and pagination. Returns the same data the user sees."""
+        logger.info(f"[COPILOT_TOOL] get_current_table_view (threads) called for project={project_id}")
+        result = await opik_client.list_threads(
+            project_id=project_id,
+            size=table_state.get("size", 25),
+            page=table_state.get("page", 1),
+            filters=table_state.get("filters"),
+            sorting=table_state.get("sorting"),
+            search=table_state.get("search"),
+        )
+        logger.debug(f"[COPILOT_TOOL] get_current_table_view (threads) returned {len(result.get('content', []))} threads")
+        return result
+
+    return get_current_table_view
+
+
+def _make_get_current_table_view_prompts(
+    opik_client: OpikBackendClient,
+    table_state: dict[str, Any],
+) -> Callable[..., Any]:
+    """Create a get_current_table_view tool for the prompts table."""
+    async def get_current_table_view() -> dict[str, Any]:
+        """Get the prompts currently visible in the user's table, respecting their
+        active filters, sorting, and pagination. Returns the same data the user sees."""
+        logger.info("[COPILOT_TOOL] get_current_table_view (prompts) called")
+        result = await opik_client.list_prompts(
+            size=table_state.get("size", 25),
+            page=table_state.get("page", 1),
+            filters=table_state.get("filters"),
+            sorting=table_state.get("sorting"),
+            search=table_state.get("search"),
+        )
+        logger.debug(f"[COPILOT_TOOL] get_current_table_view (prompts) returned {len(result.get('content', []))} prompts")
+        return result
+
+    return get_current_table_view
 
 
 def _make_list_traces(opik_client: OpikBackendClient, project_id: str) -> Callable[..., Any]:
@@ -256,6 +411,7 @@ def get_copilot_tools(
     opik_client: OpikBackendClient,
     page_id: str,
     page_params: dict[str, str],
+    table_state: Optional[dict[str, Any]] = None,
 ) -> list[Callable[..., Any]]:
     """Return the tools for the copilot agent based on the current page context.
     
@@ -263,28 +419,37 @@ def get_copilot_tools(
         opik_client: Client for fetching data from Opik backend
         page_id: The current page ID (e.g., "project_traces_table", "datasets")
         page_params: Dictionary of page parameters (e.g., {"projectId": "...", "datasetId": "..."})
+        table_state: Optional table state (filters, sorting, page, size, search) from the frontend
         
     Returns:
         List of tool functions wrapped with safe_wrapper
     """
     tools = []
     
-    logger.info(f"[COPILOT_TOOLS] Building tools for page_id={page_id}, params={page_params}")
+    logger.info(f"[COPILOT_TOOLS] Building tools for page_id={page_id}, params={page_params}, has_table_state={table_state is not None}")
     
     # Always available: list projects
     tools.append(_make_list_projects(opik_client))
     
-    # Project-related pages: add trace tools
+    # Project-related pages: add trace/span/thread tools
     if page_id in ("project_traces_table", "project_spans_table", "project_threads_table", "project_metrics"):
         project_id = page_params.get("projectId")
         if project_id:
-            logger.debug(f"[COPILOT_TOOLS] Adding trace tools for project {project_id}")
+            logger.debug(f"[COPILOT_TOOLS] Adding project tools for project {project_id}, page={page_id}")
+            if table_state and page_id == "project_traces_table":
+                tools.append(_make_get_current_table_view_traces(opik_client, project_id, table_state))
+            if table_state and page_id == "project_spans_table":
+                tools.append(_make_get_current_table_view_spans(opik_client, project_id, table_state))
+            if table_state and page_id == "project_threads_table":
+                tools.append(_make_get_current_table_view_threads(opik_client, project_id, table_state))
             tools.append(_make_list_traces(opik_client, project_id))
             tools.append(_make_get_trace(opik_client))
     
     # Dataset-related pages: add dataset tools
     if page_id in ("datasets", "dataset_detail", "dataset_items"):
         logger.debug("[COPILOT_TOOLS] Adding dataset list tool")
+        if table_state and page_id == "datasets":
+            tools.append(_make_get_current_table_view_datasets(opik_client, table_state))
         tools.append(_make_list_datasets(opik_client))
         dataset_id = page_params.get("datasetId")
         if dataset_id:
@@ -294,11 +459,15 @@ def get_copilot_tools(
     # Prompt-related pages: add prompt tools
     if page_id in ("prompts", "prompt_detail"):
         logger.debug("[COPILOT_TOOLS] Adding prompts list tool")
+        if table_state and page_id == "prompts":
+            tools.append(_make_get_current_table_view_prompts(opik_client, table_state))
         tools.append(_make_list_prompts(opik_client))
     
     # Experiment-related pages: add experiment tools
     if page_id in ("experiments", "compare_experiments"):
         logger.debug("[COPILOT_TOOLS] Adding experiments list tool")
+        if table_state and page_id == "experiments":
+            tools.append(_make_get_current_table_view_experiments(opik_client, table_state))
         tools.append(_make_list_experiments(opik_client))
     
     logger.info(f"[COPILOT_TOOLS] Built {len(tools)} tools for page {page_id}")
@@ -369,6 +538,7 @@ async def get_copilot_agent(
     current_user: UserContext,
     page_id: str,
     page_params: dict[str, str],
+    table_state: Optional[dict[str, Any]] = None,
     opik_metadata: Optional[dict[str, Any]] = None,
 ) -> Agent:
     """Build an ADK Agent configured for general Opik assistance.
@@ -448,7 +618,7 @@ async def get_copilot_agent(
     logger.debug("[COPILOT_AGENT] LiteLLM model configured")
 
     # Build agent kwargs with page-specific tools
-    tools = get_copilot_tools(opik_client, page_id, page_params)
+    tools = get_copilot_tools(opik_client, page_id, page_params, table_state=table_state)
     logger.info(f"[COPILOT_AGENT] Configured {len(tools)} tools: {[t.__name__ for t in tools]}")
     
     agent_kwargs = {

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   JsonParam,
   NumberParam,
@@ -81,6 +81,9 @@ import {
 import { useTruncationEnabled } from "@/components/server-sync-provider";
 import LogsTypeToggle from "@/components/pages/TracesPage/LogsTab/LogsTypeToggle";
 import { LOGS_TYPE } from "@/constants/traces";
+import useOllieStore from "@/store/OllieStore";
+import { processFilters } from "@/lib/filters";
+import { processSorting } from "@/lib/sorting";
 
 const getRowId = (d: Thread) => d.id;
 
@@ -372,6 +375,18 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
     }, 0);
     return () => clearTimeout(timer);
   }, []);
+
+  const setTableState = useOllieStore((state) => state.setTableState);
+  useEffect(() => {
+    setTableState({
+      ...processFilters(filters),
+      ...processSorting(sortedColumns),
+      page: page as number,
+      size: size as number,
+      search: search as string,
+    });
+    return () => setTableState(null);
+  }, [filters, sortedColumns, page, size, search, setTableState]);
 
   const { data, isPending, isPlaceholderData, isFetching, refetch } =
     useThreadList(

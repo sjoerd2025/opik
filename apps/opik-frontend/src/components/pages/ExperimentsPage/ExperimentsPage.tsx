@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ChartLine, Info, RotateCw } from "lucide-react";
 import { ColumnSort, Row, RowSelectionState } from "@tanstack/react-table";
 import { useNavigate } from "@tanstack/react-router";
@@ -70,7 +76,11 @@ import {
   getIsGroupRow,
   renderCustomRow,
 } from "@/components/shared/DataTable/utils";
-import { calculateGroupLabel, isGroupFullyExpanded } from "@/lib/groups";
+import {
+  calculateGroupLabel,
+  isGroupFullyExpanded,
+  processGroups,
+} from "@/lib/groups";
 import MultiResourceCell from "@/components/shared/DataTableCells/MultiResourceCell";
 import FeedbackScoreListCell from "@/components/shared/DataTableCells/FeedbackScoreListCell";
 import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
@@ -87,6 +97,9 @@ import TextCell from "@/components/shared/DataTableCells/TextCell";
 import DatasetVersionCell from "@/components/shared/DataTableCells/DatasetVersionCell";
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
+import useOllieStore from "@/store/OllieStore";
+import { processFilters } from "@/lib/filters";
+import { processSorting } from "@/lib/sorting";
 
 const STORAGE_KEY_PREFIX = "experiments";
 const PAGINATION_SIZE_KEY = "experiments-pagination-size";
@@ -156,6 +169,8 @@ const ExperimentsPage: React.FC = () => {
       defaultValue: [],
     },
   );
+
+  const setTableState = useOllieStore((state) => state.setTableState);
 
   const columnsDef: ColumnData<GroupedExperiment>[] = useMemo(() => {
     return [
@@ -349,6 +364,18 @@ const ExperimentsPage: React.FC = () => {
       sortedColumns,
       filters,
     });
+
+  useEffect(() => {
+    setTableState({
+      ...processFilters(filters),
+      ...processSorting(sortedColumns),
+      ...processGroups(groups),
+      page: page as number,
+      size: size as number,
+      search: search as string,
+    });
+    return () => setTableState(null);
+  }, [filters, sortedColumns, groups, page, size, search, setTableState]);
 
   const expandingConfig = useExpandingConfig({
     groups,

@@ -20,12 +20,22 @@ export type OllieMessage = {
 
 export type OlliePanelMode = "compact" | "wide";
 
+export type OllieTableState = {
+  filters?: string;
+  sorting?: string;
+  groups?: string;
+  page?: number;
+  size?: number;
+  search?: string;
+};
+
 export type OllieStore = {
   isOpen: boolean;
   mode: OlliePanelMode;
   messages: OllieMessage[];
   isStreaming: boolean;
   inputValue: string;
+  tableState: OllieTableState | null;
 
   togglePanel: () => void;
   setIsOpen: (isOpen: boolean) => void;
@@ -36,6 +46,7 @@ export type OllieStore = {
   clearMessages: () => void;
   setInputValue: (value: string) => void;
   setIsStreaming: (isStreaming: boolean) => void;
+  setTableState: (tableState: OllieTableState | null) => void;
 };
 
 const useOllieStore = create<OllieStore>()(
@@ -46,6 +57,7 @@ const useOllieStore = create<OllieStore>()(
       messages: [],
       isStreaming: false,
       inputValue: "",
+      tableState: null,
 
       togglePanel: () => {
         set((state) => ({ isOpen: !state.isOpen }));
@@ -93,6 +105,10 @@ const useOllieStore = create<OllieStore>()(
 
       setIsStreaming: (isStreaming) => {
         set({ isStreaming });
+      },
+
+      setTableState: (tableState) => {
+        set({ tableState });
       },
     }),
     {

@@ -83,6 +83,7 @@ export default function useCopilotRunStreaming() {
       pageId,
       pageDescription,
       pageParams,
+      tableState,
       signal,
       onAddChunk,
     }: TraceAnalyzerRunStreamingArgs): Promise<TraceAnalyzerRunStreamingReturn> => {
@@ -109,6 +110,7 @@ export default function useCopilotRunStreaming() {
               page_id: pageId,
               page_description: pageDescription,
               page_params: pageParams,
+              table_state: tableState ?? undefined,
             }),
             credentials: "include",
             signal,

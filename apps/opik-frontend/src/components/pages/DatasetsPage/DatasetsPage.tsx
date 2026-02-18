@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import useLocalStorageState from "use-local-storage-state";
 import { useNavigate } from "@tanstack/react-router";
@@ -42,6 +48,9 @@ import {
 import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
 import ExplainerDescription from "@/components/shared/ExplainerDescription/ExplainerDescription";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
+import useOllieStore from "@/store/OllieStore";
+import { processFilters } from "@/lib/filters";
+import { processSorting } from "@/lib/sorting";
 
 export const getRowId = (d: Dataset) => d.id;
 
@@ -196,6 +205,18 @@ const DatasetsPage: React.FunctionComponent = () => {
   });
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  const setTableState = useOllieStore((state) => state.setTableState);
+  useEffect(() => {
+    setTableState({
+      ...processFilters(filters),
+      ...processSorting(sortedColumns),
+      page,
+      size,
+      search: search as string,
+    });
+    return () => setTableState(null);
+  }, [filters, sortedColumns, page, size, search, setTableState]);
 
   const { data, isPending, isPlaceholderData, isFetching } = useDatasetsList(
     {
