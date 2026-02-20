@@ -209,7 +209,7 @@ class OpikBackendClient:
             return await response.json()
 
     async def search_spans(
-        self, project_id: str, trace_id: str, truncate: bool = False
+        self, project_id: str, trace_id: str, truncate: bool = True
     ) -> list[dict]:
         """
         Search spans by trace ID.
@@ -286,6 +286,7 @@ class OpikBackendClient:
         filters: Optional[str] = None,
         sorting: Optional[str] = None,
         search: Optional[str] = None,
+        truncate: bool = True,
     ) -> dict:
         """
         List traces for a specific project.
@@ -297,6 +298,7 @@ class OpikBackendClient:
             filters: JSON-stringified filter array (backend format)
             sorting: JSON-stringified sorting array (backend format)
             search: Search string to filter by name/id
+            truncate: Truncate input/output/metadata to slim payloads (default: True)
 
         Returns:
             Traces list response as dict with 'content', 'total', 'sortable_by'
@@ -305,7 +307,7 @@ class OpikBackendClient:
             aiohttp.ClientResponseError: If the request fails
         """
         url = "/v1/private/traces"
-        params: dict = {"project_id": project_id, "size": size, "page": page}
+        params: dict = {"project_id": project_id, "size": size, "page": page, "truncate": str(truncate).lower()}
         if filters:
             params["filters"] = filters
         if sorting:
@@ -330,6 +332,7 @@ class OpikBackendClient:
         filters: Optional[str] = None,
         sorting: Optional[str] = None,
         search: Optional[str] = None,
+        truncate: bool = True,
     ) -> dict:
         """
         List spans for a specific project.
@@ -341,6 +344,7 @@ class OpikBackendClient:
             filters: JSON-stringified filter array (backend format)
             sorting: JSON-stringified sorting array (backend format)
             search: Search string to filter by id
+            truncate: Truncate input/output/metadata to slim payloads (default: True)
 
         Returns:
             Spans list response as dict with 'content', 'total', 'sortable_by'
@@ -349,7 +353,7 @@ class OpikBackendClient:
             aiohttp.ClientResponseError: If the request fails
         """
         url = "/v1/private/spans"
-        params: dict = {"project_id": project_id, "size": size, "page": page}
+        params: dict = {"project_id": project_id, "size": size, "page": page, "truncate": str(truncate).lower()}
         if filters:
             params["filters"] = filters
         if sorting:
@@ -374,6 +378,7 @@ class OpikBackendClient:
         filters: Optional[str] = None,
         sorting: Optional[str] = None,
         search: Optional[str] = None,
+        truncate: bool = True,
     ) -> dict:
         """
         List threads for a specific project.
@@ -385,6 +390,7 @@ class OpikBackendClient:
             filters: JSON-stringified filter array (backend format)
             sorting: JSON-stringified sorting array (backend format)
             search: Search string to filter by id
+            truncate: Truncate input/output/metadata to slim payloads (default: True)
 
         Returns:
             Threads list response as dict with 'content', 'total', 'sortable_by'
@@ -393,7 +399,7 @@ class OpikBackendClient:
             aiohttp.ClientResponseError: If the request fails
         """
         url = "/v1/private/traces/threads"
-        params: dict = {"project_id": project_id, "size": size, "page": page}
+        params: dict = {"project_id": project_id, "size": size, "page": page, "truncate": str(truncate).lower()}
         if filters:
             params["filters"] = filters
         if sorting:
