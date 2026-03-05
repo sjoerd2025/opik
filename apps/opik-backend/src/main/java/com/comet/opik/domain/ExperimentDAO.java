@@ -470,6 +470,11 @@ class ExperimentDAO {
                 ) AS tc ON ei.trace_id = tc.entity_id
                 GROUP BY ei.experiment_id
             ),
+            experiments_eval_suite AS (
+                SELECT id, dataset_id, dataset_version_id
+                FROM experiments_final
+                WHERE evaluation_method = 'evaluation_suite'
+            ),
             pass_rate_eval_items AS (
                 SELECT
                     ei.id AS item_id,
@@ -483,21 +488,17 @@ class ExperimentDAO {
                     SELECT id, dataset_item_id
                     FROM experiment_items
                     WHERE workspace_id = :workspace_id
-                    AND experiment_id IN (
-                        SELECT id FROM experiments_final WHERE evaluation_method = 'evaluation_suite'
-                    )
+                    AND experiment_id IN (SELECT id FROM experiments_eval_suite)
                 ) eif ON ei.id = eif.id
-                INNER JOIN (
-                    SELECT id, dataset_id, dataset_version_id
-                    FROM experiments_final WHERE evaluation_method = 'evaluation_suite'
-                ) ef ON ei.experiment_id = ef.id
+                INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
                 LEFT JOIN (
                     SELECT dataset_item_id, dataset_version_id, execution_policy
                     FROM dataset_item_versions
                     WHERE workspace_id = :workspace_id
                     AND (dataset_id, dataset_version_id) IN (
-                        SELECT DISTINCT dataset_id, dataset_version_id FROM experiments_final
-                        WHERE evaluation_method = 'evaluation_suite' AND length(dataset_version_id) > 0
+                        SELECT DISTINCT dataset_id, dataset_version_id
+                        FROM experiments_eval_suite
+                        WHERE length(dataset_version_id) > 0
                     )
                 ) div ON eif.dataset_item_id = div.dataset_item_id
                     AND ef.dataset_version_id = div.dataset_version_id
@@ -1094,6 +1095,11 @@ class ExperimentDAO {
                 ) AS es
                 GROUP BY experiment_id
             ),
+            experiments_eval_suite AS (
+                SELECT id, dataset_id, dataset_version_id
+                FROM experiments_final
+                WHERE evaluation_method = 'evaluation_suite'
+            ),
             pass_rate_eval_items AS (
                 SELECT
                     ei.id AS item_id,
@@ -1107,21 +1113,17 @@ class ExperimentDAO {
                     SELECT id, dataset_item_id
                     FROM experiment_items
                     WHERE workspace_id = :workspace_id
-                    AND experiment_id IN (
-                        SELECT id FROM experiments_final WHERE evaluation_method = 'evaluation_suite'
-                    )
+                    AND experiment_id IN (SELECT id FROM experiments_eval_suite)
                 ) eif ON ei.id = eif.id
-                INNER JOIN (
-                    SELECT id, dataset_id, dataset_version_id
-                    FROM experiments_final WHERE evaluation_method = 'evaluation_suite'
-                ) ef ON ei.experiment_id = ef.id
+                INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
                 LEFT JOIN (
                     SELECT dataset_item_id, dataset_version_id, execution_policy
                     FROM dataset_item_versions
                     WHERE workspace_id = :workspace_id
                     AND (dataset_id, dataset_version_id) IN (
-                        SELECT DISTINCT dataset_id, dataset_version_id FROM experiments_final
-                        WHERE evaluation_method = 'evaluation_suite' AND length(dataset_version_id) > 0
+                        SELECT DISTINCT dataset_id, dataset_version_id
+                        FROM experiments_eval_suite
+                        WHERE length(dataset_version_id) > 0
                     )
                 ) div ON eif.dataset_item_id = div.dataset_item_id
                     AND ef.dataset_version_id = div.dataset_version_id
