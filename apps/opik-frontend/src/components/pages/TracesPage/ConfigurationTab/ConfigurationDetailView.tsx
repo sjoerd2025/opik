@@ -135,8 +135,8 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
             </Button>
           </div>
         </div>
-        <p className="comet-body-s flex items-center gap-1 text-light-slate">
-          <FilePen className="size-3 shrink-0" />
+        <p className="comet-body-s flex items-start gap-1 text-light-slate">
+          <FilePen className="mt-1 size-3 shrink-0" />
           {item.description || generateBlueprintDescription(item.values)}
         </p>
         <div className="comet-body-s mt-1 flex items-center gap-1 text-light-slate">
@@ -174,5 +174,3 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
 };
 
 export default ConfigurationDetailView;
-
-// ALEX getTimeFromNow

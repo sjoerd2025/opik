@@ -9,7 +9,6 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
-import { AGENT_CONFIGS_KEY } from "@/api/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,17 +107,6 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
         .filter(Boolean)
         .map((handle) => handle!.saveVersion()),
     );
-
-    const hasNonPromptChanges = agentConfig.values
-      .filter((v) => v.type !== "prompt")
-      .some((v) => draftValues[v.key] !== originalValues.current[v.key]);
-
-    if (!hasNonPromptChanges) {
-      // ALEX
-      queryClient.invalidateQueries({ queryKey: [AGENT_CONFIGS_KEY] });
-      onSaved();
-      return;
-    }
 
     const values: BlueprintValue[] = agentConfig.values.map((v) => ({
       key: v.key,

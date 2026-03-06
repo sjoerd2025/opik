@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import api, { AGENT_CONFIGS_REST_ENDPOINT } from "@/api/api";
 import {
@@ -30,6 +30,7 @@ export default function useAgentConfigById({
   const { data: blueprint, isPending } = useQuery({
     queryKey: [AGENT_CONFIGS_REST_ENDPOINT, "blueprints", blueprintId],
     queryFn: ({ signal }) => getAgentConfigById(blueprintId, signal),
+    placeholderData: keepPreviousData,
     enabled: !!blueprintId,
   });
 

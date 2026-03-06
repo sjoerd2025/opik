@@ -65,7 +65,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 
   return (
     <div className="flex gap-0">
-      <div className="min-w-0 max-w-[60vw] flex-1">
+      <div className="min-w-0 max-w-[70vw] flex-1">
         <div className="mx-6 mt-6 flex items-center justify-between">
           <p className="comet-body-s-accented">Agent configuration</p>
           <Button size="xs" onClick={() => setIsEditing(true)}>
@@ -87,7 +87,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
         )}
       </div>
 
-      <div className="w-[25vw] shrink-0 pr-2">
+      <div className="max-w-[30vw] shrink-0 pr-2">
         <p className="comet-body-s-accented ml-3 mt-6">Version history</p>
 
         <ConfigurationHistoryTimeline
@@ -107,5 +107,6 @@ export default ConfigurationTab;
 // SCROLLING
 // DESCRIPTIONS
 // PROMPT UPDATES WITH REGULAR UPDATES
-// width of editing
 // empty fields
+// add tooltips
+// edit value problem
