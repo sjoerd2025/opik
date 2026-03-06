@@ -8,7 +8,7 @@ import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import ProdTag from "./ProdTag";
 import {
-  getVersionDescription,
+  generateBlueprintDescription,
   isProdTag,
   sortTags,
 } from "@/utils/agent-configurations";
@@ -76,10 +76,12 @@ const ConfigurationHistoryTimeline: React.FC<
                   ),
                 )}
               </div>
-              <p className="comet-body-xs mt-1.5 flex items-center gap-1 truncate text-light-slate">
+              <p className="comet-body-xs mt-1.5 flex min-w-0 items-center gap-1 text-light-slate">
                 <FilePen className="size-3 shrink-0" />
-                {item.description ||
-                  getVersionDescription(item.id, item.created_by)}
+                <span className="truncate">
+                  {item.description ||
+                    generateBlueprintDescription(item.values)}
+                </span>
               </p>
               <div className="comet-body-xs mt-1.5 flex items-center gap-3 text-light-slate">
                 <span className="flex items-center gap-1">

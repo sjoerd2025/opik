@@ -5,15 +5,10 @@ export const sortTags = (tags: string[]) => [
   ...tags.filter((t) => !isProdTag(t)),
 ];
 
-export const getVersionDescription = (id: string, createdBy: string) => {
-  const shortId = id.slice(0, 8);
-  return `Updated by ${createdBy} ${shortId}`;
-};
-
 export const generateBlueprintDescription = (
-  values: Record<string, unknown>,
+  values: Array<{ key: string; value: unknown }>,
 ): string => {
-  return Object.entries(values)
-    .map(([key, value]) => `Changed the \`${key}\` setting to \`${value}\`.`)
-    .join(" ");
+  if (!values.length) return "";
+  const changes = values.map(({ key, value }) => `${key} to ${value}`);
+  return `Changed ${changes.join(", ")}.`;
 };

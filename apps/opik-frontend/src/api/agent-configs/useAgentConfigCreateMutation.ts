@@ -4,13 +4,13 @@ import api, {
   AGENT_CONFIGS_KEY,
   AGENT_CONFIGS_REST_ENDPOINT,
 } from "@/api/api";
-import { AgentConfig } from "@/types/agent-configs";
+import { AgentConfigCreate } from "@/types/agent-configs";
 import { AxiosError } from "axios";
 import { useToast } from "@/components/ui/use-toast";
 import { extractIdFromLocation } from "@/lib/utils";
 
 type UseAgentConfigCreateMutationParams = {
-  agentConfig: Omit<AgentConfig, "id">;
+  agentConfig: AgentConfigCreate;
 };
 
 const useAgentConfigCreateMutation = () => {

@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from "react";
+import { PlusIcon } from "lucide-react";
 import { StringParam, useQueryParam } from "use-query-params";
 
 import Loader from "@/components/shared/Loader/Loader";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
+import { Button } from "@/components/ui/button";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import ConfigurationHistoryTimeline from "./ConfigurationHistoryTimeline";
@@ -42,14 +44,15 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   }
 
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
+  const latestItem = allRows[0] as ConfigHistoryItem;
 
-  if (isEditing && selectedItem) {
+  if (isEditing && latestItem) {
     return (
-      <div className="min-h-[400px]">
+      <div className="max-w-[60vw]">
         <ConfigurationEditView
-          item={selectedItem}
+          item={latestItem}
           projectId={projectId}
-          version={total - selectedIndex}
+          version={total}
           onCancel={() => setIsEditing(false)}
           onSaved={() => {
             setSelectedId(undefined);
@@ -61,17 +64,21 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   }
 
   return (
-    <div className="flex min-h-[400px] gap-0">
-      <div className="min-w-0 flex-1">
-        <p className="comet-body-s-accented mx-6 mt-6">Agent configuration</p>
+    <div className="flex gap-0">
+      <div className="min-w-0 max-w-[60vw] flex-1">
+        <div className="mx-6 mt-6 flex items-center justify-between">
+          <p className="comet-body-s-accented">Agent configuration</p>
+          <Button size="xs" onClick={() => setIsEditing(true)}>
+            <PlusIcon className="mr-1.5 size-3.5" />
+            Add new version
+          </Button>
+        </div>
 
         {selectedItem ? (
           <ConfigurationDetailView
             item={selectedItem}
             version={total - selectedIndex}
             projectId={projectId}
-            isLatest={selectedIndex === 0}
-            onEdit={() => setIsEditing(true)}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-slate">
@@ -80,7 +87,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
         )}
       </div>
 
-      <div className="w-[30%] shrink-0">
+      <div className="w-[25vw] shrink-0 pr-2">
         <p className="comet-body-s-accented ml-3 mt-6">Version history</p>
 
         <ConfigurationHistoryTimeline
@@ -101,3 +108,4 @@ export default ConfigurationTab;
 // DESCRIPTIONS
 // PROMPT UPDATES WITH REGULAR UPDATES
 // width of editing
+// empty fields

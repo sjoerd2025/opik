@@ -25,12 +25,18 @@ export interface Blueprint {
   values: BlueprintValue[];
 }
 
+export type BlueprintCreate = Omit<Blueprint, "id">;
+
 export interface AgentConfig {
   id?: string;
   project_id?: string;
   project_name?: string;
   blueprint: Blueprint;
 }
+
+export type AgentConfigCreate = Omit<AgentConfig, "id" | "blueprint"> & {
+  blueprint: BlueprintCreate;
+};
 
 export interface AgentConfigEnv {
   env_name: string;
@@ -48,6 +54,7 @@ export interface ConfigHistoryItem {
   created_by: string;
   created_at: string;
   tags: string[];
+  values: BlueprintValue[];
 }
 
 export interface BlueprintDetails {
