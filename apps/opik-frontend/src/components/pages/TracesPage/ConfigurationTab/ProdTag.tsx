@@ -5,6 +5,7 @@ type ProdTagSize = "xs" | "sm";
 
 type ProdTagProps = {
   size?: ProdTagSize;
+  value: string;
 };
 
 const SIZE_CLASSES: Record<ProdTagSize, string> = {
@@ -17,13 +18,13 @@ const ICON_SIZE: Record<ProdTagSize, string> = {
   sm: "size-3.5",
 };
 
-const ProdTag: React.FC<ProdTagProps> = ({ size = "sm" }) => {
+const ProdTag: React.FC<ProdTagProps> = ({ size = "sm", value = "Prod" }) => {
   return (
     <div
       className={`inline-flex items-center bg-[#a3e635] text-[#1a2e05] dark:bg-[#3d5a0a] dark:text-[#d9f99d] ${SIZE_CLASSES[size]}`}
     >
       <Rocket className={`shrink-0 ${ICON_SIZE[size]}`} />
-      Prod
+      {value}
     </div>
   );
 };

@@ -1,15 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Info, Pencil } from "lucide-react";
-import { z } from "zod";
 
-import {
-  BlueprintType,
-  BlueprintValue,
-  BlueprintValueType,
-  ConfigHistoryItem,
-} from "@/types/agent-configs";
+import { BlueprintValueType, ConfigHistoryItem } from "@/types/agent-configs";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
-import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,10 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import Loader from "@/components/shared/Loader/Loader";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
-import BlueprintValuePrompt, {
-  BlueprintValuePromptHandle,
-} from "./BlueprintValuePrompt";
+import BlueprintValuePrompt from "./BlueprintValuePrompt";
 import { Separator } from "@/components/ui/separator";
+import { useConfigurationSave } from "./useConfigurationSave";
 
 type ConfigurationEditViewProps = {
   item: ConfigHistoryItem;
@@ -28,25 +20,6 @@ type ConfigurationEditViewProps = {
   version: number;
   onCancel: () => void;
   onSaved: () => void;
-};
-
-const nonEmptyString = z.string().min(1, "Must not be empty");
-
-const FIELD_SCHEMAS: Partial<Record<BlueprintValueType, z.ZodType>> = {
-  [BlueprintValueType.INT]: nonEmptyString.pipe(
-    z.coerce.number().int("Must be an integer"),
-  ),
-  [BlueprintValueType.FLOAT]: nonEmptyString.pipe(
-    z.coerce.number({ message: "Must be a valid number" }),
-  ),
-  [BlueprintValueType.STRING]: nonEmptyString,
-};
-
-const validateField = (type: string, value: string): string => {
-  const schema = FIELD_SCHEMAS[type as BlueprintValueType];
-  if (!schema) return "";
-  const result = schema.safeParse(value.trim());
-  return result.success ? "" : result.error.issues[0].message;
 };
 
 const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
@@ -59,20 +32,24 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
   });
-  const { mutate: createConfig, isPending: isSaving } =
-    useAgentConfigCreateMutation();
 
   const [description, setDescription] = useState("");
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [dirtyPromptKeys, setDirtyPromptKeys] = useState<
     Record<string, boolean>
   >({});
   const originalValues = useRef<Record<string, string>>({});
   const initialized = useRef(false);
-  const promptRefs = useRef<Record<string, BlueprintValuePromptHandle | null>>(
-    {},
-  );
+
+  const { handleSave, isSaving, errors, clearError, promptRefs } =
+    useConfigurationSave({
+      agentConfig,
+      draftValues,
+      originalValues,
+      description,
+      projectId,
+      onSaved,
+    });
 
   useEffect(() => {
     if (agentConfig && !initialized.current) {
@@ -91,11 +68,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   const handleFieldChange = (key: string, value: string) => {
     setDraftValues((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
+      clearError(key);
     }
   };
 
@@ -105,71 +78,6 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
     Object.keys(draftValues).some(
       (key) => draftValues[key] !== originalValues.current[key],
     ) || Object.values(dirtyPromptKeys).some(Boolean);
-
-  const handleSave = async () => {
-    if (!agentConfig) return;
-
-    const newErrors: Record<string, string> = {};
-    agentConfig.values
-      .filter(
-        (v) =>
-          v.type !== BlueprintValueType.PROMPT &&
-          v.type !== BlueprintValueType.BOOLEAN,
-      )
-      .forEach((v) => {
-        const err = validateField(v.type, draftValues[v.key] ?? "");
-        if (err) newErrors[v.key] = err;
-      });
-
-    if (Object.values(newErrors).some(Boolean)) {
-      setErrors(newErrors);
-      return;
-    }
-
-    const promptResults = await Promise.all(
-      Object.values(promptRefs.current)
-        .filter(Boolean)
-        .map((handle) => handle!.saveVersion()),
-    );
-
-    const newCommits = new Map<string, string>();
-    for (const result of promptResults) {
-      if (result) {
-        newCommits.set(result.key, result.commit);
-      }
-    }
-
-    const values: BlueprintValue[] = agentConfig.values
-      .filter((v) => {
-        if (v.type === BlueprintValueType.PROMPT) {
-          return newCommits.has(v.key);
-        }
-        return draftValues[v.key] !== originalValues.current[v.key];
-      })
-      .map((v) => ({
-        key: v.key,
-        type: v.type,
-        value:
-          v.type === BlueprintValueType.PROMPT
-            ? newCommits.get(v.key)!
-            : draftValues[v.key],
-        ...(v.description ? { description: v.description } : {}),
-      }));
-
-    createConfig(
-      {
-        agentConfig: {
-          project_id: projectId,
-          blueprint: {
-            description: description || undefined,
-            type: BlueprintType.BLUEPRINT,
-            values,
-          },
-        },
-      },
-      { onSuccess: onSaved },
-    );
-  };
 
   if (isPending) {
     return <Loader />;
