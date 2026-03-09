@@ -38,7 +38,9 @@ export const DiffCellBox: React.FC<{
   <div
     className={cn(
       "comet-body-s whitespace-pre-wrap break-words rounded-md border p-2 text-sm",
-      changed ? SIDE_STYLES[side] : "bg-primary-foreground text-muted-foreground",
+      changed
+        ? SIDE_STYLES[side]
+        : "bg-primary-foreground text-muted-foreground",
       className,
     )}
   >

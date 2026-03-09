@@ -9,7 +9,10 @@ import {
 
 import { EnrichedBlueprintValue } from "@/types/agent-configs";
 import { LLMMessage } from "@/types/llm";
-import { PROMPT_TEMPLATE_STRUCTURE, PROMPT_VERSION_ACTION } from "@/types/prompts";
+import {
+  PROMPT_TEMPLATE_STRUCTURE,
+  PROMPT_VERSION_ACTION,
+} from "@/types/prompts";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import useCreatePromptVersionMutation from "@/api/prompts/useCreatePromptVersionMutation";
 import PromptTemplateView from "@/components/pages-shared/llm/PromptTemplateView/PromptTemplateView";

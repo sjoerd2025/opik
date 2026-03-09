@@ -1,9 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import get from "lodash/get";
-import api, {
-  AGENT_CONFIGS_KEY,
-  AGENT_CONFIGS_REST_ENDPOINT,
-} from "@/api/api";
+import api, { AGENT_CONFIGS_KEY, AGENT_CONFIGS_REST_ENDPOINT } from "@/api/api";
 import { AgentConfigCreate } from "@/types/agent-configs";
 import { AxiosError } from "axios";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,9 +15,7 @@ const useAgentConfigCreateMutation = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({
-      agentConfig,
-    }: UseAgentConfigCreateMutationParams) => {
+    mutationFn: async ({ agentConfig }: UseAgentConfigCreateMutationParams) => {
       const { headers } = await api.post(
         `${AGENT_CONFIGS_REST_ENDPOINT}blueprints/`,
         agentConfig,
