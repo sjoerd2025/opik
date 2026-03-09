@@ -8,6 +8,7 @@ import {
   PromptVersion,
   PROMPT_TEMPLATE_STRUCTURE,
   PROMPT_TYPE,
+  PROMPT_VERSION_ACTION,
 } from "@/types/prompts";
 
 type UseCreatePromptVersionMutationParams = {
@@ -17,7 +18,7 @@ type UseCreatePromptVersionMutationParams = {
   changeDescription?: string;
   templateStructure?: PROMPT_TEMPLATE_STRUCTURE;
   type?: PROMPT_TYPE;
-  action?: 'no_action' | 'update_blueprint';
+  action?: PROMPT_VERSION_ACTION;
   onSuccess: (promptVersion: PromptVersion) => void;
 };
 

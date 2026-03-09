@@ -9,7 +9,7 @@ import {
 
 import { EnrichedBlueprintValue } from "@/types/agent-configs";
 import { LLMMessage } from "@/types/llm";
-import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
+import { PROMPT_TEMPLATE_STRUCTURE, PROMPT_VERSION_ACTION } from "@/types/prompts";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import useCreatePromptVersionMutation from "@/api/prompts/useCreatePromptVersionMutation";
 import PromptTemplateView from "@/components/pages-shared/llm/PromptTemplateView/PromptTemplateView";
@@ -23,6 +23,7 @@ import {
 
 export interface BlueprintValuePromptHandle {
   saveVersion: () => Promise<{ key: string; commit: string } | null>;
+  validate: () => string | null;
 }
 
 type BlueprintValuePromptProps = {
@@ -67,8 +68,11 @@ const BlueprintValuePrompt = forwardRef<
     }
   }, [promptVersion, isChatPrompt]);
 
+  const onDirtyChangeRef = useRef(onDirtyChange);
+  onDirtyChangeRef.current = onDirtyChange;
+
   useEffect(() => {
-    if (!onDirtyChange || !initialTemplate.current) return;
+    if (!onDirtyChangeRef.current || !initialTemplate.current) return;
     const currentTemplate = isChatPrompt
       ? JSON.stringify(
           draftMessages.map((m) => ({ role: m.role, content: m.content })),
@@ -76,8 +80,8 @@ const BlueprintValuePrompt = forwardRef<
           2,
         )
       : draftTemplate;
-    onDirtyChange(currentTemplate !== initialTemplate.current);
-  }, [draftTemplate, draftMessages, isChatPrompt, onDirtyChange]);
+    onDirtyChangeRef.current(currentTemplate !== initialTemplate.current);
+  }, [draftTemplate, draftMessages, isChatPrompt]);
 
   const handleAddMessage = useCallback(() => {
     setDraftMessages((prev) => [...prev, generateDefaultLLMPromptMessage()]);
@@ -86,6 +90,23 @@ const BlueprintValuePrompt = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
+      validate: () => {
+        if (isChatPrompt) {
+          const hasEmpty = draftMessages.some((m) => {
+            if (typeof m.content === "string") return !m.content.trim();
+            if (Array.isArray(m.content)) {
+              return m.content.every(
+                (part) => part.type === "text" && !part.text.trim(),
+              );
+            }
+            return true;
+          });
+          if (hasEmpty) return "Messages must not be empty";
+        } else {
+          if (!draftTemplate.trim()) return "Prompt must not be empty";
+        }
+        return null;
+      },
       saveVersion: async () => {
         if (!prompt) return null;
 
@@ -104,7 +125,7 @@ const BlueprintValuePrompt = forwardRef<
           template: currentTemplate,
           type: promptVersion?.type,
           templateStructure: prompt.template_structure,
-          action: "no_action",
+          action: PROMPT_VERSION_ACTION.NO_ACTION,
           onSuccess: () => {},
         });
 

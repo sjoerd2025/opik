@@ -135,6 +135,4 @@ export default ConfigurationTab;
 // test metadata
 // move files that are shared
 // check bug with time
-//  long prompts to 3 lines?
 // difference show
-// not valid prompts check

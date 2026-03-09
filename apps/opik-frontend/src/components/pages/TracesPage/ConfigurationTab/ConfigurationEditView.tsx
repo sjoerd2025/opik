@@ -163,19 +163,27 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                 </span>
               )}
               {v.type === BlueprintValueType.PROMPT ? (
-                <BlueprintValuePrompt
-                  value={v}
-                  isEditing
-                  ref={(el) => {
-                    promptRefs.current[v.key] = el;
-                  }}
-                  onDirtyChange={(isDirty) =>
-                    setDirtyPromptKeys((prev) => ({
-                      ...prev,
-                      [v.key]: isDirty,
-                    }))
-                  }
-                />
+                <div className="flex flex-col gap-1">
+                  <BlueprintValuePrompt
+                    value={v}
+                    isEditing
+                    ref={(el) => {
+                      promptRefs.current[v.key] = el;
+                    }}
+                    onDirtyChange={(isDirty) => {
+                      setDirtyPromptKeys((prev) => ({
+                        ...prev,
+                        [v.key]: isDirty,
+                      }));
+                      clearError(v.key);
+                    }}
+                  />
+                  {errors[v.key] && (
+                    <span className="comet-body-xs text-destructive">
+                      {errors[v.key]}
+                    </span>
+                  )}
+                </div>
               ) : v.type === BlueprintValueType.BOOLEAN ? (
                 <Switch
                   checked={draftValues[v.key] === "true"}
@@ -200,7 +208,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                     onChange={(e) => handleFieldChange(v.key, e.target.value)}
                   />
                   {errors[v.key] && (
-                    <span className="comet-body-xs text-red-500">
+                    <span className="comet-body-xs text-destructive">
                       {errors[v.key]}
                     </span>
                   )}

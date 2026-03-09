@@ -60,6 +60,7 @@ export const useConfigurationSave = ({
 
   const clearError = useCallback((key: string) => {
     setErrors((prev) => {
+      if (!(key in prev)) return prev;
       const next = { ...prev };
       delete next[key];
       return next;
@@ -81,6 +82,14 @@ export const useConfigurationSave = ({
         const err = validateField(v.type, draftValues[v.key] ?? "");
         if (err) newErrors[v.key] = err;
       });
+
+    // validate prompt fields
+    for (const [key, handle] of Object.entries(promptRefs.current)) {
+      if (handle) {
+        const err = handle.validate();
+        if (err) newErrors[key] = err;
+      }
+    }
 
     if (Object.values(newErrors).some(Boolean)) {
       setErrors(newErrors);

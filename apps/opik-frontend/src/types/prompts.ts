@@ -8,6 +8,11 @@ export enum PROMPT_TYPE {
   JINJA2 = "jinja2",
 }
 
+export enum PROMPT_VERSION_ACTION {
+  NO_ACTION = "no_action",
+  UPDATE_BLUEPRINT = "update_blueprint",
+}
+
 export interface Prompt {
   id: string;
   name: string;
