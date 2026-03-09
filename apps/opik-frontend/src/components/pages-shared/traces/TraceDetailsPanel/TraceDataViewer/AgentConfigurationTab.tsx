@@ -1,12 +1,15 @@
-import React from "react";
-import { FileSliders, GitCommitVertical } from "lucide-react";
+import React, { useMemo } from "react";
+import { FileSliders, GitCommitVertical, Info } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import { Span, Trace } from "@/types/traces";
-import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
+import {
+  BlueprintValueType,
+  EnrichedBlueprintValue,
+} from "@/types/agent-configs";
 import useConfigVersionMap from "@/api/agent-configs/useConfigVersionMap";
 import BlueprintValuesList from "@/components/pages/TracesPage/ConfigurationTab/BlueprintValuesList";
-import Loader from "@/components/shared/Loader/Loader";
+import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -14,6 +17,7 @@ import useAppStore from "@/store/AppStore";
 
 type AgentConfigurationMetadata = {
   blueprint_id: string;
+  values?: Record<string, { type: BlueprintValueType; value: string }>;
 };
 
 export const isAgentConfigurationMetadata = (
@@ -35,21 +39,23 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
 }) => {
   const agentConfigMeta = (data.metadata as Record<string, unknown>)
     ?.agent_configuration;
-  const blueprintId = isAgentConfigurationMetadata(agentConfigMeta)
-    ? agentConfigMeta.blueprint_id
+  const configMeta = isAgentConfigurationMetadata(agentConfigMeta)
+    ? agentConfigMeta
     : undefined;
+  const blueprintId = configMeta?.blueprint_id;
 
-  const { data: agentConfig, isPending } = useAgentConfigById({
-    blueprintId: blueprintId ?? "",
-  });
+  const values = useMemo<EnrichedBlueprintValue[]>(() => {
+    if (!configMeta?.values) return [];
+    return Object.entries(configMeta.values)
+      .map(([key, { type, value }]) => ({ key, type, value }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+  }, [configMeta?.values]);
 
   const versionMap = useConfigVersionMap(projectId);
   const version = blueprintId ? versionMap[blueprintId] : undefined;
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
 
-  if (isPending) return <Loader />;
-
-  if (!agentConfig?.values?.length) {
+  if (!values.length) {
     return (
       <p className="comet-body-s py-8 text-center text-muted-slate">
         No configuration values available
@@ -60,8 +66,11 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between gap-2 px-1.5">
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <span className="comet-body-s-accented">Agent configuration</span>
+          <TooltipWrapper content="Shows only the configuration used in this trace">
+            <Info className="text-muted-slate size-3.5" />
+          </TooltipWrapper>
           {version !== undefined && (
             <Tag className="flex items-center gap-1" variant="gray" size="md">
               <GitCommitVertical className="size-3.5 shrink-0" />v{version}
@@ -82,7 +91,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
         )}
       </div>
       <Separator />
-      <BlueprintValuesList values={agentConfig.values} />
+      <BlueprintValuesList values={values} />
     </div>
   );
 };

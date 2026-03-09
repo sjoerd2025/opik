@@ -21,17 +21,15 @@ export type DiffPair = {
   description?: string;
   baseValue?: EnrichedBlueprintValue;
   diffValue?: EnrichedBlueprintValue;
+  changed: boolean;
 };
 
 const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
-  const { key, type, description, baseValue, diffValue } = pair;
+  const { key, type, description, baseValue, diffValue, changed } = pair;
   const isPrompt = type === BlueprintValueType.PROMPT;
 
   const baseText = baseValue ? formatBlueprintValue(baseValue) : undefined;
   const diffText = diffValue ? formatBlueprintValue(diffValue) : undefined;
-  const changed = isPrompt
-    ? baseValue?.value !== diffValue?.value
-    : baseText !== diffText;
 
   const renderCell = (
     value: EnrichedBlueprintValue | undefined,

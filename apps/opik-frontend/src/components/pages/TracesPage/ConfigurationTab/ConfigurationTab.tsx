@@ -137,7 +137,5 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 export default ConfigurationTab;
 
 // ALEX
-// test metadata
 // move files that are shared
 // check bug with time
-// difference show
