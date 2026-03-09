@@ -73,6 +73,12 @@ const TracesPage = () => {
               <TabsTrigger variant="underline" value={PROJECT_TAB.metrics}>
                 Metrics
               </TabsTrigger>
+              <TabsTrigger
+                variant="underline"
+                value={PROJECT_TAB.configuration}
+              >
+                Configuration
+              </TabsTrigger>
               <TabsTrigger variant="underline" value={PROJECT_TAB.evaluators}>
                 Online evaluation
               </TabsTrigger>
@@ -81,12 +87,6 @@ const TracesPage = () => {
                 value={PROJECT_TAB.annotationQueues}
               >
                 Annotation queues
-              </TabsTrigger>
-              <TabsTrigger
-                variant="underline"
-                value={PROJECT_TAB.configuration}
-              >
-                Configuration
               </TabsTrigger>
             </TabsList>
           </PageBodyStickyContainer>
@@ -101,14 +101,14 @@ const TracesPage = () => {
           <TabsContent value={PROJECT_TAB.metrics}>
             <MetricsTab projectId={projectId} />
           </TabsContent>
+          <TabsContent value={PROJECT_TAB.configuration}>
+            <ConfigurationTab projectId={projectId} />
+          </TabsContent>
           <TabsContent value={PROJECT_TAB.evaluators}>
             <RulesTab projectId={projectId} />
           </TabsContent>
           <TabsContent value={PROJECT_TAB.annotationQueues}>
             <AnnotationQueuesTab projectId={projectId} />
-          </TabsContent>
-          <TabsContent value={PROJECT_TAB.configuration}>
-            <ConfigurationTab projectId={projectId} />
           </TabsContent>
         </Tabs>
       );

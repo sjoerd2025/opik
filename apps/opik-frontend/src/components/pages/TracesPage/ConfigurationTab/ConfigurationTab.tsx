@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { PlusIcon } from "lucide-react";
+import { Book, PlusIcon, Settings2 } from "lucide-react";
 import { StringParam, useQueryParam } from "use-query-params";
 
 import Loader from "@/components/shared/Loader/Loader";
-import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import { Button } from "@/components/ui/button";
+import { buildDocsUrl } from "@/lib/utils";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import ConfigurationHistoryTimeline from "./ConfigurationHistoryTimeline";
@@ -40,7 +40,28 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   }
 
   if (allRows.length === 0) {
-    return <DataTableNoData title="No configuration history" />;
+    return (
+      <div className="flex w-full justify-center p-6">
+        <div className="flex w-full flex-col items-center rounded-md border px-6 py-14">
+          <Settings2 className="mb-3 size-4 text-light-slate" />
+          <h2 className="comet-title-xs">No agent configuration found</h2>
+          <p className="comet-body-s mt-2 text-center text-muted-slate">
+            This project doesn&apos;t include an agent configuration.
+            <br />
+            Configure your agent to track and edit prompts and parameters here.
+          </p>
+          <a
+            href={buildDocsUrl("/tracing/log_agents")}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            <Book className="size-4" />
+            Learn how to configure your agent
+          </a>
+        </div>
+      </div>
+    );
   }
 
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
@@ -48,7 +69,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 
   if (isEditing && latestItem) {
     return (
-      <div className="max-w-[60vw]">
+      <div className="max-w-[65vw]">
         <ConfigurationEditView
           item={latestItem}
           projectId={projectId}
@@ -87,7 +108,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
         )}
       </div>
 
-      <div className="max-w-[30vw] shrink-0 pr-2">
+      <div className="max-w-[25vw] shrink-0 pr-2">
         <p className="comet-body-s-accented ml-3 mt-6">Version history</p>
 
         <ConfigurationHistoryTimeline
@@ -104,9 +125,12 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 export default ConfigurationTab;
 
 // ALEX
-// SCROLLING
 // DESCRIPTIONS
 // PROMPT UPDATES WITH REGULAR UPDATES
 // empty fields
 // add tooltips
 // edit value problem
+// test metadata
+// change
+// empty state
+// red inputs for numbers
