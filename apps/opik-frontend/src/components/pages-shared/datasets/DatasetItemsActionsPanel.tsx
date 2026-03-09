@@ -13,7 +13,7 @@ import GeneratedSamplesDialog from "./GeneratedSamplesDialog";
 import AddTagDialog from "./AddTagDialog";
 import { DATASET_ITEM_DATA_PREFIX } from "@/constants/datasets";
 import { stripColumnPrefix, generateBatchGroupId } from "@/lib/utils";
-import { formatEvaluatorsForExport } from "@/lib/evaluator-converters";
+import { formatAssertionsForExport } from "@/lib/assertion-converters";
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { Filters } from "@/types/filters";
@@ -138,9 +138,9 @@ const DatasetItemsActionsPanel: React.FunctionComponent<
           );
           key = columnName;
           value = get(item.data, columnName, "");
-        } else if (column === "expected_behaviors") {
+        } else if (column === "assertions") {
           key = "evaluators";
-          value = formatEvaluatorsForExport(item.evaluators ?? []);
+          value = formatAssertionsForExport(item.evaluators ?? []);
         } else {
           value = get(item, column, "");
         }

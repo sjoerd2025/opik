@@ -34,27 +34,6 @@ export const METRIC_TYPE_LABELS: Record<MetricType, string> = {
   [MetricType.MODERATION]: "Moderation",
 };
 
-export interface StringMatchConfig {
-  value: string;
-  case_sensitive: boolean;
-}
-
-export interface ThresholdConfig {
-  threshold: number;
-}
-
 export interface LLMJudgeConfig {
   assertions: string[];
-}
-
-export type MetricConfig = StringMatchConfig | ThresholdConfig | LLMJudgeConfig;
-
-export interface EvaluatorDisplayRow {
-  id: string;
-  evaluatorId?: string;
-  name: string;
-  type: MetricType;
-  config: MetricConfig;
-  isNew?: boolean;
-  isEdited?: boolean;
 }

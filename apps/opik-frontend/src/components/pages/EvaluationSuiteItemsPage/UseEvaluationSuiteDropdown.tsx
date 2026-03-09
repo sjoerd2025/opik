@@ -69,7 +69,7 @@ function UseEvaluationSuiteDropdown({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" disabled={disabled}>
-            Use evaluation suite
+            Use suite
             <ChevronDown className="ml-2 size-4" />
           </Button>
         </DropdownMenuTrigger>

@@ -27,23 +27,18 @@ import {
   DATASET_ITEM_SOURCE,
   DATASET_STATUS,
   DATASET_TYPE,
-  Evaluator,
 } from "@/types/datasets";
-import { ExecutionPolicy } from "@/types/evaluation-suites";
 import { Filters } from "@/types/filters";
 import {
   COLUMN_DATA_ID,
   COLUMN_ID_ID,
   COLUMN_SELECT_ID,
   COLUMN_TYPE,
-  ColumnData,
   DynamicColumn,
   ROW_HEIGHT,
 } from "@/types/shared";
 import EvaluationSuiteItemPanel from "@/components/pages/EvaluationSuiteItemsPage/EvaluationSuiteItemPanel/EvaluationSuiteItemPanel";
 import DatasetItemEditor from "@/components/pages-shared/datasets/DatasetItemEditor/DatasetItemEditor";
-import { EvaluatorsCountCell } from "./EvaluatorsCountCell";
-import { ExecutionPolicyCell } from "./ExecutionPolicyCell";
 import DatasetItemsActionsPanel from "@/components/pages-shared/datasets/DatasetItemsActionsPanel";
 import { DatasetItemRowActionsCell } from "@/components/pages-shared/datasets/DatasetItemRowActionsCell";
 import DataTableRowHeightSelector from "@/components/shared/DataTableRowHeightSelector/DataTableRowHeightSelector";
@@ -61,10 +56,6 @@ import {
 } from "@/lib/table";
 import { buildDocsUrl } from "@/lib/utils";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
-import AutodetectCell from "@/components/shared/DataTableCells/AutodetectCell";
-import IdCell from "@/components/shared/DataTableCells/IdCell";
-import ListCell from "@/components/shared/DataTableCells/ListCell";
-import TimeCell from "@/components/shared/DataTableCells/TimeCell";
 import { mapDynamicColumnTypesToColumnType } from "@/lib/filters";
 import {
   generateActionsColumDef,
@@ -72,6 +63,7 @@ import {
 } from "@/components/shared/DataTable/utils";
 import { transformDataColumnFilters } from "@/lib/dataset-items";
 import { useEvaluationSuiteItemsWithDraft } from "./hooks/useMergedEvaluationSuiteItems";
+import { useEvaluationSuiteColumns } from "./useEvaluationSuiteColumns";
 import {
   useIsDraftMode,
   useIsAllItemsSelected,
@@ -91,7 +83,7 @@ export const SUITE_DEFAULT_SELECTED_COLUMNS: string[] = [
   "description",
   "last_updated_at",
   "data",
-  "expected_behaviors",
+  "assertions",
   "execution_policy",
 ];
 
@@ -101,19 +93,35 @@ export const DATASET_DEFAULT_SELECTED_COLUMNS: string[] = [
   "tags",
 ];
 
-const SUITE_SELECTED_COLUMNS_KEY = "evaluation-suite-items-selected-columns";
-const SUITE_SELECTED_COLUMNS_KEY_V2 = `${SUITE_SELECTED_COLUMNS_KEY}-v2`;
-const DATASET_SELECTED_COLUMNS_KEY = "dataset-items-selected-columns";
-const SUITE_COLUMNS_WIDTH_KEY = "evaluation-suite-items-columns-width";
-const DATASET_COLUMNS_WIDTH_KEY = "dataset-items-columns-width";
-const SUITE_COLUMNS_ORDER_KEY = "evaluation-suite-items-columns-order";
-const DATASET_COLUMNS_ORDER_KEY = "dataset-items-columns-order";
-const SUITE_DYNAMIC_COLUMNS_KEY = "evaluation-suite-items-dynamic-columns";
-const DATASET_DYNAMIC_COLUMNS_KEY = "dataset-items-dynamic-columns";
-const SUITE_PAGINATION_SIZE_KEY = "evaluation-suite-items-pagination-size";
-const DATASET_PAGINATION_SIZE_KEY = "dataset-items-pagination-size";
-const SUITE_ROW_HEIGHT_KEY = "evaluation-suite-items-row-height";
-const DATASET_ROW_HEIGHT_KEY = "dataset-items-row-height";
+interface StorageKeysConfig {
+  selectedColumnsKey: string;
+  selectedColumnsMigrationKey?: string;
+  columnsWidthKey: string;
+  columnsOrderKey: string;
+  dynamicColumnsKey: string;
+  paginationSizeKey: string;
+  rowHeightKey: string;
+}
+
+const SUITE_STORAGE_KEYS: StorageKeysConfig = {
+  selectedColumnsKey: "evaluation-suite-items-selected-columns-v2",
+  selectedColumnsMigrationKey: "evaluation-suite-items-selected-columns",
+  columnsWidthKey: "evaluation-suite-items-columns-width",
+  columnsOrderKey: "evaluation-suite-items-columns-order",
+  dynamicColumnsKey: "evaluation-suite-items-dynamic-columns",
+  paginationSizeKey: "evaluation-suite-items-pagination-size",
+  rowHeightKey: "evaluation-suite-items-row-height",
+};
+
+const DATASET_STORAGE_KEYS: StorageKeysConfig = {
+  selectedColumnsKey: "dataset-items-selected-columns",
+  columnsWidthKey: "dataset-items-columns-width",
+  columnsOrderKey: "dataset-items-columns-order",
+  dynamicColumnsKey: "dataset-items-dynamic-columns",
+  paginationSizeKey: "dataset-items-pagination-size",
+  rowHeightKey: "dataset-items-row-height",
+};
+
 const POLLING_INTERVAL_MS = 3000;
 
 const DRAFT_STATUS_BORDER_CLASSES: Record<string, string> = {
@@ -126,8 +134,7 @@ interface EvaluationSuiteItemsTabProps {
   datasetName?: string;
   datasetStatus?: DATASET_STATUS;
   datasetType?: DATASET_TYPE;
-  suitePolicy?: ExecutionPolicy;
-  suiteEvaluators?: Evaluator[];
+  onOpenSettings: () => void;
 }
 
 function EvaluationSuiteItemsTab({
@@ -135,10 +142,12 @@ function EvaluationSuiteItemsTab({
   datasetName,
   datasetStatus,
   datasetType,
-  suitePolicy,
-  suiteEvaluators,
+  onOpenSettings,
 }: EvaluationSuiteItemsTabProps): React.ReactElement | null {
   const isEvaluationSuite = datasetType === DATASET_TYPE.EVALUATION_SUITE;
+  const storageKeys = isEvaluationSuite
+    ? SUITE_STORAGE_KEYS
+    : DATASET_STORAGE_KEYS;
   const { isProcessing, showSuccessMessage } = useDatasetLoadingStatus({
     datasetStatus,
   });
@@ -166,9 +175,7 @@ function EvaluationSuiteItemsTab({
   const [size, setSize] = useQueryParamAndLocalStorageState<
     number | null | undefined
   >({
-    localStorageKey: isEvaluationSuite
-      ? SUITE_PAGINATION_SIZE_KEY
-      : DATASET_PAGINATION_SIZE_KEY,
+    localStorageKey: storageKeys.paginationSizeKey,
     queryKey: "size",
     defaultValue: 10,
     queryParamConfig: NumberParam,
@@ -182,9 +189,7 @@ function EvaluationSuiteItemsTab({
   const [height, setHeight] = useQueryParamAndLocalStorageState<
     string | null | undefined
   >({
-    localStorageKey: isEvaluationSuite
-      ? SUITE_ROW_HEIGHT_KEY
-      : DATASET_ROW_HEIGHT_KEY,
+    localStorageKey: storageKeys.rowHeightKey,
     queryKey: "height",
     defaultValue: ROW_HEIGHT.small,
     queryParamConfig: StringParam,
@@ -211,7 +216,7 @@ function EvaluationSuiteItemsTab({
         filters: transformedFilters,
         page: page as number,
         size: size as number,
-        search: search!,
+        search: search ?? "",
         truncate: false,
       },
       {
@@ -235,7 +240,7 @@ function EvaluationSuiteItemsTab({
       filters: transformedFilters,
       page: page as number,
       size: size as number,
-      search: search!,
+      search: search ?? "",
       truncate: false,
     },
     {
@@ -249,7 +254,7 @@ function EvaluationSuiteItemsTab({
       filters: transformedFilters,
       page: 1,
       size: totalCount || 1,
-      search: search!,
+      search: search ?? "",
       truncate: false,
     },
     {
@@ -258,13 +263,11 @@ function EvaluationSuiteItemsTab({
   );
 
   const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>(
-    isEvaluationSuite
-      ? SUITE_SELECTED_COLUMNS_KEY_V2
-      : DATASET_SELECTED_COLUMNS_KEY,
+    storageKeys.selectedColumnsKey,
     {
-      defaultValue: isEvaluationSuite
+      defaultValue: storageKeys.selectedColumnsMigrationKey
         ? migrateSelectedColumns(
-            SUITE_SELECTED_COLUMNS_KEY,
+            storageKeys.selectedColumnsMigrationKey,
             SUITE_DEFAULT_SELECTED_COLUMNS,
             ["last_updated_at"],
           )
@@ -273,7 +276,7 @@ function EvaluationSuiteItemsTab({
   );
 
   const [columnsOrder, setColumnsOrder] = useLocalStorageState<string[]>(
-    isEvaluationSuite ? SUITE_COLUMNS_ORDER_KEY : DATASET_COLUMNS_ORDER_KEY,
+    storageKeys.columnsOrderKey,
     {
       defaultValue: [],
     },
@@ -281,7 +284,7 @@ function EvaluationSuiteItemsTab({
 
   const [columnsWidth, setColumnsWidth] = useLocalStorageState<
     Record<string, number>
-  >(isEvaluationSuite ? SUITE_COLUMNS_WIDTH_KEY : DATASET_COLUMNS_WIDTH_KEY, {
+  >(storageKeys.columnsWidthKey, {
     defaultValue: {},
   });
 
@@ -384,111 +387,15 @@ function EvaluationSuiteItemsTab({
   );
 
   useDynamicColumnsCache({
-    dynamicColumnsKey: isEvaluationSuite
-      ? SUITE_DYNAMIC_COLUMNS_KEY
-      : DATASET_DYNAMIC_COLUMNS_KEY,
+    dynamicColumnsKey: storageKeys.dynamicColumnsKey,
     dynamicColumnsIds,
     setSelectedColumns,
   });
 
-  const columnsData = useMemo((): ColumnData<DatasetItem>[] => {
-    const cols: ColumnData<DatasetItem>[] = [
-      {
-        id: COLUMN_ID_ID,
-        label: "ID",
-        type: COLUMN_TYPE.string,
-        cell: IdCell as never,
-      },
-    ];
-
-    if (isEvaluationSuite) {
-      cols.push(
-        {
-          id: "description",
-          label: "Description",
-          type: COLUMN_TYPE.string,
-          accessorFn: (row) => row.description ?? "",
-        },
-        {
-          id: "last_updated_at",
-          label: "Last updated",
-          type: COLUMN_TYPE.time,
-          cell: TimeCell as never,
-        },
-        {
-          id: "data",
-          label: "Data",
-          type: COLUMN_TYPE.dictionary,
-          accessorFn: (row) => row.data,
-          cell: AutodetectCell as never,
-          size: 400,
-        },
-        {
-          id: "expected_behaviors",
-          label: "Evaluators",
-          type: COLUMN_TYPE.string,
-          cell: EvaluatorsCountCell as never,
-        },
-        {
-          id: "execution_policy",
-          label: "Execution policy",
-          type: COLUMN_TYPE.string,
-          cell: ExecutionPolicyCell as never,
-        },
-      );
-    } else {
-      // Dynamic per-field columns for legacy datasets
-      cols.push(
-        ...dynamicDatasetColumns.map(
-          ({ label, id, columnType }) =>
-            ({
-              id,
-              label,
-              type: columnType,
-              accessorFn: (row) => get(row, ["data", label], ""),
-              cell: AutodetectCell as never,
-            }) as ColumnData<DatasetItem>,
-        ),
-      );
-    }
-
-    // Common trailing columns
-    cols.push(
-      {
-        id: "tags",
-        label: "Tags",
-        type: COLUMN_TYPE.list,
-        iconType: "tags",
-        accessorFn: (row) => row.tags || [],
-        cell: ListCell as never,
-      },
-      {
-        id: "created_at",
-        label: "Created",
-        type: COLUMN_TYPE.time,
-        cell: TimeCell as never,
-      },
-    );
-
-    // For datasets, last_updated_at goes in the trailing position.
-    // For eval suites, it is already included in the branch above.
-    if (!isEvaluationSuite) {
-      cols.push({
-        id: "last_updated_at",
-        label: "Last updated",
-        type: COLUMN_TYPE.time,
-        cell: TimeCell as never,
-      });
-    }
-
-    cols.push({
-      id: "created_by",
-      label: "Created by",
-      type: COLUMN_TYPE.string,
-    });
-
-    return cols;
-  }, [isEvaluationSuite, dynamicDatasetColumns]);
+  const columnsData = useEvaluationSuiteColumns({
+    isEvaluationSuite,
+    dynamicDatasetColumns,
+  });
 
   const filtersColumnData = useMemo(
     () => [
@@ -630,7 +537,7 @@ function EvaluationSuiteItemsTab({
           >
             <div>
               <SearchInput
-                searchText={search!}
+                searchText={search ?? ""}
                 setSearchText={handleSearchChange}
                 placeholder="Search"
                 className="w-[320px]"
@@ -666,7 +573,6 @@ function EvaluationSuiteItemsTab({
             totalCount={totalCount}
             isDraftMode={isDraftMode}
             datasetType={datasetType}
-            suiteEvaluators={suiteEvaluators}
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
           <DataTableRowHeightSelector
@@ -785,7 +691,7 @@ function EvaluationSuiteItemsTab({
           isOpen={Boolean(activeRowId)}
           rows={rows}
           setActiveRowId={setActiveRowId}
-          suitePolicy={suitePolicy}
+          onOpenSettings={onOpenSettings}
         />
       ) : (
         <DatasetItemEditor

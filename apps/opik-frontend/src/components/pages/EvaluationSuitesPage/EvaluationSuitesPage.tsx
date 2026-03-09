@@ -13,7 +13,7 @@ import DataTable from "@/components/shared/DataTable/DataTable";
 import DataTablePagination from "@/components/shared/DataTablePagination/DataTablePagination";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import useDatasetsList from "@/api/datasets/useDatasetsList";
-import { Dataset, DATASET_TYPE } from "@/types/datasets";
+import { Dataset } from "@/types/datasets";
 import Loader from "@/components/shared/Loader/Loader";
 import AddEditEvaluationSuiteDialog from "@/components/shared/AddEditEvaluationSuiteDialog/AddEditEvaluationSuiteDialog";
 import DatasetActionsPanel from "@/components/shared/DatasetActionsPanel/DatasetActionsPanel";
@@ -43,6 +43,7 @@ import {
   TYPE_LABELS,
 } from "@/components/pages/EvaluationSuitesPage/columns";
 import TextCell from "@/components/shared/DataTableCells/TextCell";
+import DatasetTypeCell from "@/components/pages/EvaluationSuitesPage/DatasetTypeCell";
 import IdCell from "@/components/shared/DataTableCells/IdCell";
 import ListCell from "@/components/shared/DataTableCells/ListCell";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -73,8 +74,7 @@ export const DEFAULT_COLUMNS: ColumnData<Dataset>[] = [
     id: "type",
     label: "Type",
     type: COLUMN_TYPE.string,
-    accessorFn: (row) =>
-      TYPE_LABELS[row.type ?? DATASET_TYPE.DATASET] ?? "Dataset",
+    cell: DatasetTypeCell as never,
   },
   {
     id: "id",

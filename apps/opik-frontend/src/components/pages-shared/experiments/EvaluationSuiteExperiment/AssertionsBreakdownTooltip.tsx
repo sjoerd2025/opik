@@ -76,7 +76,7 @@ export const AssertionsBreakdownTooltip: React.FC<
             </TableHeader>
             <TableBody>
               {assertionNames.map((name, aIdx) => (
-                <TableRow key={aIdx}>
+                <TableRow key={name}>
                   <TableCell className="max-w-48 truncate px-3 py-1.5">
                     {name}
                   </TableCell>

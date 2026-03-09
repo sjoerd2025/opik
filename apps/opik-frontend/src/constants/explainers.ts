@@ -100,8 +100,6 @@ export enum EXPLAINER_ID {
   optimizer_enable_llm_crossover = "optimizer_enable_llm_crossover",
   optimizer_output_style_guidance = "optimizer_output_style_guidance",
   optimizer_infer_output_style = "optimizer_infer_output_style",
-  // Evaluation suite explainers
-  what_are_evaluation_suite_evaluators = "what_are_evaluation_suite_evaluators",
   // Dashboard widget explainers
   feedback_score_groupby_requires_single_metric = "feedback_score_groupby_requires_single_metric",
   duration_groupby_requires_single_metric = "duration_groupby_requires_single_metric",
@@ -675,12 +673,6 @@ export const EXPLAINERS_MAP: Record<EXPLAINER_ID, Explainer> = {
     id: EXPLAINER_ID.optimizer_infer_output_style,
     description:
       "Automatically detect and maintain output style from examples.",
-  },
-  // Evaluation suite explainers
-  [EXPLAINER_ID.what_are_evaluation_suite_evaluators]: {
-    id: EXPLAINER_ID.what_are_evaluation_suite_evaluators,
-    description:
-      "Define evaluators that will be run on all the items in the evaluation suite. Each evaluator checks a specific behavior or quality criterion.",
   },
   // Dashboard widget explainers
   [EXPLAINER_ID.feedback_score_groupby_requires_single_metric]: {

@@ -13,6 +13,7 @@ interface UseClampedInputResult {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFocus: () => void;
   onBlur: () => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -43,13 +44,27 @@ export function useClampedIntegerInput({
     isFocusedRef.current = true;
   }, []);
 
-  const onBlur = useCallback(() => {
+  const commitValue = useCallback(() => {
     isFocusedRef.current = false;
     const parsed = parseInt(localValue, 10);
     const clamped = Number.isNaN(parsed) ? min : clamp(parsed, min, max);
     setLocalValue(String(clamped));
     onCommit(clamped);
   }, [localValue, min, max, onCommit]);
+
+  const onBlur = useCallback(() => {
+    commitValue();
+  }, [commitValue]);
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        commitValue();
+        (e.target as HTMLInputElement).blur();
+      }
+    },
+    [commitValue],
+  );
 
   const parsed = parseInt(localValue, 10);
   const isInvalid =
@@ -58,5 +73,12 @@ export function useClampedIntegerInput({
     parsed < min ||
     parsed > max;
 
-  return { displayValue: localValue, isInvalid, onChange, onFocus, onBlur };
+  return {
+    displayValue: localValue,
+    isInvalid,
+    onChange,
+    onFocus,
+    onBlur,
+    onKeyDown,
+  };
 }

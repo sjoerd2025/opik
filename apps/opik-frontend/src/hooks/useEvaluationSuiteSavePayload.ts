@@ -1,21 +1,25 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import useEvaluationSuiteDraftStore from "@/store/EvaluationSuiteDraftStore";
-import { reconstructEvaluators } from "@/lib/evaluator-converters";
+import { packAssertions } from "@/lib/assertion-converters";
 import {
   DatasetItem,
-  DatasetVersion,
   Dataset,
   DATASET_TYPE,
   Evaluator,
 } from "@/types/datasets";
-import { EvaluatorDisplayRow } from "@/types/evaluation-suites";
 import { UseDatasetItemsListResponse } from "@/api/datasets/useDatasetItemsList";
 
 interface BuildPayloadOptions {
   tags?: string[];
   changeDescription?: string;
   override?: boolean;
+}
+
+interface UseEvaluationSuiteSavePayloadOptions {
+  suiteId: string;
+  suite: Dataset | undefined;
+  versionEvaluators: Evaluator[];
 }
 
 function findItemInCache(
@@ -33,33 +37,31 @@ function findItemInCache(
   return undefined;
 }
 
-export function useEvaluationSuiteSavePayload(suiteId: string) {
+export function useEvaluationSuiteSavePayload({
+  suiteId,
+  suite,
+  versionEvaluators,
+}: UseEvaluationSuiteSavePayloadOptions) {
   const queryClient = useQueryClient();
 
   const buildPayload = useCallback(
     ({ tags, changeDescription, override = false }: BuildPayloadOptions) => {
       const state = useEvaluationSuiteDraftStore.getState();
 
-      // Read suite data from cache
-      const suiteData = queryClient.getQueryData<Dataset>([
-        "dataset",
-        { datasetId: suiteId },
-      ]);
-      if (!suiteData) {
+      if (!suite) {
         throw new Error(
-          "Evaluation suite data not found in cache. Please refresh and try again.",
+          "Evaluation suite data not available. Please refresh and try again.",
         );
       }
 
-      const baseVersion = suiteData.latest_version?.id ?? "";
+      const baseVersion = suite.latest_version?.id ?? "";
       if (!baseVersion) {
         throw new Error(
           "Base version is missing. The evaluation suite may not have been fully loaded.",
         );
       }
 
-      const isEvaluationSuite =
-        suiteData.type === DATASET_TYPE.EVALUATION_SUITE;
+      const isEvaluationSuite = suite.type === DATASET_TYPE.EVALUATION_SUITE;
 
       // Serialize items from store
       const addedItems = Array.from(state.addedItems.values());
@@ -70,60 +72,24 @@ export function useEvaluationSuiteSavePayload(suiteId: string) {
       const executionPolicy = state.executionPolicy ?? undefined;
 
       if (isEvaluationSuite) {
-        // Read version data from cache
-        const versionsData = queryClient.getQueryData<{
-          content: DatasetVersion[];
-        }>(["dataset-versions", { datasetId: suiteId, page: 1, size: 1 }]);
-        const versionEvaluators = versionsData?.content?.[0]?.evaluators ?? [];
-
-        // Reconstruct suite-level evaluators
-        evaluators = reconstructEvaluators(
-          versionEvaluators,
-          state.addedEvaluators,
-          state.editedEvaluators,
-          state.deletedEvaluatorIds,
-        );
-
-        // Collect all itemIds that have item-level evaluator changes
-        const itemIdsWithChanges = new Set<string>();
-        const evaluatorMaps = [
-          state.itemAddedEvaluators,
-          state.itemEditedEvaluators,
-          state.itemDeletedEvaluatorIds,
-        ];
-        for (const map of evaluatorMaps) {
-          for (const [itemId, inner] of map) {
-            if (inner.size > 0) {
-              itemIdsWithChanges.add(itemId);
-            }
-          }
+        // Suite-level: pack assertions into evaluator format
+        if (state.suiteAssertions !== null) {
+          const originalEvaluator = versionEvaluators[0];
+          evaluators = [
+            packAssertions(state.suiteAssertions, originalEvaluator),
+          ];
         }
 
-        // For each item with evaluator changes, reconstruct its evaluators
-        for (const itemId of itemIdsWithChanges) {
+        // Item-level: iterate assertion overrides
+        for (const [itemId, assertions] of state.itemAssertions) {
           const cachedItem = findItemInCache(queryClient, suiteId, itemId);
-          const originalItemEvaluators = cachedItem?.evaluators ?? [];
-          const itemAdded =
-            state.itemAddedEvaluators.get(itemId) ??
-            new Map<string, EvaluatorDisplayRow>();
-          const itemEdited =
-            state.itemEditedEvaluators.get(itemId) ??
-            new Map<string, Partial<EvaluatorDisplayRow>>();
-          const itemDeleted =
-            state.itemDeletedEvaluatorIds.get(itemId) ?? new Set<string>();
-
-          const itemEvaluators = reconstructEvaluators(
-            originalItemEvaluators,
-            itemAdded,
-            itemEdited,
-            itemDeleted,
-          );
-
-          // Merge evaluators into the edited_items entry
+          const originalEvaluator = cachedItem?.evaluators?.[0];
           const existingChanges = editedItemsMap.get(itemId) || {};
           editedItemsMap.set(itemId, {
             ...existingChanges,
-            evaluators: itemEvaluators,
+            evaluators: [
+              packAssertions(assertions, originalEvaluator),
+            ],
           });
         }
       }
@@ -163,7 +129,7 @@ export function useEvaluationSuiteSavePayload(suiteId: string) {
         override,
       };
     },
-    [suiteId, queryClient],
+    [suiteId, suite, versionEvaluators, queryClient],
   );
 
   return { buildPayload };

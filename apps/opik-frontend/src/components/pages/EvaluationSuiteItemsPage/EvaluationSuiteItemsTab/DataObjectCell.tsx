@@ -1,11 +1,12 @@
+import React from "react";
 import { CellContext } from "@tanstack/react-table";
 import { DatasetItem } from "@/types/datasets";
 import CellWrapper from "@/components/shared/DataTableCells/CellWrapper";
 import CellTooltipWrapper from "@/components/shared/DataTableCells/CellTooltipWrapper";
 
-function DataObjectCell(
-  context: CellContext<DatasetItem, unknown>,
-): React.ReactElement {
+export const DataObjectCell: React.FC<CellContext<DatasetItem, unknown>> = (
+  context,
+) => {
   const data = context.row.original.data;
   const text = data ? JSON.stringify(data) : "";
 
@@ -19,6 +20,6 @@ function DataObjectCell(
       </CellTooltipWrapper>
     </CellWrapper>
   );
-}
+};
 
 export default DataObjectCell;

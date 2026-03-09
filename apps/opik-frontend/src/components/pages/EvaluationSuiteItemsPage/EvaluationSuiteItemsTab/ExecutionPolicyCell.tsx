@@ -1,24 +1,18 @@
+import React from "react";
 import { CellContext } from "@tanstack/react-table";
 import { DatasetItem } from "@/types/datasets";
-import { useEditedDatasetItemById } from "@/store/EvaluationSuiteDraftStore";
+import { useEffectiveItemExecutionPolicy } from "@/hooks/useEffectiveItemExecutionPolicy";
 
 interface ExecutionPolicyCellInnerProps {
   itemId: string;
   item: DatasetItem;
 }
 
-function ExecutionPolicyCellInner({
+const ExecutionPolicyCellInner: React.FC<ExecutionPolicyCellInnerProps> = ({
   itemId,
   item,
-}: ExecutionPolicyCellInnerProps) {
-  const editedItem = useEditedDatasetItemById(itemId);
-  // Use `in` to detect explicit undefined (user cleared the override).
-  // See ItemExecutionPolicySection.tsx for a detailed explanation.
-  const hasEditedPolicy =
-    editedItem != null && "execution_policy" in editedItem;
-  const policy = hasEditedPolicy
-    ? editedItem.execution_policy ?? null
-    : item.execution_policy ?? null;
+}) => {
+  const policy = useEffectiveItemExecutionPolicy(itemId, item.execution_policy);
 
   if (policy === null) {
     return <span className="text-muted-slate">&mdash;</span>;
@@ -26,15 +20,14 @@ function ExecutionPolicyCellInner({
 
   return (
     <span>
-      {policy.runs_per_item} run{policy.runs_per_item !== 1 ? "s" : ""},{" "}
-      {policy.pass_threshold} to pass
+      {policy.pass_threshold} of {policy.runs_per_item} must pass
     </span>
   );
-}
+};
 
-export function ExecutionPolicyCell(
-  context: CellContext<DatasetItem, unknown>,
-) {
+export const ExecutionPolicyCell: React.FC<
+  CellContext<DatasetItem, unknown>
+> = (context) => {
   const item = context.row.original;
   return <ExecutionPolicyCellInner itemId={item.id} item={item} />;
-}
+};

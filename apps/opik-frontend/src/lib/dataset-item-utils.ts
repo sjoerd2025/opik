@@ -1,8 +1,8 @@
 import { DatasetItem, DATASET_ITEM_SOURCE, Evaluator } from "@/types/datasets";
-import { buildLLMJudgeBEConfig } from "@/lib/evaluator-converters";
+import { buildLLMJudgeBEConfig } from "@/lib/assertion-converters";
 import {
   OPIK_DESCRIPTION_FIELD,
-  OPIK_EVALUATOR_ASSERTIONS_FIELD,
+  OPIK_ASSERTIONS_FIELD,
 } from "@/constants/datasets";
 
 /** Filter valid assertion strings from raw AI-generated data */
@@ -21,7 +21,7 @@ export function extractOpikMetadata(rawData: Record<string, unknown>): {
 } {
   const {
     [OPIK_DESCRIPTION_FIELD]: rawDescription,
-    [OPIK_EVALUATOR_ASSERTIONS_FIELD]: rawAssertions,
+    [OPIK_ASSERTIONS_FIELD]: rawAssertions,
     ...data
   } = rawData;
 

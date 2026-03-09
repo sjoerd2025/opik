@@ -1,14 +1,23 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StringParam, useQueryParam } from "use-query-params";
+import { useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
-import { Blocks, Check, Code2, GitCommitVertical, X } from "lucide-react";
+import {
+  Blocks,
+  Check,
+  CheckCheck,
+  Code2,
+  GitCommitVertical,
+  Settings2,
+  X,
+} from "lucide-react";
 
 import useDatasetById from "@/api/datasets/useDatasetById";
 import useDatasetItemChangesMutation from "@/api/datasets/useDatasetItemChangesMutation";
 import useDatasetUpdateMutation from "@/api/datasets/useDatasetUpdateMutation";
 import useDatasetVersionsList from "@/api/datasets/useDatasetVersionsList";
 import EvaluationSuiteItemsTab from "@/components/pages/EvaluationSuiteItemsPage/EvaluationSuiteItemsTab/EvaluationSuiteItemsTab";
-import EvaluatorsSection from "@/components/pages/EvaluationSuiteItemsPage/EvaluatorsSection/EvaluatorsSection";
+import EditEvaluationSuiteSettingsDialog from "@/components/pages/EvaluationSuiteItemsPage/EditEvaluationSuiteSettingsDialog";
 import AddVersionDialog from "@/components/pages-shared/datasets/VersionHistoryTab/AddVersionDialog";
 import VersionHistoryTab from "@/components/pages-shared/datasets/VersionHistoryTab/VersionHistoryTab";
 import OverrideVersionDialog from "@/components/pages-shared/datasets/OverrideVersionDialog";
@@ -22,6 +31,12 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tag } from "@/components/ui/tag";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipPortal,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
 import useLoadPlayground from "@/hooks/useLoadPlayground";
@@ -31,6 +46,8 @@ import { useEvaluationSuiteSavePayload } from "@/hooks/useEvaluationSuiteSavePay
 import { useSuiteIdFromURL } from "@/hooks/useSuiteIdFromURL";
 import { useClearDraft, useHasDraft } from "@/store/EvaluationSuiteDraftStore";
 import { DATASET_STATUS, DATASET_TYPE } from "@/types/datasets";
+import { useEffectiveSuiteAssertions } from "@/hooks/useEffectiveSuiteAssertions";
+import { AssertionsListTooltipContent } from "@/components/pages-shared/experiments/EvaluationSuiteExperiment/AssertionsListTooltipContent";
 import UseEvaluationSuiteDropdown from "./UseEvaluationSuiteDropdown";
 
 const POLLING_INTERVAL_MS = 3000;
@@ -42,14 +59,15 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
   const [addVersionDialogOpen, setAddVersionDialogOpen] = useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [pendingVersionData, setPendingVersionData] = useState<{
     tags?: string[];
     changeDescription?: string;
   } | null>(null);
 
+  const queryClient = useQueryClient();
   const hasDraft = useHasDraft();
   const clearDraft = useClearDraft();
-  const { buildPayload } = useEvaluationSuiteSavePayload(suiteId);
   const { toast } = useToast();
   const { navigate: navigateToExperiment } = useNavigateToExperiment();
   const { loadPlayground } = useLoadPlayground();
@@ -78,7 +96,13 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
   );
   const latestVersionData = versionsData?.content?.[0];
   const versionEvaluators = latestVersionData?.evaluators ?? [];
-  const versionExecutionPolicy = latestVersionData?.execution_policy;
+  const { buildPayload } = useEvaluationSuiteSavePayload({
+    suiteId,
+    suite,
+    versionEvaluators,
+  });
+
+  const effectiveAssertions = useEffectiveSuiteAssertions(suiteId);
 
   useEffect(() => {
     return clearDraft;
@@ -148,10 +172,18 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
     if (changesMutation.isPending) return;
 
     changesMutation.mutate(buildPayload({ tags, changeDescription }), {
-      onSuccess: (version) => {
-        clearDraft();
+      onSuccess: async (version) => {
         setAddVersionDialogOpen(false);
         showSuccessToast(version?.id);
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["dataset-items", { datasetId: suiteId }],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["dataset-versions"],
+          }),
+        ]);
+        clearDraft();
       },
       onError: (error) => {
         if ((error as AxiosError).response?.status === 409) {
@@ -167,12 +199,20 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
     changesMutation.mutate(
       buildPayload({ ...pendingVersionData, override: true }),
       {
-        onSuccess: (version) => {
-          clearDraft();
+        onSuccess: async (version) => {
           setAddVersionDialogOpen(false);
           setOverrideDialogOpen(false);
           setPendingVersionData(null);
           showSuccessToast(version?.id);
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: ["dataset-items", { datasetId: suiteId }],
+            }),
+            queryClient.invalidateQueries({
+              queryKey: ["dataset-versions"],
+            }),
+          ]);
+          clearDraft();
         },
       },
     );
@@ -229,6 +269,10 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
         setOpen={setOverrideDialogOpen}
         onConfirm={handleOverrideConfirm}
       />
+      <EditEvaluationSuiteSettingsDialog
+        open={settingsDialogOpen}
+        setOpen={setSettingsDialogOpen}
+      />
       {DialogComponent}
       <div className="mb-4">
         <div className="mb-4 flex items-center justify-between gap-2">
@@ -268,6 +312,17 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
               datasetId={suiteId}
               datasetVersionId={latestVersion?.id}
             />
+            {isEvaluationSuite && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setSettingsDialogOpen(true)}
+              >
+                <Settings2 className="size-3.5 shrink-0" />
+                Settings
+              </Button>
+            )}
           </div>
         </div>
         {suite?.description && (
@@ -300,6 +355,30 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
               ))}
             </>
           )}
+          {isEvaluationSuite && effectiveAssertions.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex shrink-0 cursor-pointer items-center gap-1 rounded bg-thread-active px-1.5 py-0.5">
+                  <CheckCheck className="size-3 text-muted-foreground" />
+                  <span className="comet-body-s-accented text-muted-foreground">
+                    {effectiveAssertions.length} global assertion
+                    {effectiveAssertions.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent
+                  side="bottom"
+                  collisionPadding={16}
+                  className="max-w-fit p-0"
+                >
+                  <AssertionsListTooltipContent
+                    assertions={effectiveAssertions}
+                  />
+                </TooltipContent>
+              </TooltipPortal>
+            </Tooltip>
+          )}
           <Separator orientation="vertical" className="ml-1.5 mt-1 h-4" />
           <TagListRenderer
             tags={suite?.tags ?? []}
@@ -315,11 +394,6 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
           <TabsTrigger variant="underline" value="items">
             Items
           </TabsTrigger>
-          {isEvaluationSuite && (
-            <TabsTrigger variant="underline" value="evaluators">
-              Evaluators
-            </TabsTrigger>
-          )}
           <TabsTrigger variant="underline" value="version-history">
             Version history
           </TabsTrigger>
@@ -330,18 +404,9 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
             datasetName={suite?.name}
             datasetStatus={suite?.status}
             datasetType={datasetType}
-            suitePolicy={versionExecutionPolicy}
-            suiteEvaluators={versionEvaluators}
+            onOpenSettings={() => setSettingsDialogOpen(true)}
           />
         </TabsContent>
-        {isEvaluationSuite && (
-          <TabsContent value="evaluators">
-            <EvaluatorsSection
-              serverEvaluators={versionEvaluators}
-              serverExecutionPolicy={versionExecutionPolicy}
-            />
-          </TabsContent>
-        )}
         <TabsContent value="version-history">
           <VersionHistoryTab datasetId={suiteId} />
         </TabsContent>

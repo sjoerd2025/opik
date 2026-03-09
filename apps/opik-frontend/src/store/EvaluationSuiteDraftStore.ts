@@ -1,10 +1,9 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { v4 as uuidv4 } from "uuid";
+import isEqual from "lodash/isEqual";
 import { DatasetItem } from "@/types/datasets";
-import {
-  EvaluatorDisplayRow,
-  ExecutionPolicy,
-} from "@/types/evaluation-suites";
+import { ExecutionPolicy } from "@/types/evaluation-suites";
 
 interface EvaluationSuiteDraftState {
   addedItems: Map<string, DatasetItem>;
@@ -12,15 +11,9 @@ interface EvaluationSuiteDraftState {
   deletedIds: Set<string>;
   isAllItemsSelected: boolean;
 
-  addedEvaluators: Map<string, EvaluatorDisplayRow>;
-  editedEvaluators: Map<string, Partial<EvaluatorDisplayRow>>;
-  deletedEvaluatorIds: Set<string>;
-
+  suiteAssertions: string[] | null;
+  itemAssertions: Map<string, string[]>;
   executionPolicy: ExecutionPolicy | null;
-
-  itemAddedEvaluators: Map<string, Map<string, EvaluatorDisplayRow>>;
-  itemEditedEvaluators: Map<string, Map<string, Partial<EvaluatorDisplayRow>>>;
-  itemDeletedEvaluatorIds: Map<string, Set<string>>;
 
   addItem: (item: Omit<DatasetItem, "id">) => string;
   bulkAddItems: (items: Omit<DatasetItem, "id">[]) => void;
@@ -29,21 +22,35 @@ interface EvaluationSuiteDraftState {
   bulkDeleteItems: (ids: string[]) => void;
   bulkEditItems: (ids: string[], changes: Partial<DatasetItem>) => void;
   setIsAllItemsSelected: (value: boolean) => void;
-  addEvaluator: (evaluator: Omit<EvaluatorDisplayRow, "id">) => string;
-  editEvaluator: (id: string, changes: Partial<EvaluatorDisplayRow>) => void;
-  deleteEvaluator: (id: string) => void;
-  setExecutionPolicy: (policy: ExecutionPolicy) => void;
 
-  addItemEvaluator: (
-    itemId: string,
-    evaluator: Omit<EvaluatorDisplayRow, "id">,
-  ) => string;
-  editItemEvaluator: (
-    itemId: string,
-    evaluatorId: string,
-    changes: Partial<EvaluatorDisplayRow>,
+  setSuiteAssertions: (assertions: string[]) => void;
+  clearSuiteAssertions: () => void;
+  setItemAssertions: (itemId: string, assertions: string[]) => void;
+  clearItemAssertions: (itemId: string) => void;
+  setExecutionPolicy: (policy: ExecutionPolicy) => void;
+  clearExecutionPolicy: () => void;
+
+  updateSuiteAssertions: (
+    newAssertions: string[],
+    serverAssertions: string[],
   ) => void;
-  deleteItemEvaluator: (itemId: string, evaluatorId: string) => void;
+  updateExecutionPolicy: (
+    newPolicy: ExecutionPolicy,
+    serverPolicy: ExecutionPolicy,
+  ) => void;
+
+  updateItemAssertion: (
+    itemId: string,
+    index: number,
+    value: string,
+    serverAssertions: string[],
+  ) => void;
+  removeItemAssertion: (
+    itemId: string,
+    index: number,
+    serverAssertions: string[],
+  ) => void;
+  addItemAssertion: (itemId: string, serverAssertions: string[]) => void;
 
   clearDraft: () => void;
 }
@@ -54,42 +61,10 @@ function createInitialState() {
     editedItems: new Map<string, Partial<DatasetItem>>(),
     deletedIds: new Set<string>(),
     isAllItemsSelected: false,
-    addedEvaluators: new Map<string, EvaluatorDisplayRow>(),
-    editedEvaluators: new Map<string, Partial<EvaluatorDisplayRow>>(),
-    deletedEvaluatorIds: new Set<string>(),
+    suiteAssertions: null as string[] | null,
+    itemAssertions: new Map<string, string[]>(),
     executionPolicy: null as ExecutionPolicy | null,
-    itemAddedEvaluators: new Map<string, Map<string, EvaluatorDisplayRow>>(),
-    itemEditedEvaluators: new Map<
-      string,
-      Map<string, Partial<EvaluatorDisplayRow>>
-    >(),
-    itemDeletedEvaluatorIds: new Map<string, Set<string>>(),
   };
-}
-
-function cloneNestedMap<V>(
-  outer: Map<string, Map<string, V>>,
-  key: string,
-): { outerClone: Map<string, Map<string, V>>; inner: Map<string, V> } {
-  const outerClone = new Map(outer);
-  const inner = new Map(outerClone.get(key) ?? new Map<string, V>());
-  outerClone.set(key, inner);
-  return { outerClone, inner };
-}
-
-function hasNonEmptyEntries(map: Map<string, { size: number }>): boolean {
-  for (const inner of map.values()) {
-    if (inner.size > 0) return true;
-  }
-  return false;
-}
-
-function hasItemLevelChanges(state: EvaluationSuiteDraftState): boolean {
-  return (
-    hasNonEmptyEntries(state.itemAddedEvaluators) ||
-    hasNonEmptyEntries(state.itemEditedEvaluators) ||
-    hasNonEmptyEntries(state.itemDeletedEvaluatorIds)
-  );
 }
 
 function mergeEditedItem(
@@ -198,117 +173,66 @@ const useEvaluationSuiteDraftStore = create<EvaluationSuiteDraftState>(
       set({ isAllItemsSelected: value });
     },
 
-    addEvaluator: (evaluator) => {
-      const id = uuidv4();
-      set((state) => {
-        const next = new Map(state.addedEvaluators);
-        next.set(id, { ...evaluator, id, isNew: true });
-        return { addedEvaluators: next };
-      });
-      return id;
+    setSuiteAssertions: (assertions) => {
+      set({ suiteAssertions: assertions });
     },
 
-    editEvaluator: (id, changes) => {
+    clearSuiteAssertions: () => set({ suiteAssertions: null }),
+
+    setItemAssertions: (itemId, assertions) => {
       set((state) => {
-        if (state.addedEvaluators.has(id)) {
-          const next = new Map(state.addedEvaluators);
-          const existing = next.get(id)!;
-          next.set(id, { ...existing, ...changes });
-          return { addedEvaluators: next };
-        }
-        const next = new Map(state.editedEvaluators);
-        const existing = next.get(id) || {};
-        next.set(id, { ...existing, ...changes, isEdited: true });
-        return { editedEvaluators: next };
+        const next = new Map(state.itemAssertions);
+        next.set(itemId, assertions);
+        return { itemAssertions: next };
       });
     },
 
-    deleteEvaluator: (id) => {
+    clearItemAssertions: (itemId) => {
       set((state) => {
-        if (state.addedEvaluators.has(id)) {
-          const next = new Map(state.addedEvaluators);
-          next.delete(id);
-          return { addedEvaluators: next };
-        }
-        const nextEdited = new Map(state.editedEvaluators);
-        nextEdited.delete(id);
-        const nextDeleted = new Set(state.deletedEvaluatorIds);
-        nextDeleted.add(id);
-        return {
-          editedEvaluators: nextEdited,
-          deletedEvaluatorIds: nextDeleted,
-        };
+        const next = new Map(state.itemAssertions);
+        next.delete(itemId);
+        return { itemAssertions: next };
       });
     },
 
     setExecutionPolicy: (policy) => set({ executionPolicy: policy }),
 
-    addItemEvaluator: (itemId, evaluator) => {
-      const id = uuidv4();
-      set((state) => {
-        const { outerClone, inner } = cloneNestedMap(
-          state.itemAddedEvaluators,
-          itemId,
-        );
-        inner.set(id, { ...evaluator, id, isNew: true });
-        return { itemAddedEvaluators: outerClone };
-      });
-      return id;
-    },
+    clearExecutionPolicy: () => set({ executionPolicy: null }),
 
-    editItemEvaluator: (itemId, evaluatorId, changes) => {
-      set((state) => {
-        const addedInner = state.itemAddedEvaluators.get(itemId);
-        if (addedInner?.has(evaluatorId)) {
-          const { outerClone, inner } = cloneNestedMap(
-            state.itemAddedEvaluators,
-            itemId,
-          );
-          const existing = inner.get(evaluatorId)!;
-          inner.set(evaluatorId, { ...existing, ...changes });
-          return { itemAddedEvaluators: outerClone };
-        }
-
-        const { outerClone, inner } = cloneNestedMap(
-          state.itemEditedEvaluators,
-          itemId,
-        );
-        const existing = inner.get(evaluatorId) || {};
-        inner.set(evaluatorId, { ...existing, ...changes, isEdited: true });
-        return { itemEditedEvaluators: outerClone };
+    updateSuiteAssertions: (newAssertions, serverAssertions) => {
+      set({
+        suiteAssertions: isEqual(newAssertions, serverAssertions)
+          ? null
+          : newAssertions,
       });
     },
 
-    deleteItemEvaluator: (itemId, evaluatorId) => {
-      set((state) => {
-        const addedInner = state.itemAddedEvaluators.get(itemId);
-        if (addedInner?.has(evaluatorId)) {
-          const { outerClone, inner } = cloneNestedMap(
-            state.itemAddedEvaluators,
-            itemId,
-          );
-          inner.delete(evaluatorId);
-          return { itemAddedEvaluators: outerClone };
-        }
-
-        const { outerClone: editedOuter, inner: editedInner } = cloneNestedMap(
-          state.itemEditedEvaluators,
-          itemId,
-        );
-        editedInner.delete(evaluatorId);
-
-        const deletedOuter = new Map(state.itemDeletedEvaluatorIds);
-        const deletedInner = new Set<string>(
-          deletedOuter.get(itemId) ?? new Set<string>(),
-        );
-        deletedInner.add(evaluatorId);
-        deletedOuter.set(itemId, deletedInner);
-
-        return {
-          itemEditedEvaluators: editedOuter,
-          itemDeletedEvaluatorIds: deletedOuter,
-        };
+    updateExecutionPolicy: (newPolicy, serverPolicy) => {
+      set({
+        executionPolicy: isEqual(newPolicy, serverPolicy)
+          ? null
+          : newPolicy,
       });
+    },
+
+    updateItemAssertion: (itemId, index, value, serverAssertions) => {
+      const current = get().itemAssertions.get(itemId) ?? serverAssertions;
+      const updated = [...current];
+      updated[index] = value;
+      get().setItemAssertions(itemId, updated);
+    },
+
+    removeItemAssertion: (itemId, index, serverAssertions) => {
+      const current = get().itemAssertions.get(itemId) ?? serverAssertions;
+      get().setItemAssertions(
+        itemId,
+        current.filter((_, i) => i !== index),
+      );
+    },
+
+    addItemAssertion: (itemId, serverAssertions) => {
+      const current = get().itemAssertions.get(itemId) ?? serverAssertions;
+      get().setItemAssertions(itemId, [...current, ""]);
     },
 
     clearDraft: () => {
@@ -324,17 +248,15 @@ export const selectIsDraftMode = (state: EvaluationSuiteDraftState) =>
   state.editedItems.size > 0 ||
   state.deletedIds.size > 0;
 
-export const selectHasEvaluatorChanges = (
+export const selectHasAssertionChanges = (
   state: EvaluationSuiteDraftState,
 ): boolean =>
-  state.addedEvaluators.size > 0 ||
-  state.editedEvaluators.size > 0 ||
-  state.deletedEvaluatorIds.size > 0 ||
-  state.executionPolicy !== null ||
-  hasItemLevelChanges(state);
+  state.suiteAssertions !== null ||
+  state.itemAssertions.size > 0 ||
+  state.executionPolicy !== null;
 
 export const selectHasDraft = (state: EvaluationSuiteDraftState): boolean =>
-  selectIsDraftMode(state) || selectHasEvaluatorChanges(state);
+  selectIsDraftMode(state) || selectHasAssertionChanges(state);
 
 // Item CRUD hooks
 
@@ -372,58 +294,46 @@ export const useIsAllItemsSelected = () =>
 export const useSetIsAllItemsSelected = () =>
   useEvaluationSuiteDraftStore((state) => state.setIsAllItemsSelected);
 
-// Suite-level evaluator hooks
+// Assertion hooks
 
-export const useAddEvaluator = () =>
-  useEvaluationSuiteDraftStore((state) => state.addEvaluator);
-export const useEditEvaluator = () =>
-  useEvaluationSuiteDraftStore((state) => state.editEvaluator);
-export const useDeleteEvaluator = () =>
-  useEvaluationSuiteDraftStore((state) => state.deleteEvaluator);
-export const useSetExecutionPolicy = () =>
-  useEvaluationSuiteDraftStore((state) => state.setExecutionPolicy);
-export const useEvaluatorsExecutionPolicy = () =>
+export const useSuiteAssertions = () =>
+  useEvaluationSuiteDraftStore((state) => state.suiteAssertions);
+export const useItemAssertions = (itemId: string) =>
+  useEvaluationSuiteDraftStore((state) => state.itemAssertions.get(itemId));
+export const useItemAssertionsMap = () =>
+  useEvaluationSuiteDraftStore((state) => state.itemAssertions);
+// Execution policy hooks
+
+export const useDraftExecutionPolicy = () =>
   useEvaluationSuiteDraftStore((state) => state.executionPolicy);
-export const useAddedEvaluators = () =>
-  useEvaluationSuiteDraftStore((state) => state.addedEvaluators);
-export const useEditedEvaluators = () =>
-  useEvaluationSuiteDraftStore((state) => state.editedEvaluators);
-export const useDeletedEvaluatorIds = () =>
-  useEvaluationSuiteDraftStore((state) => state.deletedEvaluatorIds);
-export const useHasEvaluatorChanges = () =>
-  useEvaluationSuiteDraftStore(selectHasEvaluatorChanges);
 
-// Item-level evaluator hooks
+// Consolidated action hooks — returns all action functions in a single call.
+// Actions are stable references in Zustand, so grouping them doesn't cause
+// extra re-renders when used with useShallow.
 
-const EMPTY_MAP = new Map<string, EvaluatorDisplayRow>();
-const EMPTY_PARTIAL_MAP = new Map<string, Partial<EvaluatorDisplayRow>>();
-const EMPTY_SET = new Set<string>();
-
-export const useItemAddedEvaluators = (itemId: string) =>
+export const useDraftItemActions = () =>
   useEvaluationSuiteDraftStore(
-    (state) => state.itemAddedEvaluators.get(itemId) ?? EMPTY_MAP,
-  );
-export const useItemEditedEvaluators = (itemId: string) =>
-  useEvaluationSuiteDraftStore(
-    (state) => state.itemEditedEvaluators.get(itemId) ?? EMPTY_PARTIAL_MAP,
-  );
-export const useItemDeletedEvaluatorIds = (itemId: string) =>
-  useEvaluationSuiteDraftStore(
-    (state) => state.itemDeletedEvaluatorIds.get(itemId) ?? EMPTY_SET,
+    useShallow((state) => ({
+      addItem: state.addItem,
+      bulkAddItems: state.bulkAddItems,
+      editItem: state.editItem,
+      deleteItem: state.deleteItem,
+      bulkDeleteItems: state.bulkDeleteItems,
+      bulkEditItems: state.bulkEditItems,
+      clearDraft: state.clearDraft,
+      setIsAllItemsSelected: state.setIsAllItemsSelected,
+    })),
   );
 
-export const useAddItemEvaluator = () =>
-  useEvaluationSuiteDraftStore((state) => state.addItemEvaluator);
-export const useEditItemEvaluator = () =>
-  useEvaluationSuiteDraftStore((state) => state.editItemEvaluator);
-export const useDeleteItemEvaluator = () =>
-  useEvaluationSuiteDraftStore((state) => state.deleteItemEvaluator);
-
-export const useItemAddedEvaluatorsMap = () =>
-  useEvaluationSuiteDraftStore((state) => state.itemAddedEvaluators);
-export const useItemEditedEvaluatorsMap = () =>
-  useEvaluationSuiteDraftStore((state) => state.itemEditedEvaluators);
-export const useItemDeletedEvaluatorIdsMap = () =>
-  useEvaluationSuiteDraftStore((state) => state.itemDeletedEvaluatorIds);
+export const useDraftAssertionActions = () =>
+  useEvaluationSuiteDraftStore(
+    useShallow((state) => ({
+      updateSuiteAssertions: state.updateSuiteAssertions,
+      updateExecutionPolicy: state.updateExecutionPolicy,
+      updateItemAssertion: state.updateItemAssertion,
+      removeItemAssertion: state.removeItemAssertion,
+      addItemAssertion: state.addItemAssertion,
+    })),
+  );
 
 export default useEvaluationSuiteDraftStore;

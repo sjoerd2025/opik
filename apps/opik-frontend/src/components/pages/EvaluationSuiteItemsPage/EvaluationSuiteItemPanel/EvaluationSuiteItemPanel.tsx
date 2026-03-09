@@ -4,13 +4,10 @@ import copy from "clipboard-copy";
 import {
   DatasetItemColumn,
   DatasetItemWithDraft,
-  DATASET_ITEM_DRAFT_STATUS,
   Evaluator,
+  DATASET_ITEM_DRAFT_STATUS,
 } from "@/types/datasets";
-import {
-  DEFAULT_EXECUTION_POLICY,
-  ExecutionPolicy,
-} from "@/types/evaluation-suites";
+import { ExecutionPolicy } from "@/types/evaluation-suites";
 import {
   DatasetItemEditorAutosaveProvider,
   useDatasetItemEditorAutosaveContext,
@@ -27,9 +24,10 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import Loader from "@/components/shared/Loader/Loader";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
+import TagListRenderer from "@/components/shared/TagListRenderer/TagListRenderer";
+import { Separator } from "@/components/ui/separator";
 import ItemDescriptionSection from "./ItemDescriptionSection";
-import ItemExecutionPolicySection from "./ItemExecutionPolicySection";
-import ItemEvaluatorsSection from "./ItemEvaluatorsSection";
+import ItemEvaluationCriteriaSection from "./ItemEvaluationCriteriaSection";
 import ItemContextSection from "./ItemContextSection";
 
 interface EvaluationSuiteItemPanelProps {
@@ -40,7 +38,7 @@ interface EvaluationSuiteItemPanelProps {
   isOpen: boolean;
   rows: DatasetItemWithDraft[];
   setActiveRowId: (id: string) => void;
-  suitePolicy?: ExecutionPolicy;
+  onOpenSettings: () => void;
 }
 
 function truncateId(id: string): string {
@@ -52,9 +50,9 @@ interface EvaluationSuiteItemPanelLayoutProps {
   datasetItemId: string;
   isOpen: boolean;
   onClose: () => void;
-  itemEvaluators?: Evaluator[];
-  suitePolicy: ExecutionPolicy;
   savedItemPolicy?: ExecutionPolicy;
+  serverEvaluators: Evaluator[];
+  onOpenSettings: () => void;
   isNewItem: boolean;
 }
 
@@ -64,13 +62,19 @@ const EvaluationSuiteItemPanelLayout: React.FC<
   datasetItemId,
   isOpen,
   onClose,
-  itemEvaluators,
-  suitePolicy,
   savedItemPolicy,
+  serverEvaluators,
+  onOpenSettings,
   isNewItem,
 }) => {
-  const { isPending, handleDelete, horizontalNavigation } =
-    useDatasetItemEditorAutosaveContext();
+  const {
+    isPending,
+    handleDelete,
+    horizontalNavigation,
+    tags,
+    handleAddTag,
+    handleDeleteTag,
+  } = useDatasetItemEditorAutosaveContext();
 
   const { toast } = useToast();
 
@@ -158,19 +162,24 @@ const EvaluationSuiteItemPanelLayout: React.FC<
                 </>
               )}
             </div>
+            <TagListRenderer
+              tags={tags}
+              onAddTag={handleAddTag}
+              onDeleteTag={handleDeleteTag}
+              size="sm"
+              align="start"
+            />
           </div>
 
           <div className="flex flex-col gap-6 p-6 pt-4">
             <ItemDescriptionSection itemId={datasetItemId} />
             <ItemContextSection />
-            <ItemExecutionPolicySection
+            <Separator />
+            <ItemEvaluationCriteriaSection
               itemId={datasetItemId}
-              suitePolicy={suitePolicy}
               savedItemPolicy={savedItemPolicy}
-            />
-            <ItemEvaluatorsSection
-              itemId={datasetItemId}
-              itemEvaluators={itemEvaluators}
+              serverEvaluators={serverEvaluators}
+              onOpenSettings={onOpenSettings}
             />
           </div>
         </div>
@@ -187,7 +196,7 @@ const EvaluationSuiteItemPanel: React.FC<EvaluationSuiteItemPanelProps> = ({
   isOpen,
   rows,
   setActiveRowId,
-  suitePolicy = DEFAULT_EXECUTION_POLICY,
+  onOpenSettings,
 }) => {
   const activeRow = useMemo(
     () => rows.find((r) => r.id === datasetItemId),
@@ -195,8 +204,8 @@ const EvaluationSuiteItemPanel: React.FC<EvaluationSuiteItemPanelProps> = ({
   );
 
   const isNewItem = activeRow?.draftStatus === DATASET_ITEM_DRAFT_STATUS.added;
-  const itemEvaluators = activeRow?.evaluators;
   const itemExecutionPolicy = activeRow?.execution_policy;
+  const serverEvaluators = activeRow?.evaluators ?? [];
 
   return (
     <DatasetItemEditorAutosaveProvider
@@ -210,9 +219,9 @@ const EvaluationSuiteItemPanel: React.FC<EvaluationSuiteItemPanelProps> = ({
         datasetItemId={datasetItemId}
         isOpen={isOpen}
         onClose={onClose}
-        itemEvaluators={itemEvaluators}
-        suitePolicy={suitePolicy}
         savedItemPolicy={itemExecutionPolicy}
+        serverEvaluators={serverEvaluators}
+        onOpenSettings={onOpenSettings}
         isNewItem={isNewItem}
       />
     </DatasetItemEditorAutosaveProvider>
