@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Clock, CopyPlus, FilePen, Rocket, User } from "lucide-react";
+import {
+  Clock,
+  CopyPlus,
+  FilePen,
+  GitCompareArrows,
+  Rocket,
+  User,
+} from "lucide-react";
 
 import {
   BlueprintType,
@@ -13,6 +20,7 @@ import Loader from "@/components/shared/Loader/Loader";
 import { Card } from "@/components/ui/card";
 import ProdTag from "./ProdTag";
 import BlueprintValuesList from "./BlueprintValuesList";
+import BlueprintDiffDialog from "./BlueprintDiffDialog";
 import {
   generateBlueprintDescription,
   isProdTag,
@@ -32,6 +40,7 @@ type ConfigurationDetailViewProps = {
   item: ConfigHistoryItem;
   version: number;
   projectId: string;
+  prodItemId?: string;
   prodVersion: number | null;
 };
 
@@ -46,6 +55,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   item,
   version,
   projectId,
+  prodItemId,
   prodVersion,
 }) => {
   const { data: agentConfig, isPending } = useAgentConfigById({
@@ -54,6 +64,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [duplicateConfirmOpen, setDuplicateConfirmOpen] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
 
   const { mutate: promoteToProd, isPending: isPromoting } =
     useAgentConfigEnvsMutation();
@@ -102,6 +113,16 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="comet-title-m">v{version}</h2>
             {sortTags(item.tags).map(renderTag)}
+            {prodItemId && prodItemId !== item.id && (
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setDiffOpen(true)}
+              >
+                <GitCompareArrows className="mr-1.5 size-3.5" />
+                Show diff vs prod
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {!item.tags.some(isProdTag) && (
@@ -197,6 +218,20 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
         description={`This will create a new blueprint with all values copied from v${version}. Are you sure you want to continue? It will ignore the updates for prompts.`}
         confirmText="Duplicate"
       />
+      {prodItemId && prodItemId !== item.id && (
+        <BlueprintDiffDialog
+          open={diffOpen}
+          setOpen={setDiffOpen}
+          base={{
+            label: `Production (v${prodVersion})`,
+            blueprintId: prodItemId,
+          }}
+          diff={{
+            label: `v${version}`,
+            blueprintId: item.id,
+          }}
+        />
+      )}
     </>
   );
 };

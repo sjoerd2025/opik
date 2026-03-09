@@ -41,6 +41,10 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
     return idx >= 0 ? total - idx : null;
   }, [allRows, total]);
 
+  const prodItem = useMemo(() => {
+    return allRows.find((r) => r.tags.some(isProdTag));
+  }, [allRows]);
+
   if (isPending) {
     return <Loader />;
   }
@@ -106,6 +110,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
             item={selectedItem}
             version={total - selectedIndex}
             projectId={projectId}
+            prodItemId={prodItem?.id}
             prodVersion={prodVersion}
           />
         ) : (

@@ -55,7 +55,7 @@ export default function useAgentConfigById({
     if (!blueprint) return undefined;
     return {
       ...blueprint,
-      values: blueprint.values.map<EnrichedBlueprintValue>((v) => {
+      values: [...blueprint.values].sort((a, b) => a.key.localeCompare(b.key)).map<EnrichedBlueprintValue>((v) => {
         if (v.type !== "prompt") return v;
         const promptInfo = promptsMap[v.value];
         return {

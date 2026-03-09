@@ -34,6 +34,9 @@ const getConfigHistoryList = async (
       (item: { envs?: string[] } & Omit<ConfigHistoryItem, "tags">) => ({
         ...item,
         tags: item.envs ?? [],
+        values: [...(item.values ?? [])].sort((a, b) =>
+          a.key.localeCompare(b.key),
+        ),
       }),
     ),
   };

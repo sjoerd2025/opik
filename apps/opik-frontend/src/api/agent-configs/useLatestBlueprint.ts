@@ -10,6 +10,7 @@ type UseLatestBlueprintParams = {
   projectId: string;
 };
 
+// ALEX
 const MOCK_BLUEPRINT: BlueprintDetails = {
   id: "0195f1d4-1bf2-7b61-9ad9-1c71b4c9d0a7",
   description: "Reduce temperature for more determinism",
