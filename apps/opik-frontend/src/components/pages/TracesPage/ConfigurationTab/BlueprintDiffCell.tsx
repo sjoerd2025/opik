@@ -3,7 +3,7 @@ import React from "react";
 import { cn, formatNumericData } from "@/lib/utils";
 import {
   BlueprintValueType,
-  EnrichedBlueprintValue,
+  BlueprintValue,
 } from "@/types/agent-configs";
 import { GitCommitVertical } from "lucide-react";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
@@ -18,7 +18,7 @@ const SIDE_STYLES = {
   diff: "border-green-200 bg-green-50 text-green-800",
 } as const;
 
-export const formatBlueprintValue = (v: EnrichedBlueprintValue): string => {
+export const formatBlueprintValue = (v: BlueprintValue): string => {
   switch (v.type) {
     case BlueprintValueType.INT:
     case BlueprintValueType.FLOAT: {

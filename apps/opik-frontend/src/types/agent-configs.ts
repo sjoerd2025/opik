@@ -13,12 +13,6 @@ export interface BlueprintValue {
   description?: string;
 }
 
-export interface EnrichedBlueprintValue extends BlueprintValue {
-  promptName?: string;
-  promptId?: string;
-  promptVersionId?: string;
-}
-
 export enum BlueprintType {
   BLUEPRINT = "blueprint",
   MASK = "mask",

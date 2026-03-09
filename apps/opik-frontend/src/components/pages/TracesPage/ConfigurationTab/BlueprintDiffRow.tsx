@@ -3,7 +3,7 @@ import React from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import {
   BlueprintValueType,
-  EnrichedBlueprintValue,
+  BlueprintValue,
 } from "@/types/agent-configs";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
@@ -19,8 +19,8 @@ export type DiffPair = {
   key: string;
   type: BlueprintValueType;
   description?: string;
-  baseValue?: EnrichedBlueprintValue;
-  diffValue?: EnrichedBlueprintValue;
+  baseValue?: BlueprintValue;
+  diffValue?: BlueprintValue;
   changed?: boolean;
 };
 
@@ -32,7 +32,7 @@ const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
   const diffText = diffValue ? formatBlueprintValue(diffValue) : undefined;
 
   const renderCell = (
-    value: EnrichedBlueprintValue | undefined,
+    value: BlueprintValue | undefined,
     text: string | undefined,
     side: DiffSide,
   ) => {
