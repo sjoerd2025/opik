@@ -19,8 +19,8 @@ import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import Loader from "@/components/shared/Loader/Loader";
 import { Card } from "@/components/ui/card";
 import ProdTag from "./ProdTag";
-import BlueprintValuesList from "./BlueprintValuesList";
-import BlueprintDiffDialog from "./BlueprintDiffDialog";
+import BlueprintValuesList from "@/components/pages-shared/traces/ConfigurationTab/BlueprintValuesList";
+import BlueprintDiffDialog from "./BlueprintDiffDialog/BlueprintDiffDialog";
 import {
   generateBlueprintDescription,
   isProdTag,

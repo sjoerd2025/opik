@@ -2,7 +2,7 @@ import React from "react";
 
 import { TableCell, TableRow } from "@/components/ui/table";
 import { BlueprintValueType, BlueprintValue } from "@/types/agent-configs";
-import BlueprintTypeIcon from "./BlueprintTypeIcon";
+import BlueprintTypeIcon from "@/components/pages-shared/traces/ConfigurationTab/BlueprintTypeIcon";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import {
   type DiffSide,

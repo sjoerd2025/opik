@@ -5,7 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Span, Trace } from "@/types/traces";
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import useConfigVersionMap from "@/api/agent-configs/useConfigVersionMap";
-import BlueprintValuesList from "@/components/pages/TracesPage/ConfigurationTab/BlueprintValuesList";
+import BlueprintValuesList from "@/components/pages-shared/traces/ConfigurationTab/BlueprintValuesList";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";

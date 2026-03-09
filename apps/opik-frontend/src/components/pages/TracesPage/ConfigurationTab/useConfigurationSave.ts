@@ -7,7 +7,7 @@ import {
   BlueprintValueType,
 } from "@/types/agent-configs";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
-import { BlueprintValuePromptHandle } from "./BlueprintValuePrompt";
+import { BlueprintValuePromptHandle } from "@/components/pages-shared/traces/ConfigurationTab/BlueprintValuePrompt";
 
 import type useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 

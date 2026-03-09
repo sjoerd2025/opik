@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import Loader from "@/components/shared/Loader/Loader";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
-import BlueprintTypeIcon from "./BlueprintTypeIcon";
-import BlueprintValuePrompt from "./BlueprintValuePrompt";
+import BlueprintTypeIcon from "@/components/pages-shared/traces/ConfigurationTab/BlueprintTypeIcon";
+import BlueprintValuePrompt from "@/components/pages-shared/traces/ConfigurationTab/BlueprintValuePrompt";
 import { Separator } from "@/components/ui/separator";
 import { useConfigurationSave } from "./useConfigurationSave";
 
