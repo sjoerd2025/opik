@@ -11,7 +11,7 @@ import {
   type DiffSide,
   DiffCellBox,
   EmptyDiffCell,
-  PromptDiffCell,
+  PromptDiffPair,
   formatBlueprintValue,
 } from "./BlueprintDiffCell";
 
@@ -21,7 +21,7 @@ export type DiffPair = {
   description?: string;
   baseValue?: EnrichedBlueprintValue;
   diffValue?: EnrichedBlueprintValue;
-  changed: boolean;
+  changed?: boolean;
 };
 
 const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
@@ -36,13 +36,8 @@ const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
     text: string | undefined,
     side: DiffSide,
   ) => {
-    if (isPrompt) {
-      return (
-        <PromptDiffCell commit={value?.value} changed={changed} side={side} />
-      );
-    }
     if (!value) return <EmptyDiffCell />;
-    return <DiffCellBox text={text!} changed={changed} side={side} />;
+    return <DiffCellBox text={text!} changed={changed ?? false} side={side} />;
   };
 
   return (
@@ -60,12 +55,21 @@ const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
           <p className="comet-body-xs mt-1 text-light-slate">{description}</p>
         )}
       </TableCell>
-      <TableCell className="w-1/2 py-3 pr-2 align-top">
-        {renderCell(baseValue, baseText, "base")}
-      </TableCell>
-      <TableCell className="w-1/2 py-3 pl-2 align-top">
-        {renderCell(diffValue, diffText, "diff")}
-      </TableCell>
+      {isPrompt && baseValue?.value && diffValue?.value ? (
+        <PromptDiffPair
+          baseCommit={baseValue.value}
+          diffCommit={diffValue.value}
+        />
+      ) : (
+        <>
+          <TableCell className="w-1/2 py-3 pr-2 align-top">
+            {renderCell(baseValue, baseText, "base")}
+          </TableCell>
+          <TableCell className="w-1/2 py-3 pl-2 align-top">
+            {renderCell(diffValue, diffText, "diff")}
+          </TableCell>
+        </>
+      )}
     </TableRow>
   );
 };

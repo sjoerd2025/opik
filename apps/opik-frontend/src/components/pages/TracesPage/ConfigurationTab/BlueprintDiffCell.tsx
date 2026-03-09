@@ -5,8 +5,11 @@ import {
   BlueprintValueType,
   EnrichedBlueprintValue,
 } from "@/types/agent-configs";
+import { GitCommitVertical } from "lucide-react";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import Loader from "@/components/shared/Loader/Loader";
+import { Tag } from "@/components/ui/tag";
+import { TableCell } from "@/components/ui/table";
 
 export type DiffSide = "base" | "diff";
 
@@ -52,27 +55,91 @@ export const EmptyDiffCell: React.FC = () => (
   <span className="comet-body-xs italic text-muted-slate">—</span>
 );
 
-export const PromptDiffCell: React.FC<{
-  commit?: string;
-  changed: boolean;
-  side: DiffSide;
-}> = ({ commit, changed, side }) => {
-  const { data: prompt, isLoading } = usePromptByCommit(
-    { commitId: commit ?? "" },
-    { enabled: !!commit },
+export const PromptDiffPair: React.FC<{
+  baseCommit: string;
+  diffCommit: string;
+}> = ({ baseCommit, diffCommit }) => {
+  const { data: basePrompt, isLoading: baseLoading } = usePromptByCommit(
+    { commitId: baseCommit },
+    { enabled: !!baseCommit },
+  );
+  const { data: diffPrompt, isLoading: diffLoading } = usePromptByCommit(
+    { commitId: diffCommit },
+    { enabled: !!diffCommit },
   );
 
-  if (!commit) return <EmptyDiffCell />;
-  if (isLoading) return <Loader />;
+  if (baseLoading || diffLoading) {
+    return (
+      <>
+        <TableCell className="w-1/2 py-3 pr-2 align-top">
+          <Loader />
+        </TableCell>
+        <TableCell className="w-1/2 py-3 pl-2 align-top">
+          <Loader />
+        </TableCell>
+      </>
+    );
+  }
 
-  const text = prompt?.requested_version?.template ?? "";
+  const baseText = basePrompt?.requested_version?.template ?? "";
+  const diffText = diffPrompt?.requested_version?.template ?? "";
+  const changed = baseText !== diffText;
+  const commitsChanged = baseCommit !== diffCommit;
 
   return (
-    <DiffCellBox
-      text={text}
-      changed={changed}
-      side={side}
-      className="comet-code max-h-48 overflow-y-auto"
-    />
+    <>
+      <TableCell className="w-1/2 py-3 pr-2 align-top">
+        {baseCommit ? (
+          <div className="flex flex-col gap-1">
+            <Tag
+              className={cn(
+                "flex w-fit items-center gap-1",
+                commitsChanged && "border-red-300 bg-red-50 text-red-700",
+              )}
+              variant="gray"
+              size="sm"
+              title={baseCommit}
+            >
+              <GitCommitVertical className="size-3.5 shrink-0" />
+              {baseCommit.slice(0, 8)}
+            </Tag>
+            <DiffCellBox
+              text={baseText}
+              changed={changed}
+              side="base"
+              className="comet-code max-h-48 overflow-y-auto"
+            />
+          </div>
+        ) : (
+          <EmptyDiffCell />
+        )}
+      </TableCell>
+      <TableCell className="w-1/2 py-3 pl-2 align-top">
+        {diffCommit ? (
+          <div className="flex flex-col gap-1">
+            <Tag
+              className={cn(
+                "flex w-fit items-center gap-1",
+                commitsChanged && "border-green-300 bg-green-50 text-green-700",
+              )}
+              variant="gray"
+              size="sm"
+              title={diffCommit}
+            >
+              <GitCommitVertical className="size-3.5 shrink-0" />
+              {diffCommit.slice(0, 8)}
+            </Tag>
+            <DiffCellBox
+              text={diffText}
+              changed={changed}
+              side="diff"
+              className="comet-code max-h-48 overflow-y-auto"
+            />
+          </div>
+        ) : (
+          <EmptyDiffCell />
+        )}
+      </TableCell>
+    </>
   );
 };

@@ -53,7 +53,9 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
         const type = (dv?.type ?? bv?.type) as BlueprintValueType;
         const isPrompt = type === BlueprintValueType.PROMPT;
         const changed = isPrompt
-          ? bv?.value !== dv?.value
+          ? bv?.value === dv?.value
+            ? false
+            : undefined
           : (bv ? formatBlueprintValue(bv) : undefined) !==
             (dv ? formatBlueprintValue(dv) : undefined);
         return {
@@ -71,8 +73,10 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
 
   const descChanged =
     (baseConfig?.description ?? "") !== (diffConfig?.description ?? "");
-  const hasDifferences = descChanged || pairs.some((p) => p.changed);
-  const visiblePairs = onlyDiff ? pairs.filter((p) => p.changed) : pairs;
+  const hasDifferences = descChanged || pairs.some((p) => p.changed !== false);
+  const visiblePairs = onlyDiff
+    ? pairs.filter((p) => p.changed !== false)
+    : pairs;
 
   if (!hasDifferences) {
     return (
@@ -100,7 +104,7 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
           <div className="mb-4 grid grid-cols-2 gap-4">
             <div>
               <p className="comet-body-xs-accented mb-1 text-muted-slate">
-                Description ({base.label})
+                Description {base.label}
               </p>
               <DiffCellBox
                 text={baseConfig?.description ?? ""}
@@ -110,7 +114,7 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
             </div>
             <div>
               <p className="comet-body-xs-accented mb-1 text-muted-slate">
-                Description ({diff.label})
+                Description {diff.label}
               </p>
               <DiffCellBox
                 text={diffConfig?.description ?? ""}
