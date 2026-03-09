@@ -153,6 +153,7 @@ const BlueprintValuePrompt = forwardRef<
         <PromptTemplateView
           template={promptVersion.template}
           templateStructure={prompt?.template_structure}
+          truncate
         />
       )}
     </div>

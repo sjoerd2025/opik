@@ -20,6 +20,7 @@ interface PromptTemplateViewProps {
   template: unknown;
   templateStructure?: PROMPT_TEMPLATE_STRUCTURE;
   search?: string;
+  truncate?: boolean;
   children?: React.ReactNode;
 }
 
@@ -27,6 +28,7 @@ const PromptTemplateView: React.FC<PromptTemplateViewProps> = ({
   template,
   templateStructure,
   search,
+  truncate = false,
   children,
 }) => {
   const [showRawView, setShowRawView] = useState(false);
@@ -120,7 +122,7 @@ const PromptTemplateView: React.FC<PromptTemplateViewProps> = ({
     }
 
     if (isChatPrompt && hasMessages) {
-      return <PromptMessagesReadonly messages={messages} />;
+      return <PromptMessagesReadonly messages={messages} truncate={truncate} />;
     }
 
     if (isTextPrompt) {
