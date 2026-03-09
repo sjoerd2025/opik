@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 
-import { EnrichedBlueprintValue } from "@/types/agent-configs";
+import { BlueprintValue } from "@/types/agent-configs";
 import { LLMMessage } from "@/types/llm";
 import {
   PROMPT_TEMPLATE_STRUCTURE,
@@ -30,7 +30,7 @@ export interface BlueprintValuePromptHandle {
 }
 
 type BlueprintValuePromptProps = {
-  value: EnrichedBlueprintValue;
+  value: BlueprintValue;
   isEditing?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
 };

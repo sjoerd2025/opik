@@ -3,10 +3,7 @@ import { FileSliders, GitCommitVertical, Info } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import { Span, Trace } from "@/types/traces";
-import {
-  BlueprintValueType,
-  EnrichedBlueprintValue,
-} from "@/types/agent-configs";
+import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import useConfigVersionMap from "@/api/agent-configs/useConfigVersionMap";
 import BlueprintValuesList from "@/components/pages/TracesPage/ConfigurationTab/BlueprintValuesList";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
@@ -44,7 +41,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
     : undefined;
   const blueprintId = configMeta?.blueprint_id;
 
-  const values = useMemo<EnrichedBlueprintValue[]>(() => {
+  const values = useMemo<BlueprintValue[]>(() => {
     if (!configMeta?.values) return [];
     return Object.entries(configMeta.values)
       .map(([key, { type, value }]) => ({ key, type, value }))

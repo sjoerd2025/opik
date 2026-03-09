@@ -1,10 +1,6 @@
 import React from "react";
 
-import {
-  BlueprintValue,
-  BlueprintValueType,
-  EnrichedBlueprintValue,
-} from "@/types/agent-configs";
+import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import { formatNumericData } from "@/lib/utils";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import BlueprintValuePrompt from "./BlueprintValuePrompt";
@@ -27,7 +23,7 @@ const renderValue = (v: BlueprintValue) => {
         </div>
       );
     case BlueprintValueType.PROMPT:
-      return <BlueprintValuePrompt value={v as EnrichedBlueprintValue} />;
+      return <BlueprintValuePrompt value={v} />;
     default:
       return (
         <div className="comet-body-s whitespace-pre-wrap break-words rounded-md border bg-primary-foreground p-3 text-foreground">
