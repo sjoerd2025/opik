@@ -23,15 +23,19 @@ export const aggregateExperimentMetrics = (
   let hasCost = false;
   let hasLatency = false;
 
+  let totalWeightedScoreItems = 0;
+
   for (const exp of experiments) {
     const tc = exp.trace_count || 0;
+    const dic = exp.dataset_item_count ?? tc;
     totalTraceCount += tc;
-    totalDatasetItemCount += exp.dataset_item_count ?? tc;
+    totalDatasetItemCount += dic;
 
     if (objectiveName) {
       const score = getObjectiveScoreValue(exp, objectiveName);
       if (score != null) {
-        totalWeightedScore += score * tc;
+        totalWeightedScore += score * dic;
+        totalWeightedScoreItems += dic;
         hasScore = true;
       }
     }
@@ -49,8 +53,8 @@ export const aggregateExperimentMetrics = (
 
   return {
     score:
-      hasScore && totalTraceCount > 0
-        ? totalWeightedScore / totalTraceCount
+      hasScore && totalWeightedScoreItems > 0
+        ? totalWeightedScore / totalWeightedScoreItems
         : undefined,
     cost:
       hasCost && totalTraceCount > 0 ? totalCost / totalTraceCount : undefined,
