@@ -1,6 +1,10 @@
 import React from "react";
 
-import { BlueprintValue, BlueprintValueType, EnrichedBlueprintValue } from "@/types/agent-configs";
+import {
+  BlueprintValue,
+  BlueprintValueType,
+  EnrichedBlueprintValue,
+} from "@/types/agent-configs";
 import { formatNumericData } from "@/lib/utils";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import BlueprintValuePrompt from "./BlueprintValuePrompt";
