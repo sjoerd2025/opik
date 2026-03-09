@@ -62,7 +62,7 @@ const ConfigurationHistoryTimeline: React.FC<
               className={cn(
                 "min-w-0 flex-1 cursor-pointer rounded px-3 py-2 transition-colors",
                 isSelected
-                  ? "bg-primary-foreground ring-1 ring-primary"
+                  ? "relative z-10 bg-primary-foreground ring-1 ring-primary"
                   : "hover:bg-primary-foreground/60",
               )}
               onClick={() => onSelect(index)}
