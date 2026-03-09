@@ -56,6 +56,7 @@ import {
 } from "@/lib/table";
 import { buildDocsUrl } from "@/lib/utils";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
+import Loader from "@/components/shared/Loader/Loader";
 import { mapDynamicColumnTypesToColumnType } from "@/lib/filters";
 import {
   generateActionsColumDef,
@@ -525,7 +526,11 @@ function EvaluationSuiteItemsTab({
     selectedRows.length < totalCount;
 
   if (isPending) {
-    return null;
+    return (
+      <div className="flex items-center justify-center pt-12">
+        <Loader />
+      </div>
+    );
   }
 
   return (
