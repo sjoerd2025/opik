@@ -5,7 +5,9 @@ import com.comet.opik.api.ExperimentStatus;
 import com.comet.opik.api.ExperimentType;
 import com.comet.opik.api.ExperimentUpdate;
 import com.comet.opik.api.sorting.ExperimentSortingFactory;
+import com.comet.opik.infrastructure.ExperimentAggregatesConfig;
 import com.comet.opik.infrastructure.FeatureFlags;
+import com.comet.opik.infrastructure.OpikConfiguration;
 import com.comet.opik.podam.PodamFactoryUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.eventbus.EventBus;
@@ -17,15 +19,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import uk.co.jemos.podam.api.PodamFactory;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,6 +77,9 @@ class ExperimentServiceTest {
     private FeatureFlags featureFlags;
 
     @Mock
+    private OpikConfiguration config;
+
+    @Mock
     private ExperimentGroupEnricher experimentGroupEnricher;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -78,6 +87,9 @@ class ExperimentServiceTest {
 
     @BeforeEach
     void setUp() {
+        var aggregatesConfig = new ExperimentAggregatesConfig();
+        lenient().when(config.getExperimentAggregates()).thenReturn(aggregatesConfig);
+
         experimentService = new ExperimentService(
                 experimentDAO,
                 experimentItemDAO,
@@ -91,6 +103,7 @@ class ExperimentServiceTest {
                 sortingFactory,
                 responseBuilder,
                 featureFlags,
+                config,
                 experimentGroupEnricher);
     }
 
@@ -348,6 +361,58 @@ class ExperimentServiceTest {
 
             verify(experimentDAO).getById(experimentId);
             verify(experimentDAO).update(experimentId, experimentUpdate);
+        }
+    }
+
+    @Nested
+    @DisplayName("Evaluation Suite Stats Toggle:")
+    class EvaluationSuiteStatsToggle {
+
+        @Test
+        @DisplayName("when toggle disabled, then threshold fetching is skipped")
+        void whenToggleDisabled_thenSkipThresholdFetching() {
+            var ids = Set.of(UUID.randomUUID());
+
+            when(experimentDAO.getByIds(ids, Map.of())).thenReturn(Flux.empty());
+
+            StepVerifier.create(
+                    experimentService.finishExperiments(ids)
+                            .contextWrite(ctx -> ctx
+                                    .put("workspaceId", "test-workspace")
+                                    .put("workspaceName", "test-workspace-name")
+                                    .put("userName", "test-user")))
+                    .verifyComplete();
+
+            verify(experimentDAO, never()).getDatasetVersionIds();
+            verify(experimentDAO).getByIds(ids, Map.of());
+        }
+
+        @Test
+        @DisplayName("when toggle enabled, then thresholds are fetched")
+        void whenToggleEnabled_thenFetchThresholds() {
+            var enabledConfig = new ExperimentAggregatesConfig();
+            enabledConfig.setEvaluationSuiteStatsEnabled(true);
+            when(config.getExperimentAggregates()).thenReturn(enabledConfig);
+
+            var enabledService = new ExperimentService(
+                    experimentDAO, experimentItemDAO, datasetService, datasetVersionService,
+                    projectService, idGenerator, nameGenerator, eventBus, promptService,
+                    sortingFactory, responseBuilder, featureFlags, config, experimentGroupEnricher);
+
+            var ids = Set.of(UUID.randomUUID());
+
+            when(experimentDAO.getDatasetVersionIds()).thenReturn(Mono.just(Set.of()));
+            when(experimentDAO.getByIds(ids, Map.of())).thenReturn(Flux.empty());
+
+            StepVerifier.create(
+                    enabledService.finishExperiments(ids)
+                            .contextWrite(ctx -> ctx
+                                    .put("workspaceId", "test-workspace")
+                                    .put("workspaceName", "test-workspace-name")
+                                    .put("userName", "test-user")))
+                    .verifyComplete();
+
+            verify(experimentDAO).getDatasetVersionIds();
         }
     }
 }

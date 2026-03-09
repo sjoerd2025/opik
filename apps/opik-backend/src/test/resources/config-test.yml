@@ -420,6 +420,7 @@ workspaceSettings:
 experimentAggregates:
   # Batch size for processing experiment items when calculating aggregates
   batchSize: 100
+  evaluationSuiteStatsEnabled: true
 
 experimentDenormalization:
   # Default: false for testing

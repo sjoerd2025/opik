@@ -226,6 +226,7 @@ experimentAggregates:
   # Default: 1000
   # Description: Number of experiment items processed per batch when populating experiment_item_aggregates table. Higher values improve performance but increase memory usage. Recommended range: 100-5000.
   batchSize: ${EXPERIMENT_AGGREGATES_BATCH_SIZE:-1000}
+  evaluationSuiteStatsEnabled: ${EVALUATION_SUITE_STATS_ENABLED:-false}
 
 # Configuration for experiment denormalization (debounced re-computation of experiment aggregates)
 experimentDenormalization:

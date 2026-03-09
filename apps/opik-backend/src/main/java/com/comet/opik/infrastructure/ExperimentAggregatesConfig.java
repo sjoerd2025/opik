@@ -10,4 +10,7 @@ public class ExperimentAggregatesConfig {
 
     @Valid @JsonProperty
     @Positive private int batchSize = 1000;
+
+    @JsonProperty
+    private boolean evaluationSuiteStatsEnabled = false;
 }

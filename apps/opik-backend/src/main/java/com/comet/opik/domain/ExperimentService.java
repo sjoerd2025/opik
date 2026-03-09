@@ -25,6 +25,7 @@ import com.comet.opik.api.events.webhooks.AlertEvent;
 import com.comet.opik.api.grouping.GroupBy;
 import com.comet.opik.api.sorting.ExperimentSortingFactory;
 import com.comet.opik.infrastructure.FeatureFlags;
+import com.comet.opik.infrastructure.OpikConfiguration;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import com.google.common.base.Preconditions;
 import com.google.common.eventbus.EventBus;
@@ -77,6 +78,7 @@ public class ExperimentService {
     private final @NonNull ExperimentSortingFactory sortingFactory;
     private final @NonNull ExperimentResponseBuilder responseBuilder;
     private final @NonNull FeatureFlags featureFlags;
+    private final @NonNull OpikConfiguration config;
     private final @NonNull ExperimentGroupEnricher experimentGroupEnricher;
 
     @WithSpan
@@ -131,7 +133,7 @@ public class ExperimentService {
 
     private Mono<ExperimentPage> fetchExperimentPage(
             int page, int size, ExperimentSearchCriteria experimentSearchCriteria) {
-        return fetchSuiteLevelThresholds()
+        return getSuiteThresholds()
                 .flatMap(thresholds -> experimentDAO.find(page, size, experimentSearchCriteria, thresholds))
                 .flatMap(experimentPage -> enrichExperiments(experimentPage.content())
                         .map(experiments -> experimentPage.toBuilder().content(experiments).build()));
@@ -293,6 +295,13 @@ public class ExperimentService {
         });
     }
 
+    private Mono<Map<String, Integer>> getSuiteThresholds() {
+        if (!config.getExperimentAggregates().isEvaluationSuiteStatsEnabled()) {
+            return Mono.just(Map.of());
+        }
+        return fetchSuiteLevelThresholds();
+    }
+
     private Mono<Map<String, Integer>> fetchSuiteLevelThresholds() {
         return experimentDAO.getDatasetVersionIds()
                 .flatMap(versionIds -> {
@@ -316,7 +325,7 @@ public class ExperimentService {
     public Mono<ExperimentGroupAggregationsResponse> findGroupsAggregations(@NonNull ExperimentGroupCriteria criteria) {
         log.info("Finding experiment groups aggregations by criteria '{}'", criteria);
 
-        return fetchSuiteLevelThresholds()
+        return getSuiteThresholds()
                 .flatMapMany(thresholds -> experimentDAO.findGroupsAggregations(criteria, thresholds))
                 .collectList()
                 .flatMap(groupItems -> Mono.deferContextual(ctx -> {
@@ -339,7 +348,7 @@ public class ExperimentService {
     public Mono<Experiment> getById(@NonNull UUID id) {
         log.info("Getting experiment by id '{}'", id);
         return enrichExperiment(
-                fetchSuiteLevelThresholds()
+                getSuiteThresholds()
                         .flatMap(thresholds -> experimentDAO.getById(id, thresholds)),
                 "Not found experiment with id '%s'".formatted(id));
     }
@@ -347,7 +356,8 @@ public class ExperimentService {
     @WithSpan
     public Flux<Experiment> get(@NonNull ExperimentStreamRequest request) {
         log.info("Getting experiments by '{}'", request);
-        return experimentDAO.get(request)
+        return getSuiteThresholds()
+                .flatMapMany(thresholds -> experimentDAO.get(request, thresholds))
                 .collectList()
                 .flatMap(this::enrichExperiments)
                 .flatMapMany(Flux::fromIterable);
@@ -679,7 +689,8 @@ public class ExperimentService {
 
             log.info("Finishing experiments, count '{}', workspaceId '{}'", ids.size(), workspaceId);
 
-            return experimentDAO.getByIds(ids)
+            return getSuiteThresholds()
+                    .flatMapMany(thresholds -> experimentDAO.getByIds(ids, thresholds))
                     .collectList()
                     .doOnNext(experiments -> {
                         if (CollectionUtils.isNotEmpty(experiments)) {

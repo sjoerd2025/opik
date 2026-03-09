@@ -16,7 +16,6 @@ import com.comet.opik.api.ExperimentStreamRequest;
 import com.comet.opik.api.ExperimentType;
 import com.comet.opik.api.ExperimentUpdate;
 import com.comet.opik.api.FeedbackScoreAverage;
-import com.comet.opik.api.PercentageValues;
 import com.comet.opik.api.filter.Filter;
 import com.comet.opik.api.sorting.ExperimentSortingFactory;
 import com.comet.opik.domain.filter.FilterQueryBuilder;
@@ -51,6 +50,7 @@ import reactor.core.publisher.SignalType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -477,14 +477,18 @@ class ExperimentDAO {
                 FROM experiments_final
                 WHERE evaluation_method = 'evaluation_suite'
             ),
-            pass_rate_eval_items AS (
+            pass_rate_runs AS (
                 SELECT
-                    ei.id AS item_id,
-                    ei.experiment_id AS experiment_id,
-                    ei.trace_id AS trace_id,
-                    eif.dataset_item_id AS dataset_item_id,
+                    ei.experiment_id,
+                    eif.dataset_item_id,
+                    ei.trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
-                    arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold
+                    arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold,
+                    if(
+                        countIf(fs.name != '') = 0,
+                        1,
+                        if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                    ) AS run_passed
                 FROM experiment_items_final ei
                 INNER JOIN (
                     SELECT id, dataset_item_id
@@ -504,34 +508,9 @@ class ExperimentDAO {
                     )
                 ) div ON eif.dataset_item_id = div.dataset_item_id
                     AND ef.dataset_version_id = div.dataset_version_id
-            ),
-            pass_rate_runs AS (
-                SELECT
-                    prei.experiment_id,
-                    prei.dataset_item_id,
-                    prei.trace_id,
-                    prei.item_pass_threshold,
-                    prei.suite_pass_threshold,
-                    if(
-                        countIf(fs.name != '') = 0,
-                        1,
-                        if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
-                    ) AS run_passed
-                FROM pass_rate_eval_items prei
-                LEFT JOIN feedback_scores_final fs ON fs.entity_id = prei.trace_id
-                GROUP BY prei.experiment_id, prei.dataset_item_id, prei.trace_id,
-                         prei.item_pass_threshold, prei.suite_pass_threshold
-            ),
-            pass_rate_item_results AS (
-                SELECT
-                    experiment_id,
-                    dataset_item_id,
-                    if(sum(run_passed) >=
-                       if(item_pass_threshold > 0, item_pass_threshold,
-                          if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
-                       1, 0) AS item_passed
-                FROM pass_rate_runs
-                GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
+                LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                GROUP BY ei.experiment_id, eif.dataset_item_id, ei.trace_id,
+                         item_pass_threshold, suite_pass_threshold
             ),
             pass_rate_agg AS (
                 SELECT
@@ -539,7 +518,17 @@ class ExperimentDAO {
                     toNullable(sum(item_passed)) AS passed_count,
                     toNullable(count(*)) AS total_count,
                     if(count(*) = 0, NULL, toNullable(toFloat64(sum(item_passed)) / toFloat64(count(*)))) AS pass_rate
-                FROM pass_rate_item_results
+                FROM (
+                    SELECT
+                        experiment_id,
+                        dataset_item_id,
+                        if(sum(run_passed) >=
+                           if(item_pass_threshold > 0, item_pass_threshold,
+                              if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
+                           1, 0) AS item_passed
+                    FROM pass_rate_runs
+                    GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
+                )
                 GROUP BY experiment_id
             )
             SELECT
@@ -1102,14 +1091,18 @@ class ExperimentDAO {
                 FROM experiments_final
                 WHERE evaluation_method = 'evaluation_suite'
             ),
-            pass_rate_eval_items AS (
+            pass_rate_runs AS (
                 SELECT
-                    ei.id AS item_id,
-                    ei.experiment_id AS experiment_id,
-                    ei.trace_id AS trace_id,
-                    eif.dataset_item_id AS dataset_item_id,
+                    ei.experiment_id,
+                    eif.dataset_item_id,
+                    ei.trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
-                    arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold
+                    arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold,
+                    if(
+                        countIf(fs.name != '') = 0,
+                        1,
+                        if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                    ) AS run_passed
                 FROM experiment_items_final ei
                 INNER JOIN (
                     SELECT id, dataset_item_id
@@ -1129,34 +1122,9 @@ class ExperimentDAO {
                     )
                 ) div ON eif.dataset_item_id = div.dataset_item_id
                     AND ef.dataset_version_id = div.dataset_version_id
-            ),
-            pass_rate_runs AS (
-                SELECT
-                    prei.experiment_id,
-                    prei.dataset_item_id,
-                    prei.trace_id,
-                    prei.item_pass_threshold,
-                    prei.suite_pass_threshold,
-                    if(
-                        countIf(fs.name != '') = 0,
-                        1,
-                        if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
-                    ) AS run_passed
-                FROM pass_rate_eval_items prei
-                LEFT JOIN feedback_scores_final fs ON fs.entity_id = prei.trace_id
-                GROUP BY prei.experiment_id, prei.dataset_item_id, prei.trace_id,
-                         prei.item_pass_threshold, prei.suite_pass_threshold
-            ),
-            pass_rate_item_results AS (
-                SELECT
-                    experiment_id,
-                    dataset_item_id,
-                    if(sum(run_passed) >=
-                       if(item_pass_threshold > 0, item_pass_threshold,
-                          if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
-                       1, 0) AS item_passed
-                FROM pass_rate_runs
-                GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
+                LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                GROUP BY ei.experiment_id, eif.dataset_item_id, ei.trace_id,
+                         item_pass_threshold, suite_pass_threshold
             ),
             pass_rate_agg AS (
                 SELECT
@@ -1164,7 +1132,17 @@ class ExperimentDAO {
                     toNullable(sum(item_passed)) AS passed_count,
                     toNullable(count(*)) AS total_count,
                     if(count(*) = 0, NULL, toNullable(toFloat64(sum(item_passed)) / toFloat64(count(*)))) AS pass_rate
-                FROM pass_rate_item_results
+                FROM (
+                    SELECT
+                        experiment_id,
+                        dataset_item_id,
+                        if(sum(run_passed) >=
+                           if(item_pass_threshold > 0, item_pass_threshold,
+                              if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
+                           1, 0) AS item_passed
+                    FROM pass_rate_runs
+                    GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
+                )
                 GROUP BY experiment_id
             ), experiments_full AS (
                 SELECT
@@ -1455,6 +1433,10 @@ class ExperimentDAO {
 
     @WithSpan
     Flux<Experiment> getByIds(@NonNull Set<UUID> ids) {
+        return getByIds(ids, Map.of());
+    }
+
+    Flux<Experiment> getByIds(@NonNull Set<UUID> ids, @NonNull Map<String, Integer> suiteThresholds) {
         log.info("Getting experiment by ids '{}'", ids);
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
@@ -1462,7 +1444,7 @@ class ExperimentDAO {
                     template.add("ids_list", ids);
                     return Flux.from(get(template.render(), connection,
                             statement -> {
-                                bindSuiteThresholds(statement, Map.of());
+                                bindSuiteThresholds(statement, suiteThresholds);
                                 return statement.bind("ids_list", ids.toArray(UUID[]::new)).bind("workspace_id",
                                         workspaceId);
                             }));
@@ -1472,6 +1454,10 @@ class ExperimentDAO {
 
     @WithSpan
     Flux<Experiment> get(@NonNull ExperimentStreamRequest request) {
+        return get(request, Map.of());
+    }
+
+    Flux<Experiment> get(@NonNull ExperimentStreamRequest request, @NonNull Map<String, Integer> suiteThresholds) {
         log.info("Getting experiment by '{}'", request);
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
@@ -1483,7 +1469,7 @@ class ExperimentDAO {
                     template.add("limit", request.limit());
                     return Flux.from(get(template.render(), connection,
                             statement -> {
-                                bindSuiteThresholds(statement, Map.of());
+                                bindSuiteThresholds(statement, suiteThresholds);
                                 statement.bind("name", request.name());
                                 if (request.lastRetrievedId() != null) {
                                     statement = statement.bind("lastRetrievedId", request.lastRetrievedId());
@@ -1546,40 +1532,10 @@ class ExperimentDAO {
         });
     }
 
-    private static BigDecimal getCostValue(Row row, String fieldName) {
-        return Optional.ofNullable(row.get(fieldName, BigDecimal.class))
-                .filter(value -> value.compareTo(BigDecimal.ZERO) > 0)
-                .orElse(null);
-    }
-
     private static BigDecimal getPassRateValue(Row row, String fieldName) {
         return Optional.ofNullable(row.get(fieldName, Number.class))
                 .map(value -> BigDecimal.valueOf(value.doubleValue()).setScale(SCALE, RoundingMode.HALF_EVEN))
                 .orElse(null);
-    }
-
-    private static PercentageValues getDuration(Row row) {
-        return Optional.ofNullable(row.get("duration", Map.class))
-                .map(map -> (Map<String, ? extends Number>) map)
-                .map(durations -> new PercentageValues(
-                        convertToBigDecimal(durations.get("p50")),
-                        convertToBigDecimal(durations.get("p90")),
-                        convertToBigDecimal(durations.get("p99"))))
-                .orElse(null);
-    }
-
-    private static BigDecimal convertToBigDecimal(Number value) {
-        if (value instanceof BigDecimal) {
-            return (BigDecimal) value;
-        } else if (value instanceof Double) {
-            return BigDecimal.valueOf((Double) value);
-        } else {
-            return BigDecimal.ZERO;
-        }
-    }
-
-    private static BigDecimal getP(List<BigDecimal> durations, int index) {
-        return durations.get(index);
     }
 
     private List<PromptVersionLink> getPromptVersions(Row row) {
@@ -1804,9 +1760,14 @@ class ExperimentDAO {
             statement.bind("suite_version_ids", new String[]{""});
             statement.bind("suite_thresholds", new Integer[]{0});
         } else {
-            var entries = suiteThresholds.entrySet().stream().toList();
-            statement.bind("suite_version_ids", entries.stream().map(Map.Entry::getKey).toArray(String[]::new));
-            statement.bind("suite_thresholds", entries.stream().map(Map.Entry::getValue).toArray(Integer[]::new));
+            var keys = new ArrayList<String>(suiteThresholds.size());
+            var values = new ArrayList<Integer>(suiteThresholds.size());
+            suiteThresholds.forEach((k, v) -> {
+                keys.add(k);
+                values.add(v);
+            });
+            statement.bind("suite_version_ids", keys.toArray(String[]::new));
+            statement.bind("suite_thresholds", values.toArray(Integer[]::new));
         }
     }
 
@@ -2166,9 +2127,9 @@ class ExperimentDAO {
 
             var experimentCount = row.get("experiment_count", Long.class);
             var traceCount = row.get("trace_count", Long.class);
-            var totalEstimatedCost = getCostValue(row, "total_estimated_cost");
-            var totalEstimatedCostAvg = getCostValue(row, "total_estimated_cost_avg");
-            var duration = getDuration(row);
+            var totalEstimatedCost = ExperimentGroupMappers.getCostValue(row, "total_estimated_cost");
+            var totalEstimatedCostAvg = ExperimentGroupMappers.getCostValue(row, "total_estimated_cost_avg");
+            var duration = ExperimentGroupMappers.getDuration(row);
             var feedbackScores = getFeedbackScores(row, "feedback_scores");
             var experimentScores = getFeedbackScores(row, "experiment_scores");
 
