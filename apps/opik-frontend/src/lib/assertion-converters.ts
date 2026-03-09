@@ -1,7 +1,6 @@
 import {
   LLMJudgeConfig,
   MetricType,
-  METRIC_TYPE_LABELS,
 } from "@/types/evaluation-suites";
 import { Evaluator } from "@/types/datasets";
 
@@ -90,24 +89,3 @@ export function packAssertions(
   };
 }
 
-// --- Export utility (used by DatasetItemsActionsPanel) ---
-
-const VALID_METRIC_TYPES = new Set<string>(Object.values(MetricType));
-
-function isValidMetricType(type: string): type is MetricType {
-  return VALID_METRIC_TYPES.has(type);
-}
-
-export function formatAssertionsForExport(
-  evaluators: Evaluator[],
-): Array<Record<string, unknown>> {
-  return evaluators
-    .filter((e) => isValidMetricType(e.type))
-    .map((e) => ({
-      name: e.name,
-      type: METRIC_TYPE_LABELS[e.type as MetricType],
-      ...(e.type === MetricType.LLM_AS_JUDGE
-        ? parseLLMJudgeBEConfig(e.config)
-        : {}),
-    }));
-}

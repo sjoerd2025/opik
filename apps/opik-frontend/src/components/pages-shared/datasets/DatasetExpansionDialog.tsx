@@ -38,9 +38,7 @@ import {
   DatasetExpansionRequest,
   DatasetItem,
   DATASET_TYPE,
-  Evaluator,
 } from "@/types/datasets";
-import { parseLLMJudgeBEConfig } from "@/lib/assertion-converters";
 import {
   OPIK_DESCRIPTION_FIELD,
   OPIK_ASSERTIONS_FIELD,
@@ -67,7 +65,7 @@ type DatasetExpansionDialogProps = {
   setOpen: (open: boolean) => void;
   onSamplesGenerated?: (samples: DatasetItem[]) => void;
   datasetType?: DATASET_TYPE;
-  suiteEvaluators?: Evaluator[];
+  suiteAssertions?: string[];
 };
 
 const DatasetExpansionDialog: React.FunctionComponent<
@@ -78,7 +76,7 @@ const DatasetExpansionDialog: React.FunctionComponent<
   setOpen,
   onSamplesGenerated,
   datasetType,
-  suiteEvaluators,
+  suiteAssertions,
 }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
 
@@ -195,11 +193,7 @@ const DatasetExpansionDialog: React.FunctionComponent<
     if (isEvaluationSuite) {
       prompt += `\nEVALUATION SUITE METADATA:\nFor each generated sample, include these two additional fields in the JSON object:\n- "${OPIK_DESCRIPTION_FIELD}": A brief (1-2 sentence) description of what this specific test case evaluates\n- "${OPIK_ASSERTIONS_FIELD}": An array of 1-3 natural language assertion strings that an LLM judge should verify for this specific item's expected output\n`;
 
-      const suiteAssertions = (suiteEvaluators ?? [])
-        .filter((e) => e.type === "llm_judge")
-        .flatMap((e) => parseLLMJudgeBEConfig(e.config).assertions ?? []);
-
-      if (suiteAssertions.length > 0) {
+      if (suiteAssertions && suiteAssertions.length > 0) {
         prompt += `\nThe following assertions already apply to ALL items at the suite level. Do NOT duplicate them. Generate complementary, item-specific assertions:\n`;
         suiteAssertions.forEach((assertion) => {
           prompt += `- ${assertion}\n`;
@@ -215,7 +209,7 @@ const DatasetExpansionDialog: React.FunctionComponent<
     preserveFields,
     variationInstructions,
     isEvaluationSuite,
-    suiteEvaluators,
+    suiteAssertions,
   ]);
 
   useEffect(() => {

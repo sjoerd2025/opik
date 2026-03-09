@@ -135,6 +135,7 @@ interface EvaluationSuiteItemsTabProps {
   datasetName?: string;
   datasetStatus?: DATASET_STATUS;
   datasetType?: DATASET_TYPE;
+  suiteAssertions?: string[];
   onOpenSettings: () => void;
 }
 
@@ -143,6 +144,7 @@ function EvaluationSuiteItemsTab({
   datasetName,
   datasetStatus,
   datasetType,
+  suiteAssertions,
   onOpenSettings,
 }: EvaluationSuiteItemsTabProps): React.ReactElement | null {
   const isEvaluationSuite = datasetType === DATASET_TYPE.EVALUATION_SUITE;
@@ -578,6 +580,7 @@ function EvaluationSuiteItemsTab({
             totalCount={totalCount}
             isDraftMode={isDraftMode}
             datasetType={datasetType}
+            suiteAssertions={suiteAssertions}
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
           <DataTableRowHeightSelector

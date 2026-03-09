@@ -404,6 +404,7 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
             datasetName={suite?.name}
             datasetStatus={suite?.status}
             datasetType={datasetType}
+            suiteAssertions={effectiveAssertions}
             onOpenSettings={() => setSettingsDialogOpen(true)}
           />
         </TabsContent>

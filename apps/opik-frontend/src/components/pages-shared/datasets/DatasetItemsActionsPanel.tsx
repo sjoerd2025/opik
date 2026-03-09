@@ -4,7 +4,7 @@ import get from "lodash/get";
 import slugify from "slugify";
 
 import { Button } from "@/components/ui/button";
-import { DatasetItem, DATASET_TYPE, Evaluator } from "@/types/datasets";
+import { DatasetItem, DATASET_TYPE } from "@/types/datasets";
 import useDatasetItemBatchDeleteMutation from "@/api/datasets/useDatasetItemBatchDeleteMutation";
 import ExportToButton from "@/components/shared/ExportToButton/ExportToButton";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
@@ -13,7 +13,7 @@ import GeneratedSamplesDialog from "./GeneratedSamplesDialog";
 import AddTagDialog from "./AddTagDialog";
 import { DATASET_ITEM_DATA_PREFIX } from "@/constants/datasets";
 import { stripColumnPrefix, generateBatchGroupId } from "@/lib/utils";
-import { formatAssertionsForExport } from "@/lib/assertion-converters";
+import { extractAssertions } from "@/lib/assertion-converters";
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { Filters } from "@/types/filters";
@@ -37,7 +37,7 @@ type DatasetItemsActionsPanelProps = {
   totalCount?: number;
   isDraftMode?: boolean;
   datasetType?: DATASET_TYPE;
-  suiteEvaluators?: Evaluator[];
+  suiteAssertions?: string[];
 };
 
 const DatasetItemsActionsPanel: React.FunctionComponent<
@@ -54,7 +54,7 @@ const DatasetItemsActionsPanel: React.FunctionComponent<
   totalCount = 0,
   isDraftMode = false,
   datasetType,
-  suiteEvaluators,
+  suiteAssertions,
 }) => {
   const resetKeyRef = useRef(0);
   const [expansionDialogOpen, setExpansionDialogOpen] =
@@ -139,8 +139,7 @@ const DatasetItemsActionsPanel: React.FunctionComponent<
           key = columnName;
           value = get(item.data, columnName, "");
         } else if (column === "assertions") {
-          key = "evaluators";
-          value = formatAssertionsForExport(item.evaluators ?? []);
+          value = extractAssertions(item.evaluators ?? []);
         } else {
           value = get(item, column, "");
         }
@@ -169,7 +168,7 @@ const DatasetItemsActionsPanel: React.FunctionComponent<
         setOpen={setExpansionDialogOpen}
         onSamplesGenerated={handleSamplesGenerated}
         datasetType={datasetType}
-        suiteEvaluators={suiteEvaluators}
+        suiteAssertions={suiteAssertions}
       />
 
       <GeneratedSamplesDialog
