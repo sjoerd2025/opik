@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
+import { z } from "zod";
 
 import {
   BlueprintType,
@@ -7,7 +8,6 @@ import {
   BlueprintValueType,
   ConfigHistoryItem,
 } from "@/types/agent-configs";
-import { useQueryClient } from "@tanstack/react-query";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import BlueprintValuePrompt, {
   BlueprintValuePromptHandle,
 } from "./BlueprintValuePrompt";
+import { Separator } from "@/components/ui/separator";
 
 type ConfigurationEditViewProps = {
   item: ConfigHistoryItem;
@@ -26,6 +27,25 @@ type ConfigurationEditViewProps = {
   version: number;
   onCancel: () => void;
   onSaved: () => void;
+};
+
+const nonEmptyString = z.string().min(1, "Must not be empty");
+
+const FIELD_SCHEMAS: Partial<Record<BlueprintValueType, z.ZodType>> = {
+  [BlueprintValueType.INT]: nonEmptyString.pipe(
+    z.coerce.number().int("Must be an integer"),
+  ),
+  [BlueprintValueType.FLOAT]: nonEmptyString.pipe(
+    z.coerce.number({ message: "Must be a valid number" }),
+  ),
+  [BlueprintValueType.STRING]: nonEmptyString,
+};
+
+const validateField = (type: string, value: string): string => {
+  const schema = FIELD_SCHEMAS[type as BlueprintValueType];
+  if (!schema) return "";
+  const result = schema.safeParse(value.trim());
+  return result.success ? "" : result.error.issues[0].message;
 };
 
 const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
@@ -67,21 +87,15 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
     }
   }, [agentConfig]);
 
-  const validateField = (type: string, value: string): string => {
-    if (type === BlueprintValueType.INT) {
-      return /^-?\d+$/.test(value.trim()) ? "" : "Must be an integer";
-    }
-    if (type === BlueprintValueType.FLOAT) {
-      return value.trim() !== "" && !isNaN(Number(value))
-        ? ""
-        : "Must be a valid number";
-    }
-    return "";
-  };
-
-  const handleFieldChange = (key: string, type: string, value: string) => {
+  const handleFieldChange = (key: string, value: string) => {
     setDraftValues((prev) => ({ ...prev, [key]: value }));
-    setErrors((prev) => ({ ...prev, [key]: validateField(type, value) }));
+    if (errors[key]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   };
 
   const hasErrors = Object.values(errors).some(Boolean);
@@ -115,7 +129,10 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
     const values: BlueprintValue[] = agentConfig.values.map((v) => ({
       key: v.key,
       type: v.type,
-      value: v.type !== BlueprintValueType.PROMPT ? draftValues[v.key] ?? v.value : v.value,
+      value:
+        v.type !== BlueprintValueType.PROMPT
+          ? draftValues[v.key] ?? v.value
+          : v.value,
       ...(v.description ? { description: v.description } : {}),
     }));
 
@@ -174,9 +191,12 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
         <Input
           placeholder="Describe what changed in this version…"
           value={description}
+          dimension="sm"
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+
+      <Separator orientation="horizontal" />
 
       <div className="flex flex-col divide-y">
         {(agentConfig?.values ?? []).map((v) => {
@@ -228,16 +248,15 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
               ) : (
                 <div className="flex flex-col gap-1">
                   <Input
-                    type={
-                      v.type === BlueprintValueType.INT ||
-                      v.type === BlueprintValueType.FLOAT
-                        ? "number"
-                        : "text"
+                    inputMode={
+                      v.type === BlueprintValueType.INT
+                        ? "numeric"
+                        : v.type === BlueprintValueType.FLOAT
+                          ? "decimal"
+                          : "text"
                     }
                     value={draftValues[v.key] ?? ""}
-                    onChange={(e) =>
-                      handleFieldChange(v.key, v.type, e.target.value)
-                    }
+                    onChange={(e) => handleFieldChange(v.key, e.target.value)}
                   />
                   {errors[v.key] && (
                     <span className="comet-body-xs text-red-500">

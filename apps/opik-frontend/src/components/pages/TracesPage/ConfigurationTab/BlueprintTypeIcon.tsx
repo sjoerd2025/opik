@@ -8,8 +8,14 @@ const TYPE_CONFIG: Record<
 > = {
   [BlueprintValueType.INT]: { icon: Hash, color: "var(--color-blue)" },
   [BlueprintValueType.FLOAT]: { icon: Hash, color: "var(--color-blue)" },
-  [BlueprintValueType.BOOLEAN]: { icon: ToggleLeft, color: "var(--color-green)" },
-  [BlueprintValueType.PROMPT]: { icon: FileTerminal, color: "var(--color-burgundy)" },
+  [BlueprintValueType.BOOLEAN]: {
+    icon: ToggleLeft,
+    color: "var(--color-green)",
+  },
+  [BlueprintValueType.PROMPT]: {
+    icon: FileTerminal,
+    color: "var(--color-burgundy)",
+  },
   [BlueprintValueType.STRING]: { icon: Type, color: "var(--color-violet)" },
 };
 

@@ -23,6 +23,7 @@ import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
 import useAgentConfigEnvsMutation from "@/api/agent-configs/useAgentConfigEnvsMutation";
 import ConfirmDialog from "@/components/shared/ConfirmDialog/ConfirmDialog";
+import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import NavigationTag from "@/components/shared/NavigationTag/NavigationTag";
 import { RESOURCE_TYPE } from "@/components/shared/ResourceLink/ResourceLink";
 import { COLUMN_TYPE } from "@/types/shared";
@@ -31,6 +32,7 @@ type ConfigurationDetailViewProps = {
   item: ConfigHistoryItem;
   version: number;
   projectId: string;
+  prodVersion: number | null;
 };
 
 const renderTag = (tag: string) =>
@@ -40,6 +42,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   item,
   version,
   projectId,
+  prodVersion,
 }) => {
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
@@ -62,6 +65,9 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
       },
     });
   };
+
+  const description =
+    item.description || generateBlueprintDescription(item.values);
 
   const handleConfirmDuplicate = () => {
     if (!agentConfig) return;
@@ -95,15 +101,23 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
           </div>
           <div className="flex items-center gap-2">
             {!item.tags.some(isProdTag) && (
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => setConfirmOpen(true)}
-                disabled={isPromoting}
+              <TooltipWrapper
+                content={`This will affect your agent in production.${
+                  prodVersion
+                    ? ` Current version in production is v${prodVersion}.`
+                    : ""
+                }`}
               >
-                <Rocket className="mr-1.5 size-3.5 text-[#A3E635]" />
-                {isPromoting ? "Promoting..." : "Promote to prod"}
-              </Button>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={isPromoting}
+                >
+                  <Rocket className="mr-1.5 size-3.5 text-[#A3E635]" />
+                  {isPromoting ? "Promoting..." : "Promote to prod"}
+                </Button>
+              </TooltipWrapper>
             )}
             <NavigationTag
               id={projectId}
@@ -136,10 +150,12 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
             </Button>
           </div>
         </div>
-        <p className="comet-body-s flex items-start gap-1 text-light-slate">
-          <FilePen className="mt-1 size-3 shrink-0" />
-          {item.description || generateBlueprintDescription(item.values)}
-        </p>
+        <TooltipWrapper content={description}>
+          <p className="comet-body-s flex w-full min-w-0 items-start gap-1 overflow-hidden text-light-slate">
+            <FilePen className="mt-1 size-3 shrink-0" />
+            <span className="truncate">{description}</span>
+          </p>
+        </TooltipWrapper>
         <div className="comet-body-s mt-1 flex items-center gap-1 text-light-slate">
           <Clock className="size-3 shrink-0" />
           <span>{getTimeFromNow(item.created_at)}</span>

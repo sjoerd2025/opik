@@ -1,6 +1,6 @@
 export enum BlueprintValueType {
   STRING = "string",
-  INT = "int",
+  INT = "integer",
   FLOAT = "float",
   BOOLEAN = "boolean",
   PROMPT = "prompt",
@@ -70,5 +70,3 @@ export interface BlueprintDetails {
   created_at: string;
   values: BlueprintValue[];
 }
-
-// ALEX RENAME

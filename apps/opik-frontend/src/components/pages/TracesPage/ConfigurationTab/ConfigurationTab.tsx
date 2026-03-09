@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { buildDocsUrl } from "@/lib/utils";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import { ConfigHistoryItem } from "@/types/agent-configs";
+import { isProdTag } from "@/utils/agent-configurations";
 import ConfigurationHistoryTimeline from "./ConfigurationHistoryTimeline";
 import ConfigurationDetailView from "./ConfigurationDetailView";
 import ConfigurationEditView from "./ConfigurationEditView";
@@ -34,6 +35,11 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
     const idx = allRows.findIndex((r) => r.id === selectedId);
     return idx >= 0 ? idx : 0;
   }, [allRows, selectedId]);
+
+  const prodVersion = useMemo(() => {
+    const idx = allRows.findIndex((r) => r.tags.some(isProdTag));
+    return idx >= 0 ? total - idx : null;
+  }, [allRows, total]);
 
   if (isPending) {
     return <Loader />;
@@ -69,7 +75,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 
   if (isEditing && latestItem) {
     return (
-      <div className="max-w-[65vw]">
+      <div className="w-[70vw]">
         <ConfigurationEditView
           item={latestItem}
           projectId={projectId}
@@ -86,7 +92,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 
   return (
     <div className="flex gap-0">
-      <div className="min-w-0 max-w-[70vw] flex-1 [overflow-anchor:none]">
+      <div className="min-w-0 w-[60vw] flex-1 [overflow-anchor:none]">
         <div className="mx-6 mt-6 flex items-center justify-between">
           <p className="comet-body-s-accented">Agent configuration</p>
           <Button size="xs" onClick={() => setIsEditing(true)}>
@@ -100,6 +106,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
             item={selectedItem}
             version={total - selectedIndex}
             projectId={projectId}
+            prodVersion={prodVersion}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-slate">
@@ -108,7 +115,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
         )}
       </div>
 
-      <div className="max-w-[25vw] shrink-0 pr-2">
+      <div className="w-[25vw] shrink-0 pr-2">
         <p className="comet-body-s-accented ml-3 mt-6">Version history</p>
 
         <ConfigurationHistoryTimeline
@@ -128,7 +135,8 @@ export default ConfigurationTab;
 // DESCRIPTIONS
 // PROMPT UPDATES WITH REGULAR UPDATES
 // empty fields
-// add tooltips
 // edit value problem
 // test metadata
-// red inputs for numbers
+// move files that are shared
+// check bug with time
+//  long prompts to 3 lines?

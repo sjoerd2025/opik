@@ -6,6 +6,7 @@ import { ConfigHistoryItem } from "@/types/agent-configs";
 import { getTimeFromNow } from "@/lib/date";
 import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
+import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import ProdTag from "./ProdTag";
 import {
   generateBlueprintDescription,
@@ -76,13 +77,19 @@ const ConfigurationHistoryTimeline: React.FC<
                   ),
                 )}
               </div>
-              <p className="comet-body-xs mt-1.5 flex min-w-0 items-center gap-1 text-light-slate">
-                <FilePen className="size-3 shrink-0" />
-                <span className="truncate">
-                  {item.description ||
-                    generateBlueprintDescription(item.values)}
-                </span>
-              </p>
+              {(() => {
+                const desc =
+                  item.description ||
+                  generateBlueprintDescription(item.values);
+                return (
+                  <TooltipWrapper content={desc}>
+                    <p className="comet-body-xs mt-1.5 flex min-w-0 items-center gap-1 text-light-slate">
+                      <FilePen className="size-3 shrink-0" />
+                      <span className="truncate">{desc}</span>
+                    </p>
+                  </TooltipWrapper>
+                );
+              })()}
               <div className="comet-body-xs mt-1.5 flex items-center gap-3 text-light-slate">
                 <span className="flex items-center gap-1">
                   <Clock className="size-3 shrink-0" />
