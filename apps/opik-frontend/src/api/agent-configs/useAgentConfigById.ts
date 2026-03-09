@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import api, { AGENT_CONFIGS_REST_ENDPOINT } from "@/api/api";
@@ -16,31 +15,19 @@ const getAgentConfigById = async (
     `${AGENT_CONFIGS_REST_ENDPOINT}blueprints/${blueprintId}`,
     { signal },
   );
+  data.values.sort((a: { key: string }, b: { key: string }) =>
+    a.key.localeCompare(b.key),
+  );
   return data;
 };
 
 export default function useAgentConfigById({
   blueprintId,
 }: UseAgentConfigByIdParams) {
-  const { data: blueprint, isPending } = useQuery({
+  return useQuery({
     queryKey: [AGENT_CONFIGS_REST_ENDPOINT, "blueprints", blueprintId],
     queryFn: ({ signal }) => getAgentConfigById(blueprintId, signal),
     placeholderData: keepPreviousData,
     enabled: !!blueprintId,
   });
-
-  const sortedBlueprint = useMemo(() => {
-    if (!blueprint) return undefined;
-    return {
-      ...blueprint,
-      values: [...blueprint.values].sort((a, b) =>
-        a.key.localeCompare(b.key),
-      ),
-    };
-  }, [blueprint]);
-
-  return {
-    data: sortedBlueprint,
-    isPending,
-  };
 }

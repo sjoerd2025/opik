@@ -11,9 +11,7 @@ import { BlueprintValuePromptHandle } from "./BlueprintValuePrompt";
 
 import type useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 
-type AgentConfig = NonNullable<
-  ReturnType<typeof useAgentConfigById>["data"]
->;
+type AgentConfig = NonNullable<ReturnType<typeof useAgentConfigById>["data"]>;
 
 const nonEmptyString = z.string().min(1, "Must not be empty");
 
@@ -54,9 +52,9 @@ export const useConfigurationSave = ({
   const { mutate: createConfig, isPending: isSaving } =
     useAgentConfigCreateMutation();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const promptRefs = useRef<
-    Record<string, BlueprintValuePromptHandle | null>
-  >({});
+  const promptRefs = useRef<Record<string, BlueprintValuePromptHandle | null>>(
+    {},
+  );
 
   const clearError = useCallback((key: string) => {
     setErrors((prev) => {

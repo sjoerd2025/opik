@@ -84,15 +84,16 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
 
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex justify-end gap-2">
+        <Label htmlFor="only-diff" className="comet-body-xs cursor-pointer">
+          Show differences only
+        </Label>
         <Switch
           id="only-diff"
           checked={onlyDiff}
           onCheckedChange={setOnlyDiff}
+          size="xs"
         />
-        <Label htmlFor="only-diff" className="comet-body-xs cursor-pointer">
-          Show only differences
-        </Label>
       </div>
       <div className="max-h-[60vh] overflow-y-auto">
         {(!onlyDiff || descChanged) && descChanged && (

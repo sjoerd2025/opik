@@ -79,8 +79,7 @@ const ConfigurationHistoryTimeline: React.FC<
               </div>
               {(() => {
                 const desc =
-                  item.description ||
-                  generateBlueprintDescription(item.values);
+                  item.description || generateBlueprintDescription(item.values);
                 return (
                   <TooltipWrapper content={desc}>
                     <p className="comet-body-xs mt-1.5 flex min-w-0 items-center gap-1 text-light-slate">
