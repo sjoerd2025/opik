@@ -479,9 +479,9 @@ class ExperimentDAO {
             ),
             pass_rate_runs AS (
                 SELECT
-                    ei.experiment_id,
-                    eif.dataset_item_id,
-                    ei.trace_id,
+                    ei.experiment_id AS experiment_id,
+                    eif.dataset_item_id AS dataset_item_id,
+                    ei.trace_id AS trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
                     arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold,
                     if(
@@ -1093,9 +1093,9 @@ class ExperimentDAO {
             ),
             pass_rate_runs AS (
                 SELECT
-                    ei.experiment_id,
-                    eif.dataset_item_id,
-                    ei.trace_id,
+                    ei.experiment_id AS experiment_id,
+                    eif.dataset_item_id AS dataset_item_id,
+                    ei.trace_id AS trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
                     arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold,
                     if(
