@@ -7,7 +7,7 @@ import {
   BlueprintValueType,
   ConfigHistoryItem,
 } from "@/types/agent-configs";
-import { getTimeFromNow } from "@/lib/date";
+import { formatDate, getTimeFromNow } from "@/lib/date";
 import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import Loader from "@/components/shared/Loader/Loader";
 import { Card } from "@/components/ui/card";
@@ -36,7 +36,11 @@ type ConfigurationDetailViewProps = {
 };
 
 const renderTag = (tag: string) =>
-  isProdTag(tag) ? <ProdTag key={tag} /> : <ColoredTag key={tag} label={tag} />;
+  isProdTag(tag) ? (
+    <ProdTag key={tag} value={tag} />
+  ) : (
+    <ColoredTag key={tag} label={tag} />
+  );
 
 const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   item,
@@ -158,7 +162,14 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
         </TooltipWrapper>
         <div className="comet-body-s mt-1 flex items-center gap-1 text-light-slate">
           <Clock className="size-3 shrink-0" />
-          <span>{getTimeFromNow(item.created_at)}</span>
+          <TooltipWrapper
+            content={`${formatDate(item.created_at, {
+              utc: true,
+              includeSeconds: true,
+            })} UTC`}
+          >
+            <span>{getTimeFromNow(item.created_at)}</span>
+          </TooltipWrapper>
           <User className="size-3.5 ml-1.5 shrink-0" />
           <span>{item.created_by}</span>
         </div>

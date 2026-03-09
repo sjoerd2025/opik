@@ -3,7 +3,7 @@ import { Clock, FilePen, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { ConfigHistoryItem } from "@/types/agent-configs";
-import { getTimeFromNow } from "@/lib/date";
+import { formatDate, getTimeFromNow } from "@/lib/date";
 import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
@@ -71,7 +71,7 @@ const ConfigurationHistoryTimeline: React.FC<
                 <span className="comet-body-s-accented">v{total - index}</span>
                 {sortedTags.map((tag) =>
                   isProdTag(tag) ? (
-                    <ProdTag key={tag} size="xs" />
+                    <ProdTag key={tag} size="xs" value={tag} />
                   ) : (
                     <ColoredTag key={tag} label={tag} size="sm" />
                   ),
@@ -91,10 +91,17 @@ const ConfigurationHistoryTimeline: React.FC<
                 );
               })()}
               <div className="comet-body-xs mt-1.5 flex items-center gap-3 text-light-slate">
-                <span className="flex items-center gap-1">
-                  <Clock className="size-3 shrink-0" />
-                  {getTimeFromNow(item.created_at)}
-                </span>
+                <TooltipWrapper
+                  content={`${formatDate(item.created_at, {
+                    utc: true,
+                    includeSeconds: true,
+                  })} UTC`}
+                >
+                  <span className="flex items-center gap-1">
+                    <Clock className="size-3 shrink-0" />
+                    {getTimeFromNow(item.created_at)}
+                  </span>
+                </TooltipWrapper>
                 <span className="flex items-center gap-1">
                   <User className="size-3 shrink-0" />
                   {item.created_by}
