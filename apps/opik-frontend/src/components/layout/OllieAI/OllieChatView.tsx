@@ -50,7 +50,10 @@ const OllieChatView: React.FC = () => {
     clearMessages,
   } = useOllieStore();
 
-  const [isThinking, setIsThinking] = useState(false);
+  const [isStreamingText, setIsStreamingText] = useState(false);
+  const [pendingToolCallCount, setPendingToolCallCount] = useState(0);
+  const isThinking =
+    isStreaming && !isStreamingText && pendingToolCallCount === 0;
   const abortControllerRef = useRef<AbortController>();
   const historyLoadedRef = useRef(false);
 
@@ -101,7 +104,8 @@ const OllieChatView: React.FC = () => {
       abortControllerRef.current = undefined;
     }
     setIsStreaming(false);
-    setIsThinking(false);
+    setIsStreamingText(false);
+    setPendingToolCallCount(0);
   }, [setIsStreaming]);
 
   // Clear Zustand messages on mount to prevent showing stale data
@@ -142,7 +146,6 @@ const OllieChatView: React.FC = () => {
       };
 
       addMessage(userMessage);
-      setIsThinking(true);
 
       const abortController = startStreaming();
 
@@ -167,8 +170,6 @@ const OllieChatView: React.FC = () => {
           tableState,
           signal: abortController.signal,
           onAddChunk: (data) => {
-            setIsThinking(false);
-
             if (data.messageType === MESSAGE_TYPE.response) {
               const text = data.content || "";
               const isPartial = data.partial === true;
@@ -176,6 +177,7 @@ const OllieChatView: React.FC = () => {
                 !textMessageState.current || textMessageState.current.finalized;
 
               if (isPartial) {
+                setIsStreamingText(true);
                 if (needsNewMessage) {
                   const messageId = `assistant-${Date.now()}`;
                   textMessageState.current = {
@@ -199,6 +201,7 @@ const OllieChatView: React.FC = () => {
                 }
               } else {
                 // Final message (partial: false) - contains complete text
+                setIsStreamingText(false);
                 if (needsNewMessage) {
                   const messageId = `assistant-${Date.now()}`;
                   textMessageState.current = {
@@ -227,6 +230,7 @@ const OllieChatView: React.FC = () => {
               const toolCallId = toolCall.id;
 
               if (!toolCallMessages.has(toolCallId)) {
+                setPendingToolCallCount((prev) => prev + 1);
                 // Create new tool call message
                 const messageId = `tool-${toolCallId}`;
                 toolCallMessages.set(toolCallId, messageId);
@@ -250,6 +254,7 @@ const OllieChatView: React.FC = () => {
               const toolCallId = toolResponse.id;
 
               if (toolCallMessages.has(toolCallId)) {
+                setPendingToolCallCount((prev) => Math.max(0, prev - 1));
                 // Mark tool as completed
                 const messageId = toolCallMessages.get(toolCallId)!;
                 updateMessage(messageId, {
@@ -296,7 +301,8 @@ const OllieChatView: React.FC = () => {
             isLoading: false,
           });
         }
-        setIsThinking(false);
+        setIsStreamingText(false);
+        setPendingToolCallCount(0);
         stopStreaming();
       }
     },
