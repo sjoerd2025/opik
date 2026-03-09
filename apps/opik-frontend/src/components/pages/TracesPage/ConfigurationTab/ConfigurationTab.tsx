@@ -135,7 +135,3 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 };
 
 export default ConfigurationTab;
-
-// ALEX
-// move files that are shared
-// check bug with time
