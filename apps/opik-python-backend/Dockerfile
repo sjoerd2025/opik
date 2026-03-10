@@ -31,6 +31,7 @@ WORKDIR /opt/opik-python-backend
 
 # Copy the virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/opik-optimizer/scripts /opt/opik-optimizer/scripts
 ENV PATH="/opt/venv/bin:$PATH"
 
 ENV PYTHON_CODE_EXECUTOR_ASSET_NAME="opik-sandbox-executor-python"

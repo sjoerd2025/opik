@@ -9,6 +9,7 @@ import { APP_VERSION } from "@/constants/app";
 import { runLocalStorageMigrations } from "@/lib/ls-migrations";
 
 import "./main.scss";
+import "@/lib/demo-triggers";
 import { IS_SENTRY_ENABLED, SENTRY_DSN, SENTRY_MODE } from "@/config";
 
 // other styles

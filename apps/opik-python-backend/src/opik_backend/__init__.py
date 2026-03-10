@@ -77,6 +77,7 @@ def create_app(test_config=None, should_init_executor=True):
     from opik_backend.post_user_signup import post_user_signup
     from opik_backend.healthcheck import healthcheck
     from opik_backend.rq_worker_manager import init_rq_worker
+    from opik_backend.demo_runner import demo_runner
 
     # Initialize the code executor if needed - some of the tests override the executor and therefore don't initialize it
     if should_init_executor:
@@ -85,6 +86,7 @@ def create_app(test_config=None, should_init_executor=True):
     app.register_blueprint(healthcheck)
     app.register_blueprint(evaluator)
     app.register_blueprint(post_user_signup)
+    app.register_blueprint(demo_runner)
 
     # Initialize Redis connection at application startup if RQ worker enabled (non-fatal)
     from opik_backend.utils.env_utils import is_rq_worker_enabled
