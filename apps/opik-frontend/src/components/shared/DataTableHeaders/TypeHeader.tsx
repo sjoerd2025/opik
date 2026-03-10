@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   Tag,
   GitCommitVertical,
+  CheckCheck,
+  Repeat2,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import HeaderWrapper from "@/components/shared/DataTableHeaders/HeaderWrapper";
@@ -29,6 +31,8 @@ const COLUMN_TYPE_MAP: Record<
   guardrails: Construction,
   tags: Tag,
   version: GitCommitVertical,
+  assertions: CheckCheck,
+  execution_policy: Repeat2,
   [COLUMN_TYPE.string]: Text,
   [COLUMN_TYPE.number]: Hash,
   [COLUMN_TYPE.list]: List,
