@@ -65,6 +65,7 @@ from ..message_processing import (
     messages,
     streamer_constructors,
     message_queue,
+    permissions,
 )
 from ..message_processing.batching import sequence_splitter
 from ..message_processing.processors import message_processors_chain
@@ -208,12 +209,14 @@ class Opik:
 
         fallback_replay = self._create_replay_manager()
 
-        self.__internal_api__message_processor__ = (
-            message_processors_chain.create_message_processors_chain(
-                rest_client=self._rest_client,
-                file_upload_manager=file_uploader,
-                fallback_replay_manager=fallback_replay,
-            )
+        self.__internal_api__message_processor__ = message_processors_chain.create_message_processors_chain(
+            rest_client=self._rest_client,
+            file_upload_manager=file_uploader,
+            fallback_replay_manager=fallback_replay,
+            unauthorized_message_types_registry=permissions.UnauthorizedMessageTypeRegistry(
+                retry_interval_seconds=self._config.unauthorized_message_type_retry_interval,
+                max_retry_count=self._config.unauthorized_message_type_max_retry_count,
+            ),
         )
         self._streamer = streamer_constructors.construct_online_streamer(
             file_uploader=file_uploader,
@@ -992,8 +995,9 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        evaluators: Optional[List["llm_judge.LLMJudge"]] = None,
+        assertions: Optional[List[str]] = None,
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        evaluators: Optional[List["llm_judge.LLMJudge"]] = None,
     ) -> evaluation_suite.EvaluationSuite:
         """
         Create a new evaluation suite for regression testing.
@@ -1005,25 +1009,26 @@ class Opik:
         Args:
             name: The name of the evaluation suite.
             description: Optional description of what this suite tests.
-            evaluators: Suite-level evaluators (e.g., LLMJudge instances)
-                applied to all test items.
+            assertions: Shorthand for suite-level assertions. Under the hood,
+                an ``LLMJudge`` is created automatically. Cannot be combined
+                with ``evaluators``.
             execution_policy: Dataset-level execution policy.
                 Example: {"runs_per_item": 3, "pass_threshold": 2}
+            evaluators: (Deprecated) Suite-level evaluators (e.g., LLMJudge
+                instances). Prefer ``assertions`` instead. Cannot be combined
+                with ``assertions``.
 
         Returns:
             EvaluationSuite: The created evaluation suite object.
 
         Example:
-            >>> from opik.evaluation.suite_evaluators import LLMJudge
-            >>>
             >>> suite = client.create_evaluation_suite(
             ...     name="Refund Policy Tests",
             ...     description="Regression tests for refund scenarios",
-            ...     evaluators=[
-            ...         LLMJudge(assertions=[
-            ...             {"name": "no_hallucination", "expected_behavior": "No hallucinated information"},
-            ...         ]),
-            ...     ]
+            ...     assertions=[
+            ...         "No hallucinated information",
+            ...         "Response is helpful",
+            ...     ],
             ... )
             >>>
             >>> suite.add_item(
@@ -1034,8 +1039,9 @@ class Opik:
         """
         from .dataset import validators, rest_operations
 
-        if evaluators:
-            validators.validate_evaluators(evaluators, "suite-level evaluators")
+        evaluators = validators.resolve_evaluators(
+            assertions, evaluators, "suite-level evaluators"
+        )
 
         rest_operations.create_evaluation_suite_dataset(
             rest_client=self._rest_client,
@@ -1094,8 +1100,9 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        evaluators: Optional[List["llm_judge.LLMJudge"]] = None,
+        assertions: Optional[List[str]] = None,
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        evaluators: Optional[List["llm_judge.LLMJudge"]] = None,
     ) -> evaluation_suite.EvaluationSuite:
         """
         Get an existing evaluation suite by name or create a new one if it does not exist.
@@ -1103,8 +1110,12 @@ class Opik:
         Args:
             name: The name of the evaluation suite.
             description: Optional description (used only when creating).
-            evaluators: Suite-level evaluators (used only when creating).
+            assertions: Shorthand for suite-level assertions (used only when
+                creating). Cannot be combined with ``evaluators``.
             execution_policy: Execution policy (used only when creating).
+            evaluators: (Deprecated) Suite-level evaluators (used only when
+                creating). Prefer ``assertions`` instead. Cannot be combined
+                with ``assertions``.
 
         Returns:
             EvaluationSuite: The evaluation suite object.
@@ -1118,6 +1129,7 @@ class Opik:
                     description=description,
                     evaluators=evaluators,
                     execution_policy=execution_policy,
+                    assertions=assertions,
                 )
             raise
 
@@ -1339,6 +1351,10 @@ class Opik:
         """
         timeout = timeout if timeout is not None else self._flush_timeout
         return self._streamer.flush(timeout)
+
+    def __internal_api__failed_uploads__(self, timeout: Optional[float] = None) -> int:
+        """Returns the number of failed file uploads after flush. Blocking - waits for all uploads to complete."""
+        return self._streamer.__internal_api__failed_uploads__(timeout=timeout)
 
     def search_traces(
         self,

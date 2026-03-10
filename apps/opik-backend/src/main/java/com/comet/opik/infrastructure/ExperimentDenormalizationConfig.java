@@ -64,6 +64,12 @@ public class ExperimentDenormalizationConfig implements StreamConfiguration {
     private Duration aggregationLockTime = Duration.minutes(1);
 
     @JsonProperty
+    @Min(1000) @Max(10_000_000) private int streamMaxLen = 10_000;
+
+    @JsonProperty
+    @Min(0) @Max(10_000) private int streamTrimLimit = 100;
+
+    @JsonProperty
     @Min(2) private int claimIntervalRatio = 10;
 
     @Valid @JsonProperty

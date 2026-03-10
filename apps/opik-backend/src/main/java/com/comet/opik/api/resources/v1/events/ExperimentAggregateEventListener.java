@@ -33,6 +33,7 @@ import ru.vyarus.dropwizard.guice.module.yaml.bind.Config;
 
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @EagerSingleton
@@ -174,55 +175,39 @@ public class ExperimentAggregateEventListener {
     }
 
     private Mono<Void> triggerByExperimentIds(Set<UUID> experimentIds, String workspaceId, String userName) {
-        if (!config.isEnabled()) {
-            log.debug("Ignoring experiment aggregation trigger: experiment denormalization config is disabled");
-            return Mono.empty();
-        }
-        if (CollectionUtils.isEmpty(experimentIds)) {
-            return Mono.empty();
-        }
-
-        return experimentItemService
-                .filterExperimentIdsByStatus(experimentIds, FINISHED_STATUSES)
-                .collect(Collectors.toSet())
-                .contextWrite(ctx -> ctx
-                        .put(RequestContext.WORKSPACE_ID, workspaceId)
-                        .put(RequestContext.USER_NAME, userName))
-                .flatMap(finishedIds -> publishIfNotEmpty(finishedIds, workspaceId, userName));
+        return triggerAggregation(experimentIds, workspaceId, userName,
+                ids -> experimentItemService
+                        .filterExperimentIdsByStatus(ids, FINISHED_STATUSES)
+                        .collect(Collectors.toSet()));
     }
 
     private Mono<Void> triggerByTraceIds(Set<UUID> traceIds, String workspaceId, String userName) {
-        if (!config.isEnabled()) {
-            log.debug("Ignoring trace aggregation trigger: experiment denormalization config is disabled");
-            return Mono.empty();
-        }
-        if (CollectionUtils.isEmpty(traceIds)) {
-            return Mono.empty();
-        }
-
-        return experimentItemService
-                .getExperimentRefsByTraceIds(traceIds, FINISHED_STATUSES)
-                .map(ExperimentTraceRef::experimentId)
-                .collect(Collectors.toSet())
-                .contextWrite(ctx -> ctx
-                        .put(RequestContext.WORKSPACE_ID, workspaceId)
-                        .put(RequestContext.USER_NAME, userName))
-                .flatMap(experimentIds -> publishIfNotEmpty(experimentIds, workspaceId, userName));
+        return triggerAggregation(traceIds, workspaceId, userName,
+                ids -> experimentItemService
+                        .getExperimentRefsByTraceIds(ids, FINISHED_STATUSES)
+                        .map(ExperimentTraceRef::experimentId)
+                        .collect(Collectors.toSet()));
     }
 
     private Mono<Void> triggerBySpanIds(Set<UUID> spanIds, String workspaceId, String userName) {
+        return triggerAggregation(spanIds, workspaceId, userName,
+                ids -> experimentItemService
+                        .getExperimentRefsBySpanIds(ids, FINISHED_STATUSES)
+                        .map(ExperimentTraceRef::experimentId)
+                        .collect(Collectors.toSet()));
+    }
+
+    private Mono<Void> triggerAggregation(Set<UUID> entityIds, String workspaceId, String userName,
+            Function<Set<UUID>, Mono<Set<UUID>>> lookupExperimentIds) {
         if (!config.isEnabled()) {
-            log.debug("Ignoring span aggregation trigger: experiment denormalization config is disabled");
+            log.debug("Ignoring aggregation trigger: experiment denormalization config is disabled");
             return Mono.empty();
         }
-        if (CollectionUtils.isEmpty(spanIds)) {
+        if (CollectionUtils.isEmpty(entityIds)) {
             return Mono.empty();
         }
 
-        return experimentItemService
-                .getExperimentRefsBySpanIds(spanIds, FINISHED_STATUSES)
-                .map(ExperimentTraceRef::experimentId)
-                .collect(Collectors.toSet())
+        return lookupExperimentIds.apply(entityIds)
                 .contextWrite(ctx -> ctx
                         .put(RequestContext.WORKSPACE_ID, workspaceId)
                         .put(RequestContext.USER_NAME, userName))
