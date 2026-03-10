@@ -24,10 +24,10 @@ async function call(path: string, method = "POST") {
 }
 
 const __runGEPA = {
-  quick: () => call("/v1/private/demo/run/gepa-quick"),
-  e2e: () => call("/v1/private/demo/run/gepa-e2e"),
-  status: () => call("/v1/private/demo/status", "GET"),
-  stop: (key = "gepa-quick") => call(`/v1/private/demo/stop/${key}`),
+  quick: () => call("/v1/demo/run/gepa-quick"),
+  e2e: () => call("/v1/demo/run/gepa-e2e"),
+  status: () => call("/v1/demo/status", "GET"),
+  stop: (key = "gepa-quick") => call(`/v1/demo/stop/${key}`),
 };
 
 (window as unknown as Record<string, unknown>).__runGEPA = __runGEPA;

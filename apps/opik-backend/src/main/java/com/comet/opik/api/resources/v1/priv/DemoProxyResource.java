@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
  * Temporary proxy to forward demo GEPA trigger requests to the python-backend.
  * AI_REMOVAL_NOTE: Delete this file to remove demo trigger support.
  */
-@Path("/v1/private/demo")
+@Path("/v1/demo")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @RequiredArgsConstructor(onConstructor_ = @Inject)
