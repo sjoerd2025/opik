@@ -125,8 +125,10 @@
     /* Diff colors */
     --diff-removed-bg: #fde2e7;
     --diff-removed-text: #931a32;
+    --diff-removed-border: #fecdd3;
     --diff-added-bg: #e2fde6;
     --diff-added-text: #1d6728;
+    --diff-added-border: #bbf7d0;
 
     /* Upload field colors */
     --upload-icon-bg: 213 26.8% 83.9%;
@@ -152,6 +154,7 @@
     --color-orange: #f97316;
     --color-yellow: #eab308;
     --color-green: #10b981;
+    --color-lime: #a3e635;
     --color-turquoise: #06b6d4;
     --color-blue: #3b82f6;
     --color-primary: #6366f1;
@@ -177,6 +180,9 @@
     --tag-yellow-text: #675523;
     --tag-green-bg: #dafbf0;
     --tag-green-text: #295747;
+
+    --tag-lime-bg: #a3e635;
+    --tag-lime-text: #1a2e05;
     --tag-turquoise-bg: #cdf5f9;
     --tag-turquoise-text: #15545b;
     --tag-blue-bg: #e2effd;
@@ -311,8 +317,10 @@
     /* Diff colors - Dark Mode */
     --diff-removed-bg: #7f1d1d;
     --diff-removed-text: #fef2f2;
+    --diff-removed-border: #991b1b;
     --diff-added-bg: #14532d;
     --diff-added-text: #bbf7d0;
+    --diff-added-border: #166534;
 
     /* DataTable colors - Dark Mode */
     --table-best-row-bg: #29322f;
@@ -348,6 +356,9 @@
     --tag-yellow-text: #ebad00;
     --tag-green-bg: #29322f;
     --tag-green-text: #14bb83;
+
+    --tag-lime-bg: #3d5a0a;
+    --tag-lime-text: #d9f99d;
     --tag-turquoise-bg: #293232;
     --tag-turquoise-text: #0fbfd2;
     --tag-blue-bg: #292e32;

@@ -5,6 +5,9 @@ import ResourceLink, {
   RESOURCE_MAP,
 } from "@/components/shared/ResourceLink/ResourceLink";
 import { Filter } from "@/types/filters";
+import { TagProps } from "@/components/ui/tag";
+
+const DEFAULT_ICON_SIZE = 3;
 
 type NavigationTagProps = {
   id: string;
@@ -14,6 +17,9 @@ type NavigationTagProps = {
   tooltipContent?: string;
   className?: string;
   isSmall?: boolean;
+  iconsSize?: number;
+  size?: TagProps["size"];
+  variant?: TagProps["variant"];
 };
 
 const NavigationTag: React.FunctionComponent<NavigationTagProps> = ({
@@ -24,6 +30,9 @@ const NavigationTag: React.FunctionComponent<NavigationTagProps> = ({
   tooltipContent,
   className,
   isSmall = false,
+  iconsSize = DEFAULT_ICON_SIZE,
+  size = "md",
+  variant = "transparent",
 }) => {
   const resourceLabel = RESOURCE_MAP[resource].label;
   const defaultTooltipContent = `Navigate to ${resourceLabel}: ${name}`;
@@ -35,12 +44,13 @@ const NavigationTag: React.FunctionComponent<NavigationTagProps> = ({
       resource={resource}
       search={search}
       tooltipContent={tooltipContent ?? defaultTooltipContent}
-      variant="transparent"
+      variant={variant}
       className={className}
-      iconsSize={3}
+      iconsSize={iconsSize}
       gapSize={1}
       asTag
       isSmall={isSmall}
+      size={size}
     />
   );
 };

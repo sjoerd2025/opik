@@ -18,6 +18,10 @@
 <Button variant="ghost">Link Action</Button>
 <Button variant="minimal">Subtle Action</Button>
 
+// Link actions
+<Button variant="link">Link</Button>
+<Button variant="tableLink">Table Link</Button>
+
 // Icon buttons
 <Button variant="default" size="icon"><Icon /></Button>
 <Button variant="ghost" size="icon-sm"><Icon /></Button>

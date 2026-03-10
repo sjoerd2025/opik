@@ -1,0 +1,47 @@
+import React from "react";
+
+import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
+import { formatBlueprintValue } from "@/utils/agent-configurations";
+import BlueprintTypeIcon from "./BlueprintTypeIcon";
+import BlueprintValuePrompt from "./BlueprintValuePrompt";
+
+const renderValue = (v: BlueprintValue) => {
+  if (v.type === BlueprintValueType.PROMPT) {
+    return <BlueprintValuePrompt value={v} />;
+  }
+
+  return (
+    <div className="comet-body-s whitespace-pre-wrap break-words rounded-md border bg-primary-foreground p-3 text-foreground">
+      {formatBlueprintValue(v)}
+    </div>
+  );
+};
+
+type BlueprintValuesListProps = {
+  values: BlueprintValue[];
+};
+
+const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
+  values,
+}) => (
+  <div className="flex flex-col divide-y">
+    {values.map((v) => (
+      <div key={v.key} className="flex flex-col gap-2 py-3">
+        <div className="flex items-center gap-2">
+          <BlueprintTypeIcon type={v.type} />
+          <span className="comet-body-xs-accented text-foreground">
+            {v.key}
+          </span>
+        </div>
+        {v.description && (
+          <span className="comet-body-xs text-light-slate">
+            {v.description}
+          </span>
+        )}
+        <div className="overflow-hidden">{renderValue(v)}</div>
+      </div>
+    ))}
+  </div>
+);
+
+export default BlueprintValuesList;

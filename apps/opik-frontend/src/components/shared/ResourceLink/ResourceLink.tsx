@@ -203,17 +203,14 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
               gapSize === 3 && "gap-3",
               gapSize === 4 && "gap-4",
               deleted && "opacity-50 cursor-default",
+              !deleted &&
+                "hover:bg-primary-foreground hover:text-foreground active:bg-primary-100 active:text-foreground",
               isSmall && "size-8 justify-center",
               className,
             )}
           >
             <props.icon
-              className={cn(
-                "shrink-0",
-                iconsSize === 3 && "size-3",
-                iconsSize === 4 && "size-4",
-                iconsSize === 5 && "size-5",
-              )}
+              className={cn("shrink-0", `size-${iconsSize}`)}
               style={{ color: props.color }}
             />
             {!isSmall && (
