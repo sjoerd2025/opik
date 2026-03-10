@@ -1342,6 +1342,7 @@ class ExperimentDAO {
                 optimization_id,
                 status,
                 experiment_scores,
+                dataset_version_id,
                 created_at,
                 last_updated_at
             )
@@ -1363,6 +1364,7 @@ class ExperimentDAO {
                 optimization_id,
                 <if(status)> :status <else> status <endif> as status,
                 <if(experiment_scores)> :experiment_scores <else> experiment_scores <endif> as experiment_scores,
+                dataset_version_id,
                 created_at,
                 now64(9) as last_updated_at
             FROM experiments
