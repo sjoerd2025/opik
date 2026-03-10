@@ -963,7 +963,9 @@ class ExperimentAggregatesIntegrationTest {
                                     .build())
                             .toList();
 
-                    traceResourceClient.feedbackScores(feedbackScoreItems, apiKey, workspaceName);
+                    if (!feedbackScoreItems.isEmpty()) {
+                        traceResourceClient.feedbackScores(feedbackScoreItems, apiKey, workspaceName);
+                    }
 
                     return ExperimentItem.builder()
                             .experimentId(experimentId)
@@ -1653,6 +1655,54 @@ class ExperimentAggregatesIntegrationTest {
 
         assertThat(afterAggregation).isNotNull();
         assertThat(afterAggregation.content()).isNotEmpty();
+
+        assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
+    }
+
+    @Test
+    @DisplayName("ExperimentItemDAO.STREAM returns non-empty results before and after populating experiment_item_aggregates when experiment items have no feedback scores or comments")
+    void streamExperimentItemsWithNoScoresIsConsistentBeforeAndAfterAggregates() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment1 = createExperiment(dataset, apiKey, workspaceName);
+        var experiment2 = createExperiment(dataset, apiKey, workspaceName);
+
+        // No feedback scores — this exercises the path where LEFT JOIN misses produce null rows
+        createExperimentItemWithData(experiment1.id(), dataset.id(), project.name(), List.of(), apiKey, workspaceName);
+        createExperimentItemWithData(experiment2.id(), dataset.id(), project.name(), List.of(), apiKey, workspaceName);
+
+        var experimentIds = List.of(experiment1.id(), experiment2.id());
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs, no scores
+        var beforeAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertThat(beforeAggregation).isNotNull();
+        assertThat(beforeAggregation.content())
+                .as("Branch 2 (on-the-fly JOINs) must return items even when there are no feedback scores")
+                .isNotEmpty();
+
+        // Populate experiment_item_aggregates
+        experimentIds.forEach(id -> experimentAggregatesService.populateAggregations(id)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block());
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data, no scores
+        var afterAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertThat(afterAggregation).isNotNull();
+        assertThat(afterAggregation.content())
+                .as("Branch 1 (pre-computed aggregates) must return items even when there are no feedback scores")
+                .isNotEmpty();
 
         assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
     }
