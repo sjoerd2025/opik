@@ -54,8 +54,8 @@ const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
       </TableCell>
       {isPrompt && baseValue?.value && diffValue?.value ? (
         <PromptDiffPair
-          baseCommit={baseValue.value}
-          diffCommit={diffValue.value}
+          baseCommit={String(baseValue.value)}
+          diffCommit={String(diffValue.value)}
         />
       ) : (
         <>

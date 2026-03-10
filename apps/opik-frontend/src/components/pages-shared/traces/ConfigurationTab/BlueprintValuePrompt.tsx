@@ -44,7 +44,7 @@ const BlueprintValuePrompt = forwardRef<
   const initialTemplate = useRef("");
 
   const { data: prompt, isPending } = usePromptByCommit(
-    { commitId: value.value },
+    { commitId: String(value.value) },
     { enabled: !!value.value },
   );
 

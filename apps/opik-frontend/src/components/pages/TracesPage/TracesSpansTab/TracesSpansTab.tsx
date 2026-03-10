@@ -100,6 +100,7 @@ import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import useConfigVersionMap from "@/api/agent-configs/useConfigVersionMap";
 import { isAgentConfigurationMetadata } from "@/components/pages-shared/traces/TraceDetailsPanel/TraceDataViewer/AgentConfigurationTab";
+import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 import GuardrailsCell from "@/components/shared/DataTableCells/GuardrailsCell";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
 import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
@@ -952,8 +953,9 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
               sortable: false,
               cell: ConfigurationVersionCell as never,
               accessorFn: (row: BaseTraceData) => {
-                const agentConfig = (row.metadata as Record<string, unknown>)
-                  ?.agent_configuration;
+                const agentConfig = (
+                  row.metadata as Record<string, unknown>
+                )?.[AGENT_CONFIGURATION_METADATA_KEY];
                 if (!isAgentConfigurationMetadata(agentConfig)) return "-";
                 const version = versionMap[agentConfig.blueprint_id];
                 return version !== undefined ? `v${version}` : "-";

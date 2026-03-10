@@ -114,9 +114,19 @@
     --feature-experiment-management: #6c6ff7;
     --feature-llm: #52aea4;
 
+    /* Config link icon color */
+    --color-fuchsia: #db46ef;
+
     /* Error indicator colors */
     --error-indicator-background: #ffd2d2;
     --error-indicator-text: #822c45;
+
+    /* Edit badge colors */
+    --edit-badge-bg: #ff5a3c;
+    --edit-badge-text: #ffffff;
+
+    /* Timeline connector colors */
+    --timeline-connector: #cfd0ff;
 
     /* Search highlight colors */
     --search-highlight: #ffdf20;
@@ -280,6 +290,16 @@
     /* Feature colors - Dark Mode */
     --feature-experiment-management: #3b70f6;
     --feature-llm: #20ac74;
+
+    /* Config link icon color - Dark Mode */
+    --color-fuchsia: #c850c0;
+
+    /* Edit badge colors - Dark Mode */
+    --edit-badge-bg: #cc4730;
+    --edit-badge-text: #ffffff;
+
+    /* Timeline connector colors - Dark Mode */
+    --timeline-connector: #3b3d6b;
 
     /* Muted colors - Dark Mode */
     --muted: 0, 0%, 11%;

@@ -1,5 +1,6 @@
-import React from "react";
-import { Clock, FilePen, User } from "lucide-react";
+import React, { useEffect } from "react";
+import { Clock, FilePen, Loader2, User } from "lucide-react";
+import { useInView } from "react-intersection-observer";
 
 import { cn } from "@/lib/utils";
 import { ConfigHistoryItem } from "@/types/agent-configs";
@@ -19,11 +20,30 @@ type ConfigurationHistoryTimelineProps = {
   total: number;
   selectedIndex: number | null;
   onSelect: (index: number) => void;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
 };
 
 const ConfigurationHistoryTimeline: React.FC<
   ConfigurationHistoryTimelineProps
-> = ({ items, total, selectedIndex, onSelect }) => {
+> = ({
+  items,
+  total,
+  selectedIndex,
+  onSelect,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+}) => {
+  const { ref: sentinelRef, inView } = useInView();
+
+  useEffect(() => {
+    if (inView && hasNextPage && !isFetchingNextPage) {
+      onLoadMore();
+    }
+  }, [inView, hasNextPage, isFetchingNextPage, onLoadMore]);
+
   if (items.length === 0) {
     return <DataTableNoData title="No configuration history" />;
   }
@@ -41,19 +61,25 @@ const ConfigurationHistoryTimeline: React.FC<
               <div
                 className={cn(
                   "h-3 w-0.5 shrink-0",
-                  index > 0 ? "bg-[#cfd0ff] opacity-50" : "bg-transparent",
+                  index > 0
+                    ? "bg-[var(--timeline-connector)] opacity-50"
+                    : "bg-transparent",
                 )}
               />
               <div
                 className={cn(
                   "size-2 shrink-0 rounded-full",
-                  isSelected ? "bg-primary" : "border-2 border-[#cfd0ff]",
+                  isSelected
+                    ? "bg-primary"
+                    : "border-2 border-[var(--timeline-connector)]",
                 )}
               />
               <div
                 className={cn(
                   "w-0.5 flex-1 shrink-0",
-                  !isLast ? "bg-[#cfd0ff] opacity-50" : "bg-transparent",
+                  !isLast
+                    ? "bg-[var(--timeline-connector)] opacity-50"
+                    : "bg-transparent",
                 )}
               />
             </div>
@@ -110,6 +136,12 @@ const ConfigurationHistoryTimeline: React.FC<
           </li>
         );
       })}
+      <li ref={sentinelRef} className="h-1" />
+      {isFetchingNextPage && (
+        <li className="flex justify-center py-2">
+          <Loader2 className="size-4 animate-spin text-light-slate" />
+        </li>
+      )}
     </ul>
   );
 };

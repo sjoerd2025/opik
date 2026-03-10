@@ -88,7 +88,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="comet-title-s">Create new version</h2>
-          <div className="comet-body-xs flex items-center gap-1 rounded bg-[#FF5A3C] px-2 py-0.5 text-white">
+          <div className="comet-body-xs flex items-center gap-1 rounded bg-[var(--edit-badge-bg)] px-2 py-0.5 text-[var(--edit-badge-text)]">
             <Pencil className="size-2.5" />
             From v{version}
           </div>

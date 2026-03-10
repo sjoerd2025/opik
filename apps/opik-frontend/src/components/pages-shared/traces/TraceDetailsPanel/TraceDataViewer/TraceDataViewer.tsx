@@ -29,6 +29,7 @@ import PromptsTab from "./PromptsTab";
 import AgentConfigurationTab, {
   isAgentConfigurationMetadata,
 } from "./AgentConfigurationTab";
+import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 import { formatDuration, formatDate } from "@/lib/date";
 import isUndefined from "lodash/isUndefined";
 import { formatCost } from "@/lib/money";
@@ -93,8 +94,9 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
   }, [data.metadata, showOptimizerPrompts]);
 
   const hasAgentConfiguration = useMemo(() => {
-    const config = (data.metadata as Record<string, unknown>)
-      ?.agent_configuration;
+    const config = (data.metadata as Record<string, unknown>)?.[
+      AGENT_CONFIGURATION_METADATA_KEY
+    ];
     return isAgentConfigurationMetadata(config);
   }, [data.metadata]);
 

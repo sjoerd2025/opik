@@ -3,7 +3,7 @@ import { QueryFunctionContext, useInfiniteQuery } from "@tanstack/react-query";
 import api, { AGENT_CONFIGS_KEY, AGENT_CONFIGS_REST_ENDPOINT } from "@/api/api";
 import { ConfigHistoryItem } from "@/types/agent-configs";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 type UseConfigHistoryListInfiniteResponse = {
   content: ConfigHistoryItem[];

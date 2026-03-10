@@ -22,7 +22,8 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   });
   const [isEditing, setIsEditing] = useState(false);
 
-  const { data, isPending } = useConfigHistoryListInfinite({ projectId });
+  const { data, isPending, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useConfigHistoryListInfinite({ projectId });
 
   const allRows = useMemo(
     () => data?.pages.flatMap((p) => p.content) ?? [],
@@ -128,6 +129,9 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
           total={total}
           selectedIndex={selectedIndex}
           onSelect={(index) => setSelectedId(allRows[index]?.id ?? undefined)}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
         />
       </div>
     </div>

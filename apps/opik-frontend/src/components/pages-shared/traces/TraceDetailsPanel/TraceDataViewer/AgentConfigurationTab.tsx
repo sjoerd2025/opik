@@ -11,10 +11,14 @@ import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import useAppStore from "@/store/AppStore";
+import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 
 type AgentConfigurationMetadata = {
   blueprint_id: string;
-  values?: Record<string, { type: BlueprintValueType; value: string }>;
+  values?: Record<
+    string,
+    { type: BlueprintValueType; value: string | number | boolean }
+  >;
 };
 
 export const isAgentConfigurationMetadata = (
@@ -34,8 +38,9 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
   data,
   projectId,
 }) => {
-  const agentConfigMeta = (data.metadata as Record<string, unknown>)
-    ?.agent_configuration;
+  const agentConfigMeta = (data.metadata as Record<string, unknown>)?.[
+    AGENT_CONFIGURATION_METADATA_KEY
+  ];
   const configMeta = isAgentConfigurationMetadata(agentConfigMeta)
     ? agentConfigMeta
     : undefined;
@@ -81,7 +86,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
             search={{ tab: "configuration", configId: blueprintId }}
           >
             <Button variant="outline" size="2xs">
-              <FileSliders className="mr-1 size-3 shrink-0" color="#DB46EF" />
+              <FileSliders className="mr-1 size-3 shrink-0 text-[var(--color-fuchsia)]" />
               Go to details
             </Button>
           </Link>
