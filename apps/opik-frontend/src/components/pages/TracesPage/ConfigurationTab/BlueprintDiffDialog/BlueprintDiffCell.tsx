@@ -15,7 +15,6 @@ const SIDE_STYLES = {
   diff: "border-[var(--diff-added-border)] bg-[var(--diff-added-bg)] text-[var(--diff-added-text)]",
 } as const;
 
-
 export const DiffCellBox: React.FC<{
   text: string;
   changed: boolean;
