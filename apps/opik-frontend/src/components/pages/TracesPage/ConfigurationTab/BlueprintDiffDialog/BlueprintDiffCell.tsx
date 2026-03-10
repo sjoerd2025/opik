@@ -1,8 +1,8 @@
 import React from "react";
-
-import { cn, formatNumericData } from "@/lib/utils";
-import { BlueprintValueType, BlueprintValue } from "@/types/agent-configs";
 import { GitCommitVertical } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+export { formatBlueprintValue } from "@/utils/agent-configurations";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import Loader from "@/components/shared/Loader/Loader";
 import { Tag } from "@/components/ui/tag";
@@ -11,23 +11,10 @@ import { TableCell } from "@/components/ui/table";
 export type DiffSide = "base" | "diff";
 
 const SIDE_STYLES = {
-  base: "border-red-200 bg-red-50 text-red-800",
-  diff: "border-green-200 bg-green-50 text-green-800",
+  base: "border-[var(--diff-removed-border)] bg-[var(--diff-removed-bg)] text-[var(--diff-removed-text)]",
+  diff: "border-[var(--diff-added-border)] bg-[var(--diff-added-bg)] text-[var(--diff-added-text)]",
 } as const;
 
-export const formatBlueprintValue = (v: BlueprintValue): string => {
-  switch (v.type) {
-    case BlueprintValueType.INT:
-    case BlueprintValueType.FLOAT: {
-      const num = Number(v.value);
-      return isNaN(num) ? v.value : formatNumericData(num);
-    }
-    case BlueprintValueType.BOOLEAN:
-      return v.value === "true" ? "true" : "false";
-    default:
-      return v.value;
-  }
-};
 
 export const DiffCellBox: React.FC<{
   text: string;
@@ -91,7 +78,8 @@ export const PromptDiffPair: React.FC<{
             <Tag
               className={cn(
                 "flex w-fit items-center gap-1",
-                commitsChanged && "border-red-300 bg-red-50 text-red-700",
+                commitsChanged &&
+                  "border-[var(--diff-removed-border)] bg-[var(--diff-removed-bg)] text-[var(--diff-removed-text)]",
               )}
               variant="gray"
               size="sm"
@@ -117,7 +105,8 @@ export const PromptDiffPair: React.FC<{
             <Tag
               className={cn(
                 "flex w-fit items-center gap-1",
-                commitsChanged && "border-green-300 bg-green-50 text-green-700",
+                commitsChanged &&
+                  "border-[var(--diff-added-border)] bg-[var(--diff-added-bg)] text-[var(--diff-added-text)]",
               )}
               variant="gray"
               size="sm"

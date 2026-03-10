@@ -24,6 +24,7 @@ import BlueprintDiffDialog from "./BlueprintDiffDialog/BlueprintDiffDialog";
 import {
   generateBlueprintDescription,
   isProdTag,
+  AGENT_CONFIGURATION_PROD_ENV_NAME,
   sortTags,
 } from "@/utils/agent-configurations";
 import { Button } from "@/components/ui/button";
@@ -76,7 +77,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
     promoteToProd({
       envsRequest: {
         project_id: projectId,
-        envs: [{ env_name: "prod", blueprint_id: item.id }],
+        envs: [{ env_name: AGENT_CONFIGURATION_PROD_ENV_NAME, blueprint_id: item.id }],
       },
     });
   };
@@ -139,7 +140,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
                   onClick={() => setConfirmOpen(true)}
                   disabled={isPromoting}
                 >
-                  <Rocket className="mr-1.5 size-3.5 text-[#A3E635]" />
+                  <Rocket className="mr-1.5 size-3.5 text-[var(--color-lime)]" />
                   {isPromoting ? "Promoting..." : "Promote to prod"}
                 </Button>
               </TooltipWrapper>

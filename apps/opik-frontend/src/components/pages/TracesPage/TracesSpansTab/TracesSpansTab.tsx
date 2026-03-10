@@ -136,6 +136,8 @@ const parseSpanScoreName = (label: string): string => {
   return label.replace(SPAN_FEEDBACK_SCORE_SUFFIX, "");
 };
 
+const COLUMN_CONFIGURATION_VERSION_ID = "configuration_version";
+
 const SHARED_COLUMNS: ColumnData<BaseTraceData>[] = [
   {
     id: "name",
@@ -306,7 +308,7 @@ const DEFAULT_TRACES_COLUMNS_ORDER: string[] = [
   COLUMN_EXPERIMENT_ID,
   "created_by",
   COLUMN_GUARDRAILS_ID,
-  "configuration_version",
+  COLUMN_CONFIGURATION_VERSION_ID,
 ];
 
 const DEFAULT_SPANS_COLUMNS_ORDER: string[] = [
@@ -944,7 +946,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
               },
             },
             {
-              id: "configuration_version",
+              id: COLUMN_CONFIGURATION_VERSION_ID,
               label: "Configuration",
               type: COLUMN_TYPE.string,
               sortable: false,

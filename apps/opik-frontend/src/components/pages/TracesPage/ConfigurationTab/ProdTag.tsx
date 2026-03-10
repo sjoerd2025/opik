@@ -21,7 +21,7 @@ const ICON_SIZE: Record<ProdTagSize, string> = {
 const ProdTag: React.FC<ProdTagProps> = ({ size = "sm", value = "Prod" }) => {
   return (
     <div
-      className={`inline-flex items-center bg-[#a3e635] text-[#1a2e05] dark:bg-[#3d5a0a] dark:text-[#d9f99d] ${SIZE_CLASSES[size]}`}
+      className={`inline-flex items-center bg-[var(--tag-lime-bg)] text-[var(--tag-lime-text)] ${SIZE_CLASSES[size]}`}
     >
       <Rocket className={`shrink-0 ${ICON_SIZE[size]}`} />
       {value}

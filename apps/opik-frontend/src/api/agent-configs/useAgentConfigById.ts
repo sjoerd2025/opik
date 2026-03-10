@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import api, { AGENT_CONFIGS_REST_ENDPOINT } from "@/api/api";
+import api, { AGENT_CONFIGS_KEY, AGENT_CONFIGS_REST_ENDPOINT } from "@/api/api";
 import { BlueprintDetails } from "@/types/agent-configs";
 
 type UseAgentConfigByIdParams = {
@@ -25,7 +25,7 @@ export default function useAgentConfigById({
   blueprintId,
 }: UseAgentConfigByIdParams) {
   return useQuery({
-    queryKey: [AGENT_CONFIGS_REST_ENDPOINT, "blueprints", blueprintId],
+    queryKey: [AGENT_CONFIGS_KEY, "blueprints", blueprintId],
     queryFn: ({ signal }) => getAgentConfigById(blueprintId, signal),
     placeholderData: keepPreviousData,
     enabled: !!blueprintId,
