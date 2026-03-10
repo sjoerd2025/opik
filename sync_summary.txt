@@ -1,0 +1,238 @@
+## Provider Model Sync
+
+### Openrouter
+- Added 71 model(s):
+  + aion-labs/aion-2.0
+  + allenai/molmo-2-8b
+  + allenai/olmo-3.1-32b-instruct
+  + allenai/olmo-3.1-32b-think
+  + amazon/nova-2-lite-v1
+  + anthropic/claude-3-haiku
+  + anthropic/claude-3.5-haiku
+  + anthropic/claude-3.5-sonnet
+  + arcee-ai/trinity-large-preview:free
+  + arcee-ai/trinity-mini
+  + arcee-ai/trinity-mini:free
+  + bytedance-seed/seed-1.6
+  + bytedance-seed/seed-1.6-flash
+  + bytedance-seed/seed-2.0-mini
+  + deepseek/deepseek-v3.2
+  + deepseek/deepseek-v3.2-speciale
+  + essentialai/rnj-1-instruct
+  + google/gemini-3.1-flash-image-preview
+  + google/gemini-3.1-flash-lite-preview
+  + google/gemini-3.1-pro-preview-customtools
+  + inception/mercury-2
+  + kwaipilot/kat-coder-pro
+  + liquid/lfm-2-24b-a2b
+  + liquid/lfm-2.5-1.2b-instruct:free
+  + liquid/lfm-2.5-1.2b-thinking:free
+  + minimax/minimax-m2-her
+  + minimax/minimax-m2.1
+  + minimax/minimax-m2.5
+  + mistralai/devstral-2512
+  + mistralai/ministral-14b-2512
+  + mistralai/ministral-3b-2512
+  + mistralai/ministral-8b-2512
+  + mistralai/mistral-large-2512
+  + mistralai/mistral-small-creative
+  + moonshotai/kimi-k2.5
+  + nex-agi/deepseek-v3.1-nex-n1
+  + nvidia/nemotron-3-nano-30b-a3b
+  + nvidia/nemotron-3-nano-30b-a3b:free
+  + openai/gpt-5.1-codex-max
+  + openai/gpt-5.2-chat
+  + openai/gpt-5.2-codex
+  + openai/gpt-5.2-pro
+  + openai/gpt-5.3-chat
+  + openai/gpt-5.3-codex
+  + openai/gpt-5.4
+  + openai/gpt-5.4-pro
+  + openai/gpt-audio
+  + openai/gpt-audio-mini
+  + openai/gpt-oss-120b:free
+  + openrouter/bodybuilder
+  + prime-intellect/intellect-3
+  + qwen/qwen3-coder-next
+  + qwen/qwen3-max-thinking
+  + qwen/qwen3-next-80b-a3b-instruct:free
+  + qwen/qwen3-vl-32b-instruct
+  + qwen/qwen3.5-122b-a10b
+  + qwen/qwen3.5-27b
+  + qwen/qwen3.5-35b-a3b
+  + qwen/qwen3.5-397b-a17b
+  + qwen/qwen3.5-flash-02-23
+  + qwen/qwen3.5-plus-02-15
+  + relace/relace-search
+  + stepfun/step-3.5-flash
+  + stepfun/step-3.5-flash:free
+  + upstage/solar-pro-3
+  + writer/palmyra-x5
+  + xiaomi/mimo-v2-flash
+  + z-ai/glm-4.6v
+  + z-ai/glm-4.7
+  + z-ai/glm-4.7-flash
+  + z-ai/glm-5
+- Stale 70 model(s) (not in source, manual review needed):
+  ? ai21/jamba-mini-1.7
+  ? alibaba/tongyi-deepresearch-30b-a3b:free
+  ? arcee-ai/afm-4.5b
+  ? arliai/qwq-32b-arliai-rpr-v1
+  ? arliai/qwq-32b-arliai-rpr-v1:free
+  ? deepcogito/cogito-v2-preview-deepseek-671b
+  ? deepcogito/cogito-v2-preview-llama-109b-moe
+  ? deepcogito/cogito-v2-preview-llama-405b
+  ? deepcogito/cogito-v2-preview-llama-70b
+  ? deepseek/deepseek-chat-v3-0324:free
+  ? deepseek/deepseek-prover-v2
+  ? deepseek/deepseek-r1-0528-qwen3-8b
+  ? deepseek/deepseek-r1-0528-qwen3-8b:free
+  ? deepseek/deepseek-r1-0528:free
+  ? deepseek/deepseek-r1-distill-llama-70b:free
+  ? deepseek/deepseek-r1-distill-qwen-14b
+  ? deepseek/deepseek-r1:free
+  ? google/gemini-2.0-flash-exp:free
+  ? google/gemini-2.5-flash-image-preview
+  ? google/gemini-2.5-flash-preview-09-2025
+  ? kwaipilot/kat-coder-pro:free
+  ? meituan/longcat-flash-chat:free
+  ? meta-llama/llama-3.2-90b-vision-instruct
+  ? microsoft/mai-ds-r1
+  ? microsoft/mai-ds-r1:free
+  ? microsoft/phi-3-medium-128k-instruct
+  ? microsoft/phi-3-mini-128k-instruct
+  ? microsoft/phi-3.5-mini-128k-instruct
+  ? microsoft/phi-4-multimodal-instruct
+  ? microsoft/phi-4-reasoning-plus
+  ? mistralai/codestral-2501
+  ? mistralai/devstral-small-2505
+  ? mistralai/magistral-medium-2506
+  ? mistralai/magistral-medium-2506:thinking
+  ? mistralai/magistral-small-2506
+  ? mistralai/ministral-3b
+  ? mistralai/ministral-8b
+  ? mistralai/mistral-7b-instruct
+  ? mistralai/mistral-7b-instruct-v0.2
+  ? mistralai/mistral-7b-instruct-v0.3
+  ? mistralai/mistral-7b-instruct:free
+  ? mistralai/mistral-nemo:free
+  ? mistralai/mistral-small
+  ? mistralai/mistral-small-24b-instruct-2501:free
+  ? mistralai/mistral-small-3.2-24b-instruct:free
+  ? mistralai/mistral-tiny
+  ? mistralai/pixtral-12b
+  ? moonshotai/kimi-dev-72b
+  ? moonshotai/kimi-k2:free
+  ? moonshotai/kimi-linear-48b-a3b-instruct
+  ? nousresearch/deephermes-3-mistral-24b-preview
+  ? nvidia/llama-3.1-nemotron-ultra-253b-v1
+  ? openai/chatgpt-4o-latest
+  ? openai/codex-mini
+  ? openai/gpt-5.2-chat-latest
+  ? opengvlab/internvl3-78b
+  ? perplexity/sonar-reasoning
+  ? qwen/qwen-2.5-72b-instruct:free
+  ? qwen/qwen-2.5-coder-32b-instruct:free
+  ? qwen/qwen2.5-vl-32b-instruct:free
+  ? qwen/qwen3-14b:free
+  ? qwen/qwen3-235b-a22b:free
+  ? qwen/qwen3-30b-a3b:free
+  ? stepfun-ai/step3
+  ? thedrummer/anubis-70b-v1.1
+  ? thudm/glm-4.1v-9b-thinking
+  ? tngtech/deepseek-r1t-chimera
+  ? tngtech/deepseek-r1t-chimera:free
+  ? tngtech/deepseek-r1t2-chimera:free
+  ? x-ai/grok-4.1-fast:free
+- Total models: 416 (dropdown: 416)
+
+### Openai
+- Added 23 model(s):
+  + chatgpt-image-latest
+  + gpt-3.5-turbo-instruct
+  + gpt-3.5-turbo-instruct-0914
+  + gpt-4o-transcribe-diarize
+  + gpt-5-codex
+  + gpt-5-pro
+  + gpt-5.1-chat-latest
+  + gpt-5.1-codex
+  + gpt-5.1-codex-max
+  + gpt-5.1-codex-mini
+  + gpt-5.2-codex
+  + gpt-5.2-pro
+  + gpt-5.3-chat-latest
+  + gpt-5.3-codex
+  + gpt-5.4
+  + gpt-5.4-pro
+  + gpt-image-1
+  + gpt-image-1-mini
+  + gpt-image-1.5
+  + o1-pro
+  + o3-deep-research
+  + o3-pro
+  + o4-mini-deep-research
+- Stale 12 model(s) (not in source, manual review needed):
+  ? chatgpt-4o-latest
+  ? gpt-4-0314
+  ? gpt-4-turbo-2024-04-09
+  ? gpt-4o-2024-05-13
+  ? gpt-4o-2024-08-06
+  ? gpt-4o-2024-11-20
+  ? gpt-4o-mini-2024-07-18
+  ? o1-2024-12-17
+  ? o1-mini
+  ? o1-mini-2024-09-12
+  ? o1-preview
+  ? o1-preview-2024-09-12
+- Deprecated 2 model(s) (past deprecation_date, excluded from dropdown):
+  ✗ gpt-4-0613
+  ✗ o1-mini-2024-09-12
+- Total models: 60 (dropdown: 17)
+
+### Anthropic
+- Added 1 model(s):
+  + claude-sonnet-4-5-20250929
+- Stale 2 model(s) (not in source, manual review needed):
+  ? claude-3-7-sonnet-20250219
+  ? claude-sonnet-4-5
+- Deprecated 1 model(s) (past deprecation_date, excluded from dropdown):
+  ✗ claude-3-7-sonnet-20250219
+- Total models: 10 (dropdown: 8)
+
+### Gemini
+- Added 6 model(s):
+  + gemini-2.0-flash-lite
+  + gemini-2.5-flash-image
+  + gemini-3-pro-image-preview
+  + gemini-3.1-flash-image-preview
+  + gemini-3.1-flash-lite-preview
+  + nano-banana-pro-preview
+- Stale 6 model(s) (not in source, manual review needed):
+  ? aqa
+  ? gemini-1.0-pro
+  ? gemini-1.5-flash-latest
+  ? gemini-1.5-pro-latest
+  ? gemini-pro-vision
+  ? text-embedding-004
+- Deprecated 4 model(s) (past deprecation_date, excluded from dropdown):
+  ✗ gemini-1.5-flash-latest
+  ✗ gemini-1.5-pro-latest
+  ✗ gemini-3-pro-preview
+  ✗ text-embedding-004
+- Total models: 19 (dropdown: 8)
+
+### Vertexai
+- Added 1 model(s):
+  + vertex_ai/gemini-3-flash-preview
+- Stale 9 model(s) (not in source, manual review needed):
+  ? vertex_ai/gemini-2.0-flash-001
+  ? vertex_ai/gemini-2.0-flash-lite-001
+  ? vertex_ai/gemini-2.5-flash
+  ? vertex_ai/gemini-2.5-flash-lite-preview-06-17
+  ? vertex_ai/gemini-2.5-flash-preview-04-17
+  ? vertex_ai/gemini-2.5-pro
+  ? vertex_ai/gemini-2.5-pro-exp-03-25
+  ? vertex_ai/gemini-2.5-pro-preview-03-25
+  ? vertex_ai/gemini-2.5-pro-preview-05-06
+- Total models: 12 (dropdown: 7)
+
