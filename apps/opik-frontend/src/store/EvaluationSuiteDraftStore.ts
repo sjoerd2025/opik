@@ -209,9 +209,7 @@ const useEvaluationSuiteDraftStore = create<EvaluationSuiteDraftState>(
 
     updateExecutionPolicy: (newPolicy, serverPolicy) => {
       set({
-        executionPolicy: isEqual(newPolicy, serverPolicy)
-          ? null
-          : newPolicy,
+        executionPolicy: isEqual(newPolicy, serverPolicy) ? null : newPolicy,
       });
     },
 

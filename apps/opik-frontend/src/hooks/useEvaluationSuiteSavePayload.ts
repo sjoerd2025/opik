@@ -87,9 +87,7 @@ export function useEvaluationSuiteSavePayload({
           const existingChanges = editedItemsMap.get(itemId) || {};
           editedItemsMap.set(itemId, {
             ...existingChanges,
-            evaluators: [
-              packAssertions(assertions, originalEvaluator),
-            ],
+            evaluators: [packAssertions(assertions, originalEvaluator)],
           });
         }
       }

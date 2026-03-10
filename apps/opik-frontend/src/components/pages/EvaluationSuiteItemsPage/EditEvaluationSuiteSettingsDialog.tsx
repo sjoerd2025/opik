@@ -102,10 +102,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="grid gap-4"
-      >
+      <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
         <DialogHeader>
           <DialogTitle>Edit evaluation suite</DialogTitle>
         </DialogHeader>
@@ -208,9 +205,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
               <div className="pt-1.5">
                 <AssertionsField
                   editableAssertions={fields.map((f) => f.value)}
-                  onChangeEditable={(index, value) =>
-                    update(index, { value })
-                  }
+                  onChangeEditable={(index, value) => update(index, { value })}
                   onRemoveEditable={(index) => remove(index)}
                   onAdd={() => append({ value: "" })}
                   placeholder="e.g. Response should be factually accurate and cite sources"
