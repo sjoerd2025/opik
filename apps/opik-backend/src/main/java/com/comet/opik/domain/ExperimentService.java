@@ -740,12 +740,12 @@ public class ExperimentService {
                                     .build());
                         }
                     })
-                    .then(experimentAggregationPublisher.publish(ids, workspaceId, userName)
+                    .then(Mono.defer(() -> experimentAggregationPublisher.publish(ids, workspaceId, userName)
                             .onErrorResume(error -> {
                                 log.error("Failed to publish aggregation for finished experiments, workspaceId '{}'",
                                         workspaceId, error);
                                 return Mono.empty();
-                            }));
+                            })));
         });
     }
 

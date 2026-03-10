@@ -452,8 +452,8 @@ class ExperimentServiceTest {
         }
 
         @Test
-        @DisplayName("when publisher fails, then error is propagated")
-        void finishExperimentsWhenPublisherFailsThenErrorPropagated() {
+        @DisplayName("when publisher fails, then error is swallowed and operation completes")
+        void finishExperimentsWhenPublisherFailsThenErrorIsSwallowed() {
             // given
             var experimentId = UUID.randomUUID();
             var ids = Set.of(experimentId);
@@ -473,8 +473,7 @@ class ExperimentServiceTest {
                             .put(RequestContext.WORKSPACE_ID, TEST_WORKSPACE_ID)
                             .put(RequestContext.WORKSPACE_NAME, TEST_WORKSPACE_NAME)
                             .put(RequestContext.USER_NAME, TEST_USER_NAME)))
-                    .expectError(RuntimeException.class)
-                    .verify();
+                    .verifyComplete();
 
             verify(experimentDAO).getByIds(ids);
             verify(experimentAggregationPublisher).publish(ids, TEST_WORKSPACE_ID, TEST_USER_NAME);
