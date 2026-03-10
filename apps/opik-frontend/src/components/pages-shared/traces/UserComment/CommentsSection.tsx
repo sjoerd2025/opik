@@ -1,5 +1,5 @@
-import React from "react";
-import { orderBy } from "lodash";
+import React, { useMemo } from "react";
+import orderBy from "lodash/orderBy";
 import { CommentItem } from "@/types/comment";
 import { useLoggedInUserName } from "@/store/AppStore";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -31,6 +31,11 @@ const CommentsSection: React.FC<CommentsSectionProps> = ({
     permissions: { canWriteComments },
   } = usePermissions();
 
+  const sortedComments = useMemo(
+    () => orderBy(comments || [], "created_at", "desc"),
+    [comments],
+  );
+
   return (
     <>
       {canWriteComments && (
@@ -47,8 +52,8 @@ const CommentsSection: React.FC<CommentsSectionProps> = ({
         </UserCommentForm>
       )}
       <div className={listClassName}>
-        {comments?.length ? (
-          orderBy(comments, "created_at", "desc").map((comment) => (
+        {sortedComments.length ? (
+          sortedComments.map((comment) => (
             <UserComment
               key={comment.id}
               comment={comment}
