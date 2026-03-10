@@ -12,12 +12,14 @@ import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import BlueprintTypeIcon from "@/components/pages-shared/traces/ConfigurationTab/BlueprintTypeIcon";
 import BlueprintValuePrompt from "@/components/pages-shared/traces/ConfigurationTab/BlueprintValuePrompt";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useConfigurationSave } from "./useConfigurationSave";
 
 type ConfigurationEditViewProps = {
   item: ConfigHistoryItem;
   projectId: string;
   version: number;
+  latestVersion: number;
   onCancel: () => void;
   onSaved: () => void;
 };
@@ -26,6 +28,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   item,
   projectId,
   version,
+  latestVersion,
   onCancel,
   onSaved,
 }) => {
@@ -48,6 +51,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       originalValues,
       description,
       projectId,
+      isLatestVersion: version === latestVersion,
       onSaved,
     });
 
@@ -119,6 +123,16 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
           </TooltipWrapper>
         </div>
       </div>
+
+      {version !== latestVersion && (
+        <Alert variant="callout" size="md" className="mb-4">
+          <Info />
+          <AlertDescription size="md">
+            You&apos;re creating a version from v{version}. More recent versions
+            contain prompt updates that won&apos;t be included.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="mb-4">
         <label className="comet-body-xs-accented mb-1.5 block text-foreground">

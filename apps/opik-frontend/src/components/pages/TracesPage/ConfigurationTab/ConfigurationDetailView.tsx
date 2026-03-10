@@ -1,19 +1,14 @@
 import React, { useState } from "react";
 import {
   Clock,
-  CopyPlus,
   FilePen,
   GitCompareArrows,
+  Pencil,
   Rocket,
   User,
 } from "lucide-react";
 
-import {
-  BlueprintType,
-  BlueprintValue,
-  BlueprintValueType,
-  ConfigHistoryItem,
-} from "@/types/agent-configs";
+import { ConfigHistoryItem } from "@/types/agent-configs";
 import { formatDate, getTimeFromNow } from "@/lib/date";
 import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import Loader from "@/components/shared/Loader/Loader";
@@ -29,7 +24,6 @@ import {
 } from "@/utils/agent-configurations";
 import { Button } from "@/components/ui/button";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
-import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
 import useAgentConfigEnvsMutation from "@/api/agent-configs/useAgentConfigEnvsMutation";
 import useTracesList from "@/api/traces/useTracesList";
 import ConfirmDialog from "@/components/shared/ConfirmDialog/ConfirmDialog";
@@ -45,6 +39,7 @@ type ConfigurationDetailViewProps = {
   projectId: string;
   prodItemId?: string;
   prodVersion: number | null;
+  onEdit: () => void;
 };
 
 const renderTag = (tag: string) =>
@@ -60,6 +55,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   projectId,
   prodItemId,
   prodVersion,
+  onEdit,
 }) => {
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
@@ -84,14 +80,10 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   const hasTraces = (tracesData?.total ?? 0) > 0;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [duplicateConfirmOpen, setDuplicateConfirmOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
 
   const { mutate: promoteToProd, isPending: isPromoting } =
     useAgentConfigEnvsMutation();
-
-  const { mutate: createConfig, isPending: isDuplicating } =
-    useAgentConfigCreateMutation();
 
   const handleConfirmPromote = () => {
     promoteToProd({
@@ -109,28 +101,6 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
 
   const description =
     item.description || generateBlueprintDescription(item.values);
-
-  const handleConfirmDuplicate = () => {
-    if (!agentConfig) return;
-    const values: BlueprintValue[] = agentConfig.values
-      .filter((v) => v.type !== BlueprintValueType.PROMPT)
-      .map((v) => ({
-        key: v.key,
-        type: v.type,
-        value: v.value,
-        ...(v.description ? { description: v.description } : {}),
-      }));
-    createConfig({
-      agentConfig: {
-        project_id: projectId,
-        blueprint: {
-          description: agentConfig.description || undefined,
-          type: BlueprintType.BLUEPRINT,
-          values,
-        },
-      },
-    });
-  };
 
   return (
     <>
@@ -192,14 +162,9 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
                 }}
               />
             )}
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => setDuplicateConfirmOpen(true)}
-              disabled={isDuplicating || isPending}
-            >
-              <CopyPlus className="mr-1.5 size-3.5 text-light-slate" />
-              {isDuplicating ? "Duplicating..." : "Duplicate as new"}
+            <Button size="xs" variant="outline" onClick={onEdit}>
+              <Pencil className="mr-1.5 size-3.5" />
+              Edit configuration
             </Button>
           </div>
         </div>
@@ -239,14 +204,6 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
         title="Promote to production"
         description={`This will set v${version} as the active configuration for the prod environment. Are you sure you want to continue?`}
         confirmText="Promote to prod"
-      />
-      <ConfirmDialog
-        open={duplicateConfirmOpen}
-        setOpen={setDuplicateConfirmOpen}
-        onConfirm={handleConfirmDuplicate}
-        title="Duplicate as new blueprint"
-        description={`This will create a new blueprint with all values copied from v${version}. Are you sure you want to continue? It will ignore the updates for prompts.`}
-        confirmText="Duplicate"
       />
       {prodItemId && prodItemId !== item.id && (
         <BlueprintDiffDialog

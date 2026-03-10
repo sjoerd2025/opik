@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { Book, PlusIcon, Settings2 } from "lucide-react";
+import { Book, Settings2 } from "lucide-react";
 import { StringParam, useQueryParam } from "use-query-params";
 
 import Loader from "@/components/shared/Loader/Loader";
-import { Button } from "@/components/ui/button";
 import { buildDocsUrl } from "@/lib/utils";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import { ConfigHistoryItem } from "@/types/agent-configs";
@@ -20,7 +19,10 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   const [selectedId, setSelectedId] = useQueryParam("configId", StringParam, {
     updateType: "replaceIn",
   });
-  const [isEditing, setIsEditing] = useState(false);
+  const [editItem, setEditItem] = useState<{
+    item: ConfigHistoryItem;
+    version: number;
+  } | null>(null);
 
   const { data, isPending, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useConfigHistoryListInfinite({ projectId });
@@ -76,19 +78,19 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   }
 
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
-  const latestItem = allRows[0] as ConfigHistoryItem;
 
-  if (isEditing && latestItem) {
+  if (editItem) {
     return (
       <div className="w-[70vw]">
         <ConfigurationEditView
-          item={latestItem}
+          item={editItem.item}
           projectId={projectId}
-          version={total}
-          onCancel={() => setIsEditing(false)}
+          version={editItem.version}
+          latestVersion={total}
+          onCancel={() => setEditItem(null)}
           onSaved={() => {
             setSelectedId(undefined);
-            setIsEditing(false);
+            setEditItem(null);
           }}
         />
       </div>
@@ -98,12 +100,8 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   return (
     <div className="flex gap-0">
       <div className="w-[60vw] min-w-0 flex-1 [overflow-anchor:none]">
-        <div className="mx-6 mt-6 flex items-center justify-between">
+        <div className="mx-6 mt-6">
           <p className="comet-body-s-accented">Agent configuration</p>
-          <Button size="xs" onClick={() => setIsEditing(true)}>
-            <PlusIcon className="mr-1.5 size-3.5" />
-            Add new version
-          </Button>
         </div>
 
         {selectedItem ? (
@@ -113,6 +111,12 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
             projectId={projectId}
             prodItemId={prodItem?.id}
             prodVersion={prodVersion}
+            onEdit={() =>
+              setEditItem({
+                item: selectedItem,
+                version: total - selectedIndex,
+              })
+            }
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-slate">
