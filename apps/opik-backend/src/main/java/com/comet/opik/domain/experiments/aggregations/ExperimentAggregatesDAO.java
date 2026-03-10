@@ -113,7 +113,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private static final TypeReference<List<ExperimentScore>> TYPE_REFERENCE = new TypeReference<>() {
     };
 
-    public static final String EMPTY_ARRAY_STR = "[]";
+    private static final String EMPTY_ARRAY_STR = "[]";
 
     private final @NonNull TransactionTemplateAsync asyncTemplate;
     private final @NonNull FilterQueryBuilder filterQueryBuilder;
@@ -843,7 +843,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             <if(name)> AND ilike(name, CONCAT('%', :name, '%')) <endif>
             <if(filters)> AND <filters> <endif>
             <if(project_id)> AND project_id = :project_id <endif>
-            <if(project_deleted)> AND project_id = '' <endif>
+            <if(project_deleted)> AND project_id = :zero_uuid <endif>
             GROUP BY <groupBy>
             SETTINGS log_comment = '<log_comment>'
             ;
@@ -869,7 +869,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             <if(name)> AND ilike(name, CONCAT('%', :name, '%')) <endif>
             <if(filters)> AND <filters> <endif>
             <if(project_id)> AND project_id = :project_id <endif>
-            <if(project_deleted)> AND project_id = '' <endif>
+            <if(project_deleted)> AND project_id = :zero_uuid <endif>
             GROUP BY <groupBy>
             SETTINGS log_comment = '<log_comment>'
             ;
@@ -894,7 +894,23 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     div_dedup.last_updated_by AS item_last_updated_by,
                     div_dedup.dataset_version_id AS dataset_version_id
                 FROM (
-                    SELECT div.*
+                    SELECT
+                        div.id,
+                        div.dataset_item_id,
+                        div.dataset_id,
+                        div.data,
+                        div.source,
+                        div.trace_id,
+                        div.span_id,
+                        div.tags,
+                        div.evaluators,
+                        div.execution_policy,
+                        div.created_at,
+                        div.last_updated_at,
+                        div.created_by,
+                        div.last_updated_by,
+                        div.dataset_version_id,
+                        div.workspace_id
                     FROM dataset_item_versions div
                     INNER JOIN experiment_aggregates ea FINAL ON
                         ea.workspace_id = div.workspace_id
@@ -951,7 +967,24 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     div_dedup.dataset_version_id AS dataset_version_id,
                     div_dedup.description AS description
                 FROM (
-                    SELECT div.*
+                    SELECT
+                        div.id,
+                        div.dataset_item_id,
+                        div.dataset_id,
+                        div.data,
+                        div.source,
+                        div.trace_id,
+                        div.span_id,
+                        div.tags,
+                        div.evaluators,
+                        div.execution_policy,
+                        div.created_at,
+                        div.last_updated_at,
+                        div.created_by,
+                        div.last_updated_by,
+                        div.dataset_version_id,
+                        div.description,
+                        div.workspace_id
                     FROM dataset_item_versions div
                     INNER JOIN experiment_aggregates ea FINAL ON
                         ea.workspace_id = div.workspace_id
@@ -979,6 +1012,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     FROM experiment_item_aggregates eia FINAL
                     INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
                     WHERE eia.workspace_id = :workspace_id
+                    AND ea.dataset_id = :dataset_id
                     <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
                 )
                 ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
@@ -2081,7 +2115,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private TraceAggregations createEmptyTraceAggregations(UUID experimentId) {
         return TraceAggregations.builder()
                 .experimentId(experimentId)
-                .projectId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                .projectId(ExperimentGroupMappers.ZERO_UUID)
                 .durationPercentiles(Map.of())
                 .traceCount(0L)
                 .build();
@@ -2108,14 +2142,12 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
 
     @Override
     public Flux<ExperimentGroupItem> findGroups(ExperimentGroupCriteria criteria) {
-        log.info("Finding experiment groups from aggregates by criteria: '{}'", criteria);
         return streamGroupQuery(FIND_GROUPS_FROM_AGGREGATES, criteria,
                 ExperimentGroupMappers::toExperimentGroupItem);
     }
 
     @Override
     public Flux<ExperimentGroupAggregationItem> findGroupsAggregations(ExperimentGroupCriteria criteria) {
-        log.info("Finding experiment groups aggregations from aggregates by criteria: '{}'", criteria);
         return streamGroupQuery(FIND_GROUPS_AGGREGATIONS_FROM_AGGREGATES, criteria,
                 ExperimentGroupMappers::toExperimentGroupAggregationItem);
     }
@@ -2129,6 +2161,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     .bind("workspace_id", workspaceId);
 
             bindGroupCriteria(statement, criteria, filterQueryBuilder);
+            if (Boolean.TRUE.equals(criteria.projectDeleted())) {
+                statement.bind("zero_uuid", ExperimentGroupMappers.ZERO_UUID.toString());
+            }
 
             int groupsCount = criteria.groups().size();
 
@@ -2141,9 +2176,6 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     public Mono<Long> countDatasetItemsWithExperimentItemsFromAggregates(
             @NonNull DatasetItemSearchCriteria criteria,
             @NonNull UUID versionId) {
-
-        log.info("Counting dataset items with experiment items from aggregates for dataset: '{}'",
-                criteria.datasetId());
 
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(
@@ -2173,9 +2205,6 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             @NonNull UUID versionId,
             int page,
             int size) {
-
-        log.info("Getting dataset items with experiment items from aggregates for dataset: '{}'",
-                criteria.datasetId());
 
         var countMono = countDatasetItemsWithExperimentItemsFromAggregates(criteria, versionId);
 
@@ -2245,9 +2274,6 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             @NonNull UUID versionId,
             @NonNull Set<UUID> experimentIds,
             List<ExperimentsComparisonFilter> filters) {
-        log.info("Getting experiment items stats from aggregates for dataset '{}', version '{}', experiments '{}'",
-                datasetId, versionId, experimentIds);
-
         return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(SELECT_EXPERIMENT_ITEMS_STATS_FROM_AGGREGATES,
                     "getExperimentItemsStatsFromAggregates", workspaceId, datasetId);

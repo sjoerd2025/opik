@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.IntStream;
 
 import static com.comet.opik.utils.ValidationUtils.SCALE;
@@ -29,7 +30,7 @@ import static com.comet.opik.utils.ValidationUtils.SCALE;
  */
 public final class ExperimentGroupMappers {
 
-    public static final String ZERO_UUID = "00000000-0000-0000-0000-000000000000";
+    public static final UUID ZERO_UUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
 
     private ExperimentGroupMappers() {
     }
@@ -123,7 +124,7 @@ public final class ExperimentGroupMappers {
         } else if (value instanceof Double d) {
             return BigDecimal.valueOf(d);
         } else {
-            return null;
+            return BigDecimal.ZERO;
         }
     }
 
