@@ -5,6 +5,7 @@ import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DatasetItem;
 import com.comet.opik.api.DatasetItemBatch;
 import com.comet.opik.api.DatasetItemChanges;
+import com.comet.opik.api.DatasetItemEdit;
 import com.comet.opik.api.DeleteIdsHolder;
 import com.comet.opik.api.EvaluationMethod;
 import com.comet.opik.api.ExecutionPolicy;
@@ -7862,6 +7863,116 @@ class ExperimentsResourceTest {
             assertThat(actualExperiment.totalCount()).isEqualTo(1L);
             assertThat(actualExperiment.passRate()).isNotNull();
             assertThat(actualExperiment.passRate().doubleValue()).isCloseTo(0.0, within(0.01));
+        }
+
+        @Test
+        @DisplayName("when item-level pass_threshold=3 overrides suite default, then only that item requires 3 passing runs")
+        void findEvaluationSuiteExperiment__itemThreshold__overridesSuiteDefault() {
+            var workspaceName = UUID.randomUUID().toString();
+            var workspaceId = UUID.randomUUID().toString();
+            var apiKey = UUID.randomUUID().toString();
+
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            // Create dataset with two items
+            var dataset = podamFactory.manufacturePojo(Dataset.class).toBuilder()
+                    .id(null)
+                    .build();
+            var datasetId = datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
+
+            var datasetItemA = podamFactory.manufacturePojo(DatasetItem.class).toBuilder()
+                    .datasetId(datasetId)
+                    .build();
+            var datasetItemB = podamFactory.manufacturePojo(DatasetItem.class).toBuilder()
+                    .datasetId(datasetId)
+                    .build();
+            datasetResourceClient.createDatasetItems(
+                    DatasetItemBatch.builder()
+                            .datasetName(dataset.name())
+                            .items(List.of(datasetItemA, datasetItemB))
+                            .build(),
+                    workspaceName, apiKey);
+
+            // Create version 2: set item-level pass_threshold=3 on itemA only, itemB keeps default (1)
+            var versions = datasetResourceClient.listVersions(datasetId, apiKey, workspaceName);
+            var version1 = versions.content().getFirst();
+
+            var changes = DatasetItemChanges.builder()
+                    .baseVersion(version1.id())
+                    .editedItems(List.of(
+                            DatasetItemEdit.builder()
+                                    .id(datasetItemA.id())
+                                    .executionPolicy(new ExecutionPolicy(3, 3))
+                                    .build()))
+                    .build();
+            datasetResourceClient.applyDatasetItemChanges(
+                    datasetId, changes, false, apiKey, workspaceName);
+
+            // Create experiment linked to same dataset
+            var experiment = experimentResourceClient.createPartialExperiment()
+                    .evaluationMethod(EvaluationMethod.EVALUATION_SUITE)
+                    .datasetName(dataset.name())
+                    .optimizationId(null)
+                    .build();
+            var experimentId = experimentResourceClient.create(experiment, apiKey, workspaceName);
+
+            // 3 runs per item (6 traces total)
+            var traceA1 = podamFactory.manufacturePojo(Trace.class);
+            var traceA2 = podamFactory.manufacturePojo(Trace.class);
+            var traceA3 = podamFactory.manufacturePojo(Trace.class);
+            var traceB1 = podamFactory.manufacturePojo(Trace.class);
+            var traceB2 = podamFactory.manufacturePojo(Trace.class);
+            var traceB3 = podamFactory.manufacturePojo(Trace.class);
+            traceResourceClient.batchCreateTraces(
+                    List.of(traceA1, traceA2, traceA3, traceB1, traceB2, traceB3), apiKey, workspaceName);
+
+            // Experiment items: 3 runs for itemA, 3 runs for itemB
+            experimentResourceClient.createExperimentItem(Set.of(
+                    ExperimentItem.builder().experimentId(experimentId)
+                            .datasetItemId(datasetItemA.id()).traceId(traceA1.id()).build(),
+                    ExperimentItem.builder().experimentId(experimentId)
+                            .datasetItemId(datasetItemA.id()).traceId(traceA2.id()).build(),
+                    ExperimentItem.builder().experimentId(experimentId)
+                            .datasetItemId(datasetItemA.id()).traceId(traceA3.id()).build(),
+                    ExperimentItem.builder().experimentId(experimentId)
+                            .datasetItemId(datasetItemB.id()).traceId(traceB1.id()).build(),
+                    ExperimentItem.builder().experimentId(experimentId)
+                            .datasetItemId(datasetItemB.id()).traceId(traceB2.id()).build(),
+                    ExperimentItem.builder().experimentId(experimentId)
+                            .datasetItemId(datasetItemB.id()).traceId(traceB3.id()).build()),
+                    apiKey, workspaceName);
+
+            // Score: 2 of 3 runs pass for each item
+            // ItemA: 2 pass < pass_threshold=3 → item FAILS
+            // ItemB: 2 pass >= default threshold=1 → item PASSES
+            var scores = List.of(
+                    FeedbackScoreBatchItem.builder().id(traceA1.id())
+                            .projectName(traceA1.projectName()).name("check")
+                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
+                    FeedbackScoreBatchItem.builder().id(traceA2.id())
+                            .projectName(traceA2.projectName()).name("check")
+                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
+                    FeedbackScoreBatchItem.builder().id(traceA3.id())
+                            .projectName(traceA3.projectName()).name("check")
+                            .value(BigDecimal.ZERO).source(ScoreSource.SDK).build(),
+                    FeedbackScoreBatchItem.builder().id(traceB1.id())
+                            .projectName(traceB1.projectName()).name("check")
+                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
+                    FeedbackScoreBatchItem.builder().id(traceB2.id())
+                            .projectName(traceB2.projectName()).name("check")
+                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
+                    FeedbackScoreBatchItem.builder().id(traceB3.id())
+                            .projectName(traceB3.projectName()).name("check")
+                            .value(BigDecimal.ZERO).source(ScoreSource.SDK).build());
+            createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
+
+            var actualExperiment = experimentResourceClient.getExperiment(experimentId, apiKey, workspaceName);
+
+            // ItemA fails (2 < 3), ItemB passes (2 >= 1) → passedCount=1, totalCount=2, passRate=0.5
+            assertThat(actualExperiment.passedCount()).isEqualTo(1L);
+            assertThat(actualExperiment.totalCount()).isEqualTo(2L);
+            assertThat(actualExperiment.passRate()).isNotNull();
+            assertThat(actualExperiment.passRate().doubleValue()).isCloseTo(0.5, within(0.01));
         }
     }
 }
