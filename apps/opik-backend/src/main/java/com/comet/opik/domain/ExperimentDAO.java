@@ -1460,7 +1460,7 @@ class ExperimentDAO {
                     template.add("limit", limit);
                     return Flux.from(get(template.render(), connection,
                             statement -> statement.bind("id", id).bind("limit", limit).bind("workspace_id",
-                                    workspaceId)));
+                                    workspaceId).bind("zero_uuid", ExperimentGroupMappers.ZERO_UUID)));
                 }))
                 .flatMap(this::mapToDto)
                 .singleOrEmpty();
@@ -1475,7 +1475,7 @@ class ExperimentDAO {
                     template.add("ids_list", ids);
                     return Flux.from(get(template.render(), connection,
                             statement -> statement.bind("ids_list", ids.toArray(UUID[]::new)).bind("workspace_id",
-                                    workspaceId)));
+                                    workspaceId).bind("zero_uuid", ExperimentGroupMappers.ZERO_UUID)));
                 }))
                 .flatMap(this::mapToDto);
     }
@@ -1497,7 +1497,8 @@ class ExperimentDAO {
                                 if (request.lastRetrievedId() != null) {
                                     statement = statement.bind("lastRetrievedId", request.lastRetrievedId());
                                 }
-                                return statement.bind("limit", request.limit()).bind("workspace_id", workspaceId);
+                                return statement.bind("limit", request.limit()).bind("workspace_id", workspaceId)
+                                        .bind("zero_uuid", ExperimentGroupMappers.ZERO_UUID);
                             }));
                 }))
                 .flatMap(this::mapToDto);

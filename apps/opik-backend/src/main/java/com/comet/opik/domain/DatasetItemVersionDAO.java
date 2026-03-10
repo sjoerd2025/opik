@@ -948,14 +948,14 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     mapFromArrays(
                         authors,
                         arrayMap(
-                            i -> tuple(values[i], reasons[i], categories[i], sources[i], last_updated_ats[i]),
+                            i -> tuple(values[i], reasons[i], categories[i], sources[i], CAST(last_updated_ats[i] AS DateTime64(9, 'UTC'))),
                             arrayEnumerate(values)
                         )
                     ) AS value_by_author,
                     arrayStringConcat(created_bies, ', ') AS created_by,
                     arrayStringConcat(updated_bies, ', ') AS last_updated_by,
-                    arrayMin(created_ats) AS created_at,
-                    arrayMax(last_updated_ats) AS last_updated_at
+                    CAST(arrayMin(created_ats) AS DateTime64(9, 'UTC')) AS created_at,
+                    CAST(arrayMax(last_updated_ats) AS DateTime64(9, 'UTC')) AS last_updated_at
                 FROM feedback_scores_combined_grouped
             )
             <if(feedback_scores_empty_filters)>
@@ -1256,28 +1256,38 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         t.visibility_mode,
                         s.total_estimated_cost,
                         s.usage,
-                        groupUniqArray(tuple(
-                            fs.entity_id,
-                            fs.name,
-                            fs.category_name,
-                            fs.value,
-                            fs.reason,
-                            fs.source,
-                            fs.created_at,
-                            fs.last_updated_at,
-                            fs.created_by,
-                            fs.last_updated_by,
-                            fs.value_by_author
-                        )) AS feedback_scores_array,
-                        mapFromArrays(
-                            groupArray(fs.name),
-                            groupArray(fs.value)
-                        ) AS feedback_scores,
-                        groupUniqArray(tuple(c.*)) AS comments_array_agg
+                        any(fsa.feedback_scores_array) AS feedback_scores_array,
+                        any(fsa.feedback_scores) AS feedback_scores,
+                        any(co.comments_array_agg) AS comments_array_agg
                     FROM experiment_items_final ei2
                     INNER JOIN trace_data AS t ON ei2.trace_id = t.id
-                    LEFT JOIN feedback_scores_final AS fs ON t.id = fs.entity_id
-                    LEFT JOIN comments_final AS c ON t.id = c.entity_id
+                    LEFT JOIN (
+                        SELECT
+                            entity_id,
+                            groupUniqArray(tuple(
+                                entity_id,
+                                name,
+                                category_name,
+                                value,
+                                reason,
+                                source,
+                                CAST(created_at AS DateTime64(9, 'UTC')),
+                                CAST(last_updated_at AS DateTime64(9, 'UTC')),
+                                created_by,
+                                last_updated_by,
+                                value_by_author
+                            )) AS feedback_scores_array,
+                            mapFromArrays(groupArray(name), groupArray(value)) AS feedback_scores
+                        FROM feedback_scores_final
+                        GROUP BY entity_id
+                    ) AS fsa ON t.id = fsa.entity_id
+                    LEFT JOIN (
+                        SELECT
+                            entity_id,
+                            groupUniqArray(tuple(c.*)) AS comments_array_agg
+                        FROM comments_final AS c
+                        GROUP BY entity_id
+                    ) AS co ON t.id = co.entity_id
                     LEFT JOIN (
                         SELECT
                             trace_id,
