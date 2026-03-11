@@ -8,6 +8,7 @@ import {
 } from "@/types/agent-configs";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
 import { BlueprintValuePromptHandle } from "@/components/pages-shared/traces/ConfigurationTab/BlueprintValuePrompt";
+import { useToast } from "@/components/ui/use-toast";
 
 import type useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 
@@ -51,6 +52,7 @@ export const useConfigurationSave = ({
   isLatestVersion,
   onSaved,
 }: UseConfigurationSaveParams) => {
+  const { toast } = useToast();
   const { mutate: createConfig, isPending: isSaving } =
     useAgentConfigCreateMutation();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -97,11 +99,23 @@ export const useConfigurationSave = ({
     }
 
     // Step 2: Persist all dirty prompts and collect their new commit hashes
-    const promptResults = await Promise.all(
-      Object.values(promptRefs.current)
-        .filter(Boolean)
-        .map((handle) => handle!.saveVersion()),
-    );
+    let promptResults: Awaited<
+      ReturnType<BlueprintValuePromptHandle["saveVersion"]>
+    >[];
+    try {
+      promptResults = await Promise.all(
+        Object.values(promptRefs.current)
+          .filter(Boolean)
+          .map((handle) => handle!.saveVersion()),
+      );
+    } catch {
+      toast({
+        title: "Failed to save prompt versions",
+        description: "Please try again",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const newCommits = new Map<string, string>();
     for (const result of promptResults) {
@@ -160,6 +174,7 @@ export const useConfigurationSave = ({
     isLatestVersion,
     onSaved,
     createConfig,
+    toast,
   ]);
 
   return {

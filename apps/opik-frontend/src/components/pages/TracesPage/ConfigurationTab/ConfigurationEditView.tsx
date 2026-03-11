@@ -217,6 +217,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
               {v.type === BlueprintValueType.PROMPT ? (
                 <div className="flex flex-col gap-1">
                   <BlueprintValuePrompt
+                    key={v.value}
                     value={v}
                     isEditing={isLatestVersion}
                     ref={(el) => {

@@ -146,7 +146,7 @@ type ResourceLinkProps = {
   params?: Record<string, string | number | string[]>;
   variant?: TagProps["variant"];
   size?: TagProps["size"];
-  iconSize?: number;
+  iconSize?: 3 | 3.5 | 4 | 5;
   gapSize?: number;
   tooltipContent?: string;
   asTag?: boolean;
@@ -210,7 +210,13 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
             )}
           >
             <props.icon
-              className={cn("shrink-0", `size-${iconSize}`)}
+              className={cn(
+                "shrink-0",
+                iconSize === 3 && "size-3",
+                iconSize === 3.5 && "size-3.5",
+                iconSize === 4 && "size-4",
+                iconSize === 5 && "size-5",
+              )}
               style={{ color: props.color }}
             />
             {!isSmall && (

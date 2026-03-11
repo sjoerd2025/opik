@@ -8,7 +8,7 @@ import BlueprintValuePrompt from "./BlueprintValuePrompt";
 
 const renderValue = (v: BlueprintValue) => {
   if (v.type === BlueprintValueType.PROMPT) {
-    return <BlueprintValuePrompt value={v} />;
+    return <BlueprintValuePrompt key={v.value} value={v} />;
   }
 
   return (
