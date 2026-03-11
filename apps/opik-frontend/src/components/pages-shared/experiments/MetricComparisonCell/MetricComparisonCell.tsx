@@ -23,7 +23,9 @@ const MetricComparisonCell: React.FunctionComponent<
 
   const percentage =
     !isUndefined(baseline) && !isUndefined(current) && baseline !== 0
-      ? ((current - baseline) / Math.abs(baseline)) * 100
+      ? formatter(current) === formatter(baseline)
+        ? 0
+        : ((current - baseline) / Math.abs(baseline)) * 100
       : undefined;
 
   if (compact) {

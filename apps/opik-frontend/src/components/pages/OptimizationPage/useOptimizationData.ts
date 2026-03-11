@@ -4,11 +4,9 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { ColumnSort } from "@tanstack/react-table";
 import useLocalStorageState from "use-local-storage-state";
 import { StringParam, useQueryParam } from "use-query-params";
-import isArray from "lodash/isArray";
 
 import {
   AggregatedFeedbackScore,
-  COLUMN_FEEDBACK_SCORES_ID,
   COLUMN_ID_ID,
   COLUMN_NAME_ID,
   ROW_HEIGHT,
@@ -61,15 +59,50 @@ const DEFAULT_COLUMNS_ORDER: string[] = [
   "created_at",
 ];
 
-const DEFAULT_SORTING: ColumnSort[] = [{ id: COLUMN_ID_ID, desc: false }];
+const DEFAULT_SORTING: ColumnSort[] = [{ id: COLUMN_NAME_ID, desc: false }];
 
-const CLIENT_ONLY_SORT_COLUMNS = [
-  "step",
-  "trace_count",
-  "trial_status",
-  "runtime_cost",
-  "latency",
-];
+const CANDIDATE_SORT_FIELD_MAP: Record<
+  string,
+  keyof AggregatedCandidate | undefined
+> = {
+  [COLUMN_NAME_ID]: "trialNumber",
+  step: "stepIndex",
+  [COLUMN_ID_ID]: "id",
+  objective_name: "score",
+  runtime_cost: "runtimeCost",
+  latency: "latencyP50",
+  trace_count: "totalDatasetItemCount",
+  created_at: "created_at",
+};
+
+const sortCandidates = (
+  candidates: AggregatedCandidate[],
+  sortedColumns: ColumnSort[],
+): AggregatedCandidate[] => {
+  if (!sortedColumns.length) return candidates;
+
+  const { id: columnId, desc } = sortedColumns[0];
+  const field = CANDIDATE_SORT_FIELD_MAP[columnId];
+  if (!field) return candidates;
+
+  return [...candidates].sort((a, b) => {
+    const aVal = a[field];
+    const bVal = b[field];
+
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    let cmp: number;
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      cmp = aVal - bVal;
+    } else {
+      cmp = String(aVal).localeCompare(String(bVal));
+    }
+
+    return desc ? -cmp : cmp;
+  });
+};
 
 const getOptimizationMetadata = (
   metadata: object | undefined,
@@ -251,17 +284,8 @@ export const useOptimizationData = () => {
     {
       workspaceName,
       optimizationId: optimizationId,
-      sorting: sortedColumns
-        .filter((column) => !CLIENT_ONLY_SORT_COLUMNS.includes(column.id))
-        .map((column) => {
-          if (column.id === "objective_name") {
-            return {
-              ...column,
-              id: `${COLUMN_FEEDBACK_SCORES_ID}.${optimization?.objective_name}`,
-            };
-          }
-          return column;
-        }),
+      sorting: [{ id: "created_at", desc: false }],
+      forceSorting: true,
       types: [EXPERIMENT_TYPE.TRIAL],
       page: 1,
       size: MAX_EXPERIMENTS_LOADED,
@@ -297,11 +321,8 @@ export const useOptimizationData = () => {
   );
 
   const sortableBy: string[] = useMemo(
-    () =>
-      isArray(data?.sortable_by)
-        ? [...data.sortable_by, "objective_name", ...CLIENT_ONLY_SORT_COLUMNS]
-        : [],
-    [data?.sortable_by],
+    () => Object.keys(CANDIDATE_SORT_FIELD_MAP),
+    [],
   );
 
   const title = optimization?.name || optimizationId;
@@ -376,13 +397,12 @@ export const useOptimizationData = () => {
     };
   }, [isInProgress, latestExpData?.content, candidates]);
 
-  const rows = useMemo(
-    () =>
-      candidates.filter(({ name }) =>
-        name.toLowerCase().includes(search!.toLowerCase()),
-      ),
-    [candidates, search],
-  );
+  const rows = useMemo(() => {
+    const filtered = candidates.filter(({ name }) =>
+      name.toLowerCase().includes(search!.toLowerCase()),
+    );
+    return sortCandidates(filtered, sortedColumns);
+  }, [candidates, search, sortedColumns]);
 
   const { scoreMap, baseScore, bestExperiment } = useOptimizationScores(
     experiments,

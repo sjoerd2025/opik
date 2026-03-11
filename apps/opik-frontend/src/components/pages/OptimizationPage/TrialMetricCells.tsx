@@ -22,6 +22,7 @@ const calcPercentageVsBaseline = (
   baselineValue: number | undefined,
   candidateId: string,
   baselineCandidateId?: string,
+  formatter?: (v: number) => string,
 ): number | undefined => {
   if (
     isNumber(value) &&
@@ -29,6 +30,7 @@ const calcPercentageVsBaseline = (
     baselineValue !== 0 &&
     candidateId !== baselineCandidateId
   ) {
+    if (formatter && formatter(value) === formatter(baselineValue)) return 0;
     return ((value - baselineValue) / Math.abs(baselineValue)) * 100;
   }
   return undefined;
@@ -102,6 +104,7 @@ export const TrialAccuracyCell = (context: CellContext<unknown, unknown>) => {
     baseline?.score,
     row.candidateId,
     baseline?.candidateId,
+    formatAsPercentage,
   );
 
   const passRateFraction =
@@ -142,6 +145,7 @@ export const TrialCandidateCostCell = (
     baseline?.runtimeCost,
     row.candidateId,
     baseline?.candidateId,
+    formatAsCurrency,
   );
 
   return (
@@ -175,6 +179,7 @@ export const TrialCandidateLatencyCell = (
     baseline?.latencyP50,
     row.candidateId,
     baseline?.candidateId,
+    formatAsDuration,
   );
 
   return (

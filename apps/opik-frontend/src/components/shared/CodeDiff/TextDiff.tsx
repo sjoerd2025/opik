@@ -10,6 +10,18 @@ type CodeDiffProps = {
   mode?: DiffMode;
 };
 
+const WORD_DIFF_CHANGE_THRESHOLD = 0.6;
+
+const getChangedRatio = (changes: Change[]): number => {
+  let changed = 0;
+  let total = 0;
+  for (const c of changes) {
+    total += c.value.length;
+    if (c.added || c.removed) changed += c.value.length;
+  }
+  return total === 0 ? 0 : changed / total;
+};
+
 /**
  * Renders a single change item with appropriate styling.
  */
@@ -18,7 +30,6 @@ const DiffChange: React.FC<{ change: Change; mode: DiffMode }> = ({
   mode,
 }) => {
   if (!change.added && !change.removed) {
-    // Unchanged content
     return <span className="text-muted-foreground">{change.value}</span>;
   }
 
@@ -39,20 +50,51 @@ const DiffChange: React.FC<{ change: Change; mode: DiffMode }> = ({
 };
 
 /**
+ * When word diff is too noisy (most content changed), show as two
+ * separate removed/added blocks instead of interleaved words.
+ */
+const BlockDiff: React.FC<{ content1: string; content2: string }> = ({
+  content1,
+  content2,
+}) => (
+  <div className="flex flex-col gap-2">
+    {content1 && (
+      <span className="whitespace-pre-wrap break-words rounded-[2px] bg-diff-removed-bg px-0.5 text-diff-removed-text line-through">
+        {content1}
+      </span>
+    )}
+    {content2 && (
+      <span className="whitespace-pre-wrap break-words rounded-[2px] bg-diff-added-bg px-0.5 text-diff-added-text">
+        {content2}
+      </span>
+    )}
+  </div>
+);
+
+/**
  * TextDiff component that shows differences between two text strings.
  * Supports both line-level and word-level diff modes.
+ * Falls back to block diff when word changes exceed 60% of content.
  */
 const TextDiff: React.FunctionComponent<CodeDiffProps> = ({
   content1,
   content2,
   mode = "lines",
 }) => {
-  const changes = useMemo(() => {
+  const { changes, useBlockDiff } = useMemo(() => {
     if (mode === "words") {
-      return diffWords(content1, content2);
+      const wordChanges = diffWords(content1, content2);
+      if (getChangedRatio(wordChanges) > WORD_DIFF_CHANGE_THRESHOLD) {
+        return { changes: wordChanges, useBlockDiff: true };
+      }
+      return { changes: wordChanges, useBlockDiff: false };
     }
-    return diffLines(content1, content2);
+    return { changes: diffLines(content1, content2), useBlockDiff: false };
   }, [content1, content2, mode]);
+
+  if (useBlockDiff) {
+    return <BlockDiff content1={content1} content2={content2} />;
+  }
 
   return (
     <div
