@@ -36,7 +36,9 @@ const TextPromptEditor: React.FC<TextPromptEditorProps> = ({
   return (
     <div className="flex flex-col gap-2 pb-4">
       <div className="flex items-center justify-between gap-0.5">
-        <Label htmlFor="template" className={labelClassName}>{label}</Label>
+        <Label htmlFor="template" className={labelClassName}>
+          {label}
+        </Label>
         <Button
           variant="ghost"
           size="sm"
