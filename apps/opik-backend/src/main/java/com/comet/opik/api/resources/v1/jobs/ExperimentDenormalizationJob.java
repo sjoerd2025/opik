@@ -105,11 +105,14 @@ public class ExperimentDenormalizationJob extends Job implements InterruptableJo
      * Queries the ZSET index in pages for experiment IDs whose debounce window has elapsed (score &lt;= now).
      * Uses offset/count pagination to avoid materializing the entire ZSET into memory.
      * Since each processed experiment is removed from the ZSET, we always query from offset 0.
+     * A safety counter caps the number of expand iterations (using batchSize as the limit) to
+     * prevent infinite loops if entries fail to be removed (e.g., due to errors swallowed by onErrorContinue).
      */
     private Flux<String> getExperimentsReadyToProcess() {
         long nowMillis = Instant.now().toEpochMilli();
         int batchSize = config.getJobBatchSize();
         var index = redisClient.<String>getScoredSortedSet(ExperimentDenormalizationConfig.PENDING_SET_KEY);
+        var iterations = new int[]{0};
 
         log.debug("Checking for experiments ready to process (up to timestamp: '{}', batchSize: '{}')",
                 nowMillis, batchSize);
@@ -122,6 +125,12 @@ public class ExperimentDenormalizationJob extends Job implements InterruptableJo
         return index.valueRange(Double.NEGATIVE_INFINITY, true, nowMillis, true, 0, batchSize)
                 .expand(collection -> {
                     if (collection.size() < batchSize) {
+                        return Mono.empty();
+                    }
+                    iterations[0]++;
+                    if (iterations[0] >= batchSize) {
+                        log.warn("Reached maximum expand iterations '{}', stopping pagination to prevent infinite loop",
+                                batchSize);
                         return Mono.empty();
                     }
                     return index.valueRange(Double.NEGATIVE_INFINITY, true, nowMillis, true, 0, batchSize);
