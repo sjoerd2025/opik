@@ -26,7 +26,7 @@ import MetricLineChart from "./MetricLineChart";
 import MetricBarChart from "./MetricBarChart";
 import { BreakdownConfig } from "@/types/dashboard";
 import type { LegendLabelAction } from "@/components/shared/Charts/LegendItem/LegendItem";
-import { BREAKDOWN_GROUP_NAMES } from "@/components/shared/Dashboard/widgets/ProjectMetricsWidget/breakdown";
+import { BREAKDOWN_GROUP_NAMES } from "../breakdown";
 
 const renderTooltipValue = ({ value }: ChartTooltipRenderValueArguments) => {
   if (isNumber(value)) {

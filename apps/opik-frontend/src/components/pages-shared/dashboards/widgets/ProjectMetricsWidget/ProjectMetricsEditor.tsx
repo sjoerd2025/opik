@@ -15,12 +15,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Description } from "@/components/ui/description";
-
 import SelectBox from "@/components/shared/SelectBox/SelectBox";
+import VisualizationCardSelector from "@/components/pages-shared/dashboards/widgets/shared/VisualizationCardSelector/VisualizationCardSelector";
 import { LoadableSelectBox } from "@/components/shared/LoadableSelectBox/LoadableSelectBox";
 import ProjectsSelectBox from "@/components/pages-shared/automations/ProjectsSelectBox";
-import ProjectWidgetFiltersSection from "@/components/shared/Dashboard/widgets/shared/ProjectWidgetFiltersSection/ProjectWidgetFiltersSection";
+import ProjectWidgetFiltersSection from "@/components/pages-shared/dashboards/widgets/shared/ProjectWidgetFiltersSection/ProjectWidgetFiltersSection";
 import FeedbackDefinitionsAndScoresSelectBox, {
   ScoreSource,
 } from "@/components/pages-shared/experiments/FeedbackDefinitionsAndScoresSelectBox/FeedbackDefinitionsAndScoresSelectBox";
@@ -48,10 +47,9 @@ import {
   ProjectMetricsWidgetSchema,
   ProjectMetricsWidgetFormData,
 } from "./schema";
-import WidgetEditorBaseLayout from "@/components/shared/Dashboard/WidgetConfigDialog/WidgetEditorBaseLayout";
 import { CHART_TYPE } from "@/constants/chart";
 import { Filter } from "@/types/filters";
-import { BREAKDOWN_FIELD } from "./breakdown";
+import { BREAKDOWN_FIELD } from "@/types/dashboard";
 
 const METRIC_OPTIONS = [
   {
@@ -119,11 +117,6 @@ const METRIC_OPTIONS = [
     label: "Span token usage",
     filterType: "span" as const,
   },
-];
-
-const CHART_TYPE_OPTIONS = [
-  { value: CHART_TYPE.line, label: "Line chart" },
-  { value: CHART_TYPE.bar, label: "Bar chart" },
 ];
 
 const DURATION_METRIC_OPTIONS = [
@@ -413,235 +406,134 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
 
   return (
     <Form {...form}>
-      <WidgetEditorBaseLayout>
-        <div className="space-y-4">
+      <div className="space-y-4">
+        <FormField
+          control={form.control}
+          name="projectId"
+          render={({ field, formState }) => {
+            const validationErrors = get(formState.errors, ["projectId"]);
+            return (
+              <FormItem>
+                <FormLabel>Project</FormLabel>
+                <FormControl>
+                  <ProjectsSelectBox
+                    className={cn("flex-1", {
+                      "border-destructive": Boolean(validationErrors?.message),
+                    })}
+                    value={field.value || ""}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      handleProjectChange(value);
+                    }}
+                    showClearButton
+                    disabled={hasRuntimeProjectId}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
+        />
+
+        <FormField
+          control={form.control}
+          name="metricType"
+          render={({ field, formState }) => {
+            const validationErrors = get(formState.errors, ["metricType"]);
+            return (
+              <FormItem>
+                <FormLabel>Metric type</FormLabel>
+                <FormControl>
+                  <SelectBox
+                    className={cn({
+                      "border-destructive": Boolean(validationErrors?.message),
+                    })}
+                    value={field.value}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      handleMetricTypeChange(value);
+                    }}
+                    options={METRIC_OPTIONS}
+                    placeholder="Select a metric type"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
+        />
+
+        {isFeedbackScoreMetric && projectId && (
           <FormField
             control={form.control}
-            name="metricType"
+            name="feedbackScores"
             render={({ field, formState }) => {
-              const validationErrors = get(formState.errors, ["metricType"]);
+              const validationErrors = get(formState.errors, [
+                "feedbackScores",
+              ]);
               return (
                 <FormItem>
-                  <FormLabel>Metric type</FormLabel>
+                  <FormLabel>Metrics</FormLabel>
                   <FormControl>
-                    <SelectBox
+                    <FeedbackDefinitionsAndScoresSelectBox
+                      value={field.value || []}
+                      onChange={(value) => {
+                        field.onChange(value);
+                        handleFeedbackScoresChange(value);
+                      }}
+                      scoreSource={
+                        metricType === METRIC_NAME_TYPE.THREAD_FEEDBACK_SCORES
+                          ? ScoreSource.THREADS
+                          : metricType === METRIC_NAME_TYPE.SPAN_FEEDBACK_SCORES
+                            ? ScoreSource.SPANS
+                            : ScoreSource.TRACES
+                      }
+                      entityIds={[projectId]}
+                      multiselect={true}
+                      showSelectAll={true}
+                      placeholder="All metrics"
                       className={cn({
                         "border-destructive": Boolean(
                           validationErrors?.message,
                         ),
                       })}
-                      value={field.value}
-                      onChange={(value) => {
-                        field.onChange(value);
-                        handleMetricTypeChange(value);
-                      }}
-                      options={METRIC_OPTIONS}
-                      placeholder="Select a metric type"
                     />
                   </FormControl>
-                  <Description>
-                    Select the metric type you want this widget to display.
-                  </Description>
                   <FormMessage />
                 </FormItem>
               );
             }}
           />
+        )}
 
-          {isFeedbackScoreMetric && projectId && (
-            <FormField
-              control={form.control}
-              name="feedbackScores"
-              render={({ field, formState }) => {
-                const validationErrors = get(formState.errors, [
-                  "feedbackScores",
-                ]);
-                return (
-                  <FormItem>
-                    <FormLabel>Metrics</FormLabel>
-                    <FormControl>
-                      <FeedbackDefinitionsAndScoresSelectBox
-                        value={field.value || []}
-                        onChange={(value) => {
-                          field.onChange(value);
-                          handleFeedbackScoresChange(value);
-                        }}
-                        scoreSource={
-                          metricType === METRIC_NAME_TYPE.THREAD_FEEDBACK_SCORES
-                            ? ScoreSource.THREADS
-                            : metricType ===
-                                METRIC_NAME_TYPE.SPAN_FEEDBACK_SCORES
-                              ? ScoreSource.SPANS
-                              : ScoreSource.TRACES
-                        }
-                        entityIds={[projectId]}
-                        multiselect={true}
-                        showSelectAll={true}
-                        placeholder="All metrics"
-                        className={cn({
-                          "border-destructive": Boolean(
-                            validationErrors?.message,
-                          ),
-                        })}
-                      />
-                    </FormControl>
-                    <Description>
-                      Select specific metrics to display. Leave empty to show
-                      all available metrics.
-                    </Description>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
-            />
-          )}
-
-          {isDurationMetric && (
-            <FormField
-              control={form.control}
-              name="durationMetrics"
-              render={({ field, formState }) => {
-                const validationErrors = get(formState.errors, [
-                  "durationMetrics",
-                ]);
-                return (
-                  <FormItem>
-                    <FormLabel>Duration metrics</FormLabel>
-                    <FormControl>
-                      <LoadableSelectBox
-                        buttonClassName={cn("w-full", {
-                          "border-destructive": Boolean(
-                            validationErrors?.message,
-                          ),
-                        })}
-                        value={field.value || []}
-                        onChange={(value) => {
-                          field.onChange(value);
-                          handleDurationMetricsChange(value);
-                        }}
-                        options={DURATION_METRIC_OPTIONS}
-                        placeholder="All percentiles"
-                        multiselect
-                        showSelectAll
-                        selectAllLabel="All percentiles"
-                      />
-                    </FormControl>
-                    <Description>
-                      Select specific duration percentiles to display. Leave
-                      empty to show all percentiles.
-                    </Description>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
-            />
-          )}
-
-          {isTokenUsageMetric && projectId && (
-            <FormField
-              control={form.control}
-              name="usageMetrics"
-              render={({ field, formState }) => {
-                const validationErrors = get(formState.errors, [
-                  "usageMetrics",
-                ]);
-                return (
-                  <FormItem>
-                    <FormLabel>Usage metrics</FormLabel>
-                    <FormControl>
-                      <LoadableSelectBox
-                        buttonClassName={cn("w-full", {
-                          "border-destructive": Boolean(
-                            validationErrors?.message,
-                          ),
-                        })}
-                        value={field.value || []}
-                        onChange={(value) => {
-                          field.onChange(value);
-                          handleUsageMetricsChange(value);
-                        }}
-                        options={usageKeyOptions}
-                        isLoading={isLoadingUsageKeys}
-                        placeholder="All usage metrics"
-                        multiselect
-                        showSelectAll
-                        selectAllLabel="All usage metrics"
-                      />
-                    </FormControl>
-                    <Description>
-                      Select specific usage metrics to display. Leave empty to
-                      show all usage metrics.
-                    </Description>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
-            />
-          )}
-
-          <ProjectWidgetFiltersSection
-            control={form.control}
-            fieldName={
-              isTraceMetric
-                ? "traceFilters"
-                : isThreadMetric
-                  ? "threadFilters"
-                  : "spanFilters"
-            }
-            projectId={projectId}
-            filterType={
-              isTraceMetric ? "trace" : isThreadMetric ? "thread" : "span"
-            }
-            onFiltersChange={(filters) => {
-              updatePreviewWidget({
-                config: {
-                  ...config,
-                  ...(isTraceMetric
-                    ? { traceFilters: filters }
-                    : isThreadMetric
-                      ? { threadFilters: filters }
-                      : { spanFilters: filters }),
-                },
-              });
-            }}
-          />
-
-          <ProjectMetricsBreakdownSection
-            control={form.control}
-            metricType={metricType}
-            projectId={projectId}
-            isSpanMetric={!!isSpanMetric}
-            breakdown={breakdown}
-            isGroupByDisabledForFeedbackScore={
-              isGroupByDisabledForFeedbackScore
-            }
-            isGroupByDisabledForDuration={isGroupByDisabledForDuration}
-            isGroupByDisabledForUsage={isGroupByDisabledForUsage}
-            onBreakdownChange={handleBreakdownChange}
-          />
-
+        {isDurationMetric && (
           <FormField
             control={form.control}
-            name="chartType"
+            name="durationMetrics"
             render={({ field, formState }) => {
-              const validationErrors = get(formState.errors, ["chartType"]);
+              const validationErrors = get(formState.errors, [
+                "durationMetrics",
+              ]);
               return (
                 <FormItem>
-                  <FormLabel>Chart type</FormLabel>
+                  <FormLabel>Duration metrics</FormLabel>
                   <FormControl>
-                    <SelectBox
-                      className={cn({
+                    <LoadableSelectBox
+                      buttonClassName={cn("w-full", {
                         "border-destructive": Boolean(
                           validationErrors?.message,
                         ),
                       })}
-                      value={field.value}
+                      value={field.value || []}
                       onChange={(value) => {
                         field.onChange(value);
-                        handleChartTypeChange(value);
+                        handleDurationMetricsChange(value);
                       }}
-                      options={CHART_TYPE_OPTIONS}
-                      placeholder="Select chart type"
+                      options={DURATION_METRIC_OPTIONS}
+                      placeholder="All percentiles"
+                      multiselect
+                      showSelectAll
+                      selectAllLabel="All percentiles"
                     />
                   </FormControl>
                   <FormMessage />
@@ -649,29 +541,35 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
               );
             }}
           />
+        )}
 
+        {isTokenUsageMetric && projectId && (
           <FormField
             control={form.control}
-            name="projectId"
+            name="usageMetrics"
             render={({ field, formState }) => {
-              const validationErrors = get(formState.errors, ["projectId"]);
+              const validationErrors = get(formState.errors, ["usageMetrics"]);
               return (
                 <FormItem>
-                  <FormLabel>Project</FormLabel>
+                  <FormLabel>Usage metrics</FormLabel>
                   <FormControl>
-                    <ProjectsSelectBox
-                      className={cn("flex-1", {
+                    <LoadableSelectBox
+                      buttonClassName={cn("w-full", {
                         "border-destructive": Boolean(
                           validationErrors?.message,
                         ),
                       })}
-                      value={field.value || ""}
-                      onValueChange={(value) => {
+                      value={field.value || []}
+                      onChange={(value) => {
                         field.onChange(value);
-                        handleProjectChange(value);
+                        handleUsageMetricsChange(value);
                       }}
-                      showClearButton
-                      disabled={hasRuntimeProjectId}
+                      options={usageKeyOptions}
+                      isLoading={isLoadingUsageKeys}
+                      placeholder="All usage metrics"
+                      multiselect
+                      showSelectAll
+                      selectAllLabel="All usage metrics"
                     />
                   </FormControl>
                   <FormMessage />
@@ -679,8 +577,67 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
               );
             }}
           />
-        </div>
-      </WidgetEditorBaseLayout>
+        )}
+
+        <ProjectWidgetFiltersSection
+          control={form.control}
+          fieldName={
+            isTraceMetric
+              ? "traceFilters"
+              : isThreadMetric
+                ? "threadFilters"
+                : "spanFilters"
+          }
+          projectId={projectId}
+          filterType={
+            isTraceMetric ? "trace" : isThreadMetric ? "thread" : "span"
+          }
+          onFiltersChange={(filters) => {
+            updatePreviewWidget({
+              config: {
+                ...config,
+                ...(isTraceMetric
+                  ? { traceFilters: filters }
+                  : isThreadMetric
+                    ? { threadFilters: filters }
+                    : { spanFilters: filters }),
+              },
+            });
+          }}
+        />
+
+        <ProjectMetricsBreakdownSection
+          control={form.control}
+          metricType={metricType}
+          projectId={projectId}
+          isSpanMetric={!!isSpanMetric}
+          breakdown={breakdown}
+          isGroupByDisabledForFeedbackScore={isGroupByDisabledForFeedbackScore}
+          isGroupByDisabledForDuration={isGroupByDisabledForDuration}
+          isGroupByDisabledForUsage={isGroupByDisabledForUsage}
+          onBreakdownChange={handleBreakdownChange}
+        />
+
+        <FormField
+          control={form.control}
+          name="chartType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Visualization</FormLabel>
+              <FormControl>
+                <VisualizationCardSelector
+                  value={field.value || CHART_TYPE.line}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    handleChartTypeChange(value);
+                  }}
+                  types={[CHART_TYPE.line, CHART_TYPE.bar]}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </div>
     </Form>
   );
 });

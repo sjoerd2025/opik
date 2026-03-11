@@ -1,16 +1,11 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { AxiosError, HttpStatusCode } from "axios";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import get from "lodash/get";
-import {
-  ChartLine,
-  FlaskConical,
-  LayoutDashboard,
-  Loader2,
-} from "lucide-react";
+import { ChartLine, FlaskConical, LayoutGridIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,7 +48,28 @@ import { ToastAction } from "@/components/ui/toast";
 import { useDashboardStore } from "@/store/DashboardStore";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { DISABLED_EXPERIMENTS_TOOLTIP } from "@/constants/permissions";
-import SelectableCard from "./SelectableCard";
+import CardSelector, {
+  CardOption,
+} from "@/components/shared/CardSelector/CardSelector";
+
+const DASHBOARD_TYPE_OPTIONS: CardOption[] = [
+  {
+    value: DASHBOARD_TYPE.MULTI_PROJECT,
+    label: "Multi-project dashboard",
+    description:
+      "Monitor performance, cost, and usage across multiple projects in your workspace.",
+    icon: <LayoutGridIcon className="size-4" />,
+    iconColor: "text-chart-red",
+  },
+  {
+    value: DASHBOARD_TYPE.EXPERIMENTS,
+    label: "Experiments dashboard",
+    description:
+      "Track experiment results and quality metrics across your workspace.",
+    icon: <FlaskConical className="size-4" />,
+    iconColor: "text-chart-green",
+  },
+];
 
 const DashboardFormSchema = z.object({
   name: z
@@ -307,6 +323,20 @@ const AddEditCloneDashboardDialog: React.FC<
     ],
   );
 
+  const dashboardTypeOptions = useMemo<CardOption[]>(
+    () =>
+      DASHBOARD_TYPE_OPTIONS.map((option) =>
+        option.value === DASHBOARD_TYPE.EXPERIMENTS && !canViewExperiments
+          ? {
+              ...option,
+              disabled: true,
+              disabledTooltip: DISABLED_EXPERIMENTS_TOOLTIP,
+            }
+          : option,
+      ),
+    [canViewExperiments],
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-lg sm:max-w-screen-sm">
@@ -363,34 +393,11 @@ const AddEditCloneDashboardDialog: React.FC<
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type</FormLabel>
-                      <div className="grid grid-cols-2 gap-4">
-                        <SelectableCard
-                          name="Multi-project dashboard"
-                          description="Monitor performance, cost, and usage across multiple projects in your workspace."
-                          icon={LayoutDashboard}
-                          iconColor="text-template-icon-overview"
-                          interactive
-                          selected={
-                            field.value === DASHBOARD_TYPE.MULTI_PROJECT
-                          }
-                          onClick={() =>
-                            field.onChange(DASHBOARD_TYPE.MULTI_PROJECT)
-                          }
-                        />
-                        <SelectableCard
-                          name="Experiments dashboard"
-                          description="Track experiment results and quality metrics across your workspace."
-                          icon={FlaskConical}
-                          iconColor="text-template-icon-experiment"
-                          interactive
-                          selected={field.value === DASHBOARD_TYPE.EXPERIMENTS}
-                          disabled={!canViewExperiments}
-                          disabledTooltip={DISABLED_EXPERIMENTS_TOOLTIP}
-                          onClick={() =>
-                            field.onChange(DASHBOARD_TYPE.EXPERIMENTS)
-                          }
-                        />
-                      </div>
+                      <CardSelector
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={dashboardTypeOptions}
+                      />
                     </FormItem>
                   )}
                 />

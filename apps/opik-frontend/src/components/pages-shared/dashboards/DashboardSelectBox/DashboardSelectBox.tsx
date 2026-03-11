@@ -16,7 +16,10 @@ import AddEditCloneDashboardDialog, {
 } from "@/components/pages-shared/dashboards/AddEditCloneDashboardDialog/AddEditCloneDashboardDialog";
 import useDashboardsList from "@/api/dashboards/useDashboardsList";
 import { cn } from "@/lib/utils";
-import { generateDashboardScopeFilter } from "@/lib/filters";
+import {
+  generateDashboardScopeFilter,
+  generateDashboardTypeFilter,
+} from "@/lib/filters";
 import useAppStore from "@/store/AppStore";
 import { TEMPLATE_LIST } from "@/lib/dashboard/templates";
 import { isTemplateId } from "@/lib/dashboard/utils";
@@ -86,11 +89,13 @@ const DashboardSelectBox: React.FC<DashboardSelectBoxProps> = ({
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const { mutate: deleteMutate } = useDashboardBatchDeleteMutation();
 
-  const processedFilters = useMemo(
-    () =>
-      dashboardScope ? generateDashboardScopeFilter(dashboardScope) : undefined,
-    [dashboardScope],
-  );
+  const processedFilters = useMemo(() => {
+    const filters = [
+      ...(dashboardScope ? generateDashboardScopeFilter(dashboardScope) : []),
+      ...(dashboardType ? generateDashboardTypeFilter(dashboardType) : []),
+    ];
+    return filters.length > 0 ? filters : undefined;
+  }, [dashboardScope, dashboardType]);
 
   const { data: dashboardsData } = useDashboardsList(
     {

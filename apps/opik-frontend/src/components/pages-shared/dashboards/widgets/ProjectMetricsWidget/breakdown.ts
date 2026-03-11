@@ -1,29 +1,6 @@
 import { COLUMN_TYPE } from "@/types/shared";
 import { Filter, FilterOperator } from "@/types/filters";
-
-/**
- * Group by field options for dashboard widget metrics.
- * Each field represents a dimension by which metrics can be grouped.
- *
- * Compatibility with metric types is based on entity type:
- * - Trace metrics: DURATION, TRACE_COUNT, TOKEN_USAGE, COST, FEEDBACK_SCORES, GUARDRAILS_FAILED_COUNT
- * - Thread metrics: THREAD_COUNT, THREAD_DURATION, THREAD_FEEDBACK_SCORES
- * - Span metrics: SPAN_COUNT, SPAN_DURATION, SPAN_TOKEN_USAGE, SPAN_FEEDBACK_SCORES
- *
- * This mirrors the backend BreakdownField enum in:
- * apps/opik-backend/src/main/java/com/comet/opik/api/metrics/BreakdownField.java
- */
-export enum BREAKDOWN_FIELD {
-  NONE = "none",
-  TAGS = "tags",
-  METADATA = "metadata",
-  NAME = "name",
-  ERROR_INFO = "error_info",
-  ERROR_TYPE = "error_type",
-  MODEL = "model",
-  PROVIDER = "provider",
-  TYPE = "type",
-}
+import { BREAKDOWN_FIELD } from "@/types/dashboard";
 
 /**
  * Display labels for group by fields.

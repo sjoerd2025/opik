@@ -21,11 +21,12 @@ import {
 } from "@/components/ui/form";
 import { Description } from "@/components/ui/description";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
-import ExperimentWidgetDataSection from "@/components/shared/Dashboard/widgets/shared/ExperimentWidgetDataSection/ExperimentWidgetDataSection";
-import WidgetRankingSettingsSection from "@/components/shared/Dashboard/widgets/ExperimentsLeaderboardWidget/WidgetRankingSettingsSection";
-import ColumnsButton from "@/components/shared/ColumnsButton/ColumnsButton";
+import ExperimentWidgetDataSection from "@/components/pages-shared/dashboards/widgets/shared/ExperimentWidgetDataSection/ExperimentWidgetDataSection";
+import WidgetRankingSettingsSection, {
+  NO_RANKING_VALUE,
+} from "@/components/pages-shared/dashboards/widgets/ExperimentsLeaderboardWidget/WidgetRankingSettingsSection";
+import ColumnsSection from "@/components/shared/ColumnsSection/ColumnsSection";
 
 import { cn } from "@/lib/utils";
 import { Filters } from "@/types/filters";
@@ -45,7 +46,6 @@ import {
   ExperimentsLeaderboardWidgetSchema,
   ExperimentsLeaderboardWidgetFormData,
 } from "./schema";
-import WidgetEditorBaseLayout from "@/components/shared/Dashboard/WidgetConfigDialog/WidgetEditorBaseLayout";
 import {
   parseMetadataKeys,
   formatConfigColumnName,
@@ -193,14 +193,12 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
       updateWidgetConfig({ selectedColumns: newSelectedColumns });
     };
 
-    const handleEnableRankingChange = (checked: boolean) => {
-      form.setValue("enableRanking", checked, { shouldValidate: true });
-      updateWidgetConfig({ enableRanking: checked });
-    };
-
     const handleRankingMetricChange = (value: string) => {
-      form.setValue("rankingMetric", value, { shouldValidate: true });
-      updateWidgetConfig({ rankingMetric: value });
+      const enabled = value !== NO_RANKING_VALUE;
+      const metric = enabled ? value : "";
+      form.setValue("enableRanking", enabled, { shouldValidate: true });
+      form.setValue("rankingMetric", metric, { shouldValidate: true });
+      updateWidgetConfig({ enableRanking: enabled, rankingMetric: metric });
     };
 
     const handleRankingHigherIsBetterChange = (value: boolean) => {
@@ -274,88 +272,76 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
 
     return (
       <Form {...form}>
-        <WidgetEditorBaseLayout>
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 pr-4">
-                <div className="flex flex-col gap-0.5 px-0.5">
-                  <Label className="comet-body-s-accented">Columns</Label>
-                  <Description>
-                    Select and reorder columns to display.
-                  </Description>
-                </div>
-              </div>
-              <ColumnsButton
-                columns={PREDEFINED_COLUMNS}
-                selectedColumns={selectedColumns}
-                onSelectionChange={handleSelectedColumnsChange}
-                order={columnsOrder}
-                onOrderChange={handleColumnsOrderChange}
-                sections={columnSections}
+        <div className="space-y-4">
+          {hasRuntimeExperiments ? (
+            <FormItem>
+              <FormLabel>Data source</FormLabel>
+              <Description>
+                Experiments are provided by the page context.
+              </Description>
+            </FormItem>
+          ) : (
+            <>
+              <ExperimentWidgetDataSection
+                control={form.control}
+                filtersFieldName="filters"
+                filters={widgetFilters}
+                onFiltersChange={handleFiltersChange}
               />
-            </div>
+              <FormField
+                control={form.control}
+                name="maxRows"
+                render={({ field, formState }) => {
+                  const validationErrors = get(formState.errors, ["maxRows"]);
+                  return (
+                    <FormItem>
+                      <FormLabel>Max experiments</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={MIN_MAX_EXPERIMENTS}
+                          max={MAX_MAX_EXPERIMENTS}
+                          value={field.value ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            handleMaxRowsChange(value);
+                          }}
+                          className={cn({
+                            "border-destructive": Boolean(
+                              validationErrors?.message,
+                            ),
+                          })}
+                        />
+                      </FormControl>
+                      <Description>
+                        Limit how many experiments are loaded (max{" "}
+                        {MAX_MAX_EXPERIMENTS}).
+                      </Description>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+            </>
+          )}
 
-            <WidgetRankingSettingsSection
-              control={form.control}
-              dynamicScoresColumns={dynamicScoresColumns}
-              onEnableRankingChange={handleEnableRankingChange}
-              onRankingMetricChange={handleRankingMetricChange}
-              onRankingHigherIsBetterChange={handleRankingHigherIsBetterChange}
-            />
+          <ColumnsSection
+            label="Columns"
+            columns={PREDEFINED_COLUMNS}
+            selectedColumns={selectedColumns}
+            onSelectionChange={handleSelectedColumnsChange}
+            order={columnsOrder}
+            onOrderChange={handleColumnsOrderChange}
+            sections={columnSections}
+          />
 
-            {hasRuntimeExperiments ? (
-              <FormItem>
-                <FormLabel>Data source</FormLabel>
-                <Description>
-                  Experiments are provided by the page context.
-                </Description>
-              </FormItem>
-            ) : (
-              <>
-                <ExperimentWidgetDataSection
-                  control={form.control}
-                  filtersFieldName="filters"
-                  filters={widgetFilters}
-                  onFiltersChange={handleFiltersChange}
-                />
-                <FormField
-                  control={form.control}
-                  name="maxRows"
-                  render={({ field, formState }) => {
-                    const validationErrors = get(formState.errors, ["maxRows"]);
-                    return (
-                      <FormItem>
-                        <FormLabel>Maximum rows</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={MIN_MAX_EXPERIMENTS}
-                            max={MAX_MAX_EXPERIMENTS}
-                            value={field.value ?? ""}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              handleMaxRowsChange(value);
-                            }}
-                            className={cn({
-                              "border-destructive": Boolean(
-                                validationErrors?.message,
-                              ),
-                            })}
-                          />
-                        </FormControl>
-                        <Description>
-                          Limit how many experiments are loaded (max{" "}
-                          {MAX_MAX_EXPERIMENTS}).
-                        </Description>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-              </>
-            )}
-          </div>
-        </WidgetEditorBaseLayout>
+          <WidgetRankingSettingsSection
+            control={form.control}
+            dynamicScoresColumns={dynamicScoresColumns}
+            onRankingMetricChange={handleRankingMetricChange}
+            onRankingHigherIsBetterChange={handleRankingHigherIsBetterChange}
+          />
+        </div>
       </Form>
     );
   },

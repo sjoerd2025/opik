@@ -14,7 +14,7 @@ import {
 } from "@/types/dashboard";
 import { Filter } from "@/types/filters";
 import { isFilterValid, createFilter } from "@/lib/filters";
-import MetricContainerChart from "@/components/pages/TracesPage/MetricsTab/MetricChart/MetricChartContainer";
+import MetricContainerChart from "./MetricChart/MetricChartContainer";
 import { LOGS_TYPE, PROJECT_TAB } from "@/constants/traces";
 import useAppStore from "@/store/AppStore";
 import { CHART_TYPE } from "@/constants/chart";
@@ -25,13 +25,13 @@ import {
   renderCostTooltipValue,
   costYTickFormatter,
   tokenYTickFormatter,
-} from "@/components/pages/TracesPage/MetricsTab/utils";
+} from "./chartUtils";
 import { renderScoreTooltipValue } from "@/lib/feedback-scores";
 import { calculateIntervalConfig } from "@/components/pages-shared/traces/MetricDateRangeSelect/utils";
 import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 import { buildDocsUrl } from "@/lib/utils";
+import { BREAKDOWN_FIELD } from "@/types/dashboard";
 import {
-  BREAKDOWN_FIELD,
   BREAKDOWN_GROUP_NAMES,
   buildBreakdownDrilldownFilter,
   getMetricEntityType,

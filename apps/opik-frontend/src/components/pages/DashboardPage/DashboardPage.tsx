@@ -10,8 +10,8 @@ import {
   useMetricDateRangeWithQueryAndStorage,
   MetricDateRangeSelect,
 } from "@/components/pages-shared/traces/MetricDateRangeSelect";
+import { DASHBOARD_TYPE } from "@/types/dashboard";
 import Loader from "@/components/shared/Loader/Loader";
-import { Separator } from "@/components/ui/separator";
 import { useDashboardLifecycle } from "@/components/pages-shared/dashboards/hooks/useDashboardLifecycle";
 import DashboardSaveActions from "@/components/pages-shared/dashboards/DashboardSaveActions/DashboardSaveActions";
 import ShareDashboardButton from "@/components/pages-shared/dashboards/ShareDashboardButton/ShareDashboardButton";
@@ -30,6 +30,8 @@ const DashboardPage: React.FunctionComponent = () => {
 
   const setRuntimeConfig = useDashboardStore(selectSetRuntimeConfig);
 
+  const showDateRange = dashboard?.type !== DASHBOARD_TYPE.EXPERIMENTS;
+
   const { dateRange, handleDateRangeChange, minDate, maxDate, dateRangeValue } =
     useMetricDateRangeWithQueryAndStorage({
       key: "dashboard_time_range",
@@ -37,8 +39,11 @@ const DashboardPage: React.FunctionComponent = () => {
     });
 
   useEffect(() => {
-    setRuntimeConfig({ dateRange: dateRangeValue });
-  }, [dateRangeValue, setRuntimeConfig]);
+    setRuntimeConfig({
+      dateRange: dateRangeValue,
+      dashboardType: dashboard?.type,
+    });
+  }, [dateRangeValue, dashboard?.type, setRuntimeConfig]);
 
   useEffect(() => {
     if (dashboard?.name) {
@@ -77,14 +82,15 @@ const DashboardPage: React.FunctionComponent = () => {
             onDiscard={discard}
             dashboard={dashboard}
           />
-          <MetricDateRangeSelect
-            value={dateRange}
-            onChangeValue={handleDateRangeChange}
-            minDate={minDate}
-            maxDate={maxDate}
-            hideAlltime
-          />
-          <Separator orientation="vertical" className="mx-2 h-4" />
+          {showDateRange && (
+            <MetricDateRangeSelect
+              value={dateRange}
+              onChangeValue={handleDateRangeChange}
+              minDate={minDate}
+              maxDate={maxDate}
+              hideAlltime
+            />
+          )}
           <ShareDashboardButton />
         </div>
       </div>

@@ -81,12 +81,13 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
     setRuntimeConfig({
       projectIds: [projectId],
       dateRange: dateRangeValue,
+      dashboardType: dashboard?.type,
     });
 
     return () => {
       setRuntimeConfig({});
     };
-  }, [projectId, dateRangeValue, setRuntimeConfig]);
+  }, [projectId, dateRangeValue, dashboard?.type, setRuntimeConfig]);
 
   const handleDashboardCreated = useCallback(
     (newDashboardId: string) => {

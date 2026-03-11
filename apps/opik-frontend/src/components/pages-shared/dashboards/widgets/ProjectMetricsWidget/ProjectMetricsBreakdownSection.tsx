@@ -25,8 +25,8 @@ import { TRACE_DATA_TYPE } from "@/hooks/useTracesOrSpansList";
 import { cn } from "@/lib/utils";
 import { BreakdownConfig } from "@/types/dashboard";
 
+import { BREAKDOWN_FIELD } from "@/types/dashboard";
 import {
-  BREAKDOWN_FIELD,
   BREAKDOWN_FIELD_LABELS,
   getCompatibleBreakdownFields,
 } from "./breakdown";

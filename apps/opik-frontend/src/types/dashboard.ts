@@ -4,12 +4,24 @@ import { TRACE_DATA_TYPE } from "@/constants/traces";
 import { Groups } from "@/types/groups";
 import { CHART_TYPE } from "@/constants/chart";
 import { Sorting } from "@/types/sorting";
-import { BREAKDOWN_FIELD } from "@/components/shared/Dashboard/widgets/ProjectMetricsWidget/breakdown";
+
+export enum BREAKDOWN_FIELD {
+  NONE = "none",
+  TAGS = "tags",
+  METADATA = "metadata",
+  NAME = "name",
+  ERROR_INFO = "error_info",
+  ERROR_TYPE = "error_type",
+  MODEL = "model",
+  PROVIDER = "provider",
+  TYPE = "type",
+}
 
 export interface DashboardRuntimeConfig {
   dateRange?: DateRangeSerializedValue;
   projectIds?: string[];
   experimentIds?: string[];
+  dashboardType?: DASHBOARD_TYPE;
 }
 
 export enum DASHBOARD_TYPE {

@@ -26,7 +26,7 @@ import { TRACE_DATA_TYPE } from "@/hooks/useTracesOrSpansList";
 import FiltersButton from "@/components/shared/FiltersButton/FiltersButton";
 import TracesOrSpansPathsAutocomplete from "@/components/pages-shared/traces/TracesOrSpansPathsAutocomplete/TracesOrSpansPathsAutocomplete";
 import TracesOrSpansFeedbackScoresSelect from "@/components/pages-shared/traces/TracesOrSpansFeedbackScoresSelect/TracesOrSpansFeedbackScoresSelect";
-import MetricContainerChart from "./MetricChart/MetricChartContainer";
+import MetricContainerChart from "@/components/pages-shared/dashboards/widgets/ProjectMetricsWidget/MetricChart/MetricChartContainer";
 import { CHART_TYPE } from "@/constants/chart";
 import {
   DURATION_LABELS_MAP,
@@ -34,7 +34,7 @@ import {
   renderDurationTooltipValue,
   durationYTickFormatter,
   tokenYTickFormatter,
-} from "./utils";
+} from "@/components/pages-shared/dashboards/widgets/ProjectMetricsWidget/chartUtils";
 import { renderScoreTooltipValue } from "@/lib/feedback-scores";
 
 const TRACE_FILTER_COLUMNS: ColumnData<BaseTraceData>[] = [

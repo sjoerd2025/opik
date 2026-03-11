@@ -125,6 +125,17 @@ export const generateDashboardScopeFilter = (scope: string): Filter[] => [
   }),
 ];
 
+export const generateDashboardTypeFilter = (
+  dashboardType: string,
+): Filter[] => [
+  createFilter({
+    field: "type",
+    type: COLUMN_TYPE.string,
+    operator: "=",
+    value: dashboardType,
+  }),
+];
+
 export const generateAnnotationQueueIdFilter = (annotationQueueId?: string) => {
   if (!annotationQueueId) return [];
 

@@ -6,9 +6,14 @@ import {
   selectClearDashboard,
 } from "@/store/DashboardStore";
 import useDashboardById from "@/api/dashboards/useDashboardById";
-import { widgetResolver } from "@/components/shared/Dashboard/widgets/widgetRegistry";
+import { widgetResolver } from "@/components/pages-shared/dashboards/widgets/widgetRegistry";
 import { useDashboardSave } from "./useDashboardSave";
-import { Dashboard } from "@/types/dashboard";
+import {
+  Dashboard,
+  DASHBOARD_SCOPE,
+  DASHBOARD_TYPE,
+  TEMPLATE_SCOPE,
+} from "@/types/dashboard";
 import { isTemplateId } from "@/lib/dashboard/utils";
 import { TEMPLATE_LIST } from "@/lib/dashboard/templates";
 
@@ -43,6 +48,11 @@ export const useDashboardLifecycle = ({
       description: template.description,
       workspace_id: "",
       config: template.config,
+      type:
+        template.scope === TEMPLATE_SCOPE.EXPERIMENTS
+          ? DASHBOARD_TYPE.EXPERIMENTS
+          : DASHBOARD_TYPE.MULTI_PROJECT,
+      scope: DASHBOARD_SCOPE.INSIGHTS,
       created_at: "",
       last_updated_at: "",
     } as Dashboard;

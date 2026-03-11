@@ -5,6 +5,7 @@ import get from "lodash/get";
 import isEmpty from "lodash/isEmpty";
 import isString from "lodash/isString";
 import {
+  DASHBOARD_TYPE,
   DashboardSection,
   DashboardSections,
   DashboardState,
@@ -244,4 +245,39 @@ export const isValidIntegerInRange = (
     numValue >= min &&
     numValue <= max
   );
+};
+
+const MULTI_PROJECT_WIDGET_TYPES = [
+  WIDGET_TYPES.PROJECT_METRICS,
+  WIDGET_TYPES.PROJECT_STATS_CARD,
+  WIDGET_TYPES.TEXT_MARKDOWN,
+];
+
+const EXPERIMENTS_WIDGET_TYPES = [
+  WIDGET_TYPES.EXPERIMENTS_FEEDBACK_SCORES,
+  WIDGET_TYPES.EXPERIMENT_LEADERBOARD,
+  WIDGET_TYPES.TEXT_MARKDOWN,
+];
+
+export const getAllWidgetTypes = (): string[] => {
+  return [
+    WIDGET_TYPES.PROJECT_METRICS,
+    WIDGET_TYPES.PROJECT_STATS_CARD,
+    WIDGET_TYPES.EXPERIMENTS_FEEDBACK_SCORES,
+    WIDGET_TYPES.EXPERIMENT_LEADERBOARD,
+    WIDGET_TYPES.TEXT_MARKDOWN,
+  ];
+};
+
+export const getWidgetTypesForDashboard = (
+  dashboardType?: DASHBOARD_TYPE,
+): string[] => {
+  switch (dashboardType) {
+    case DASHBOARD_TYPE.MULTI_PROJECT:
+      return MULTI_PROJECT_WIDGET_TYPES;
+    case DASHBOARD_TYPE.EXPERIMENTS:
+      return EXPERIMENTS_WIDGET_TYPES;
+    default:
+      return getAllWidgetTypes();
+  }
 };

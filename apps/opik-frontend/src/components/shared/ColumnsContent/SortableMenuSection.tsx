@@ -17,6 +17,7 @@ import type { DragEndEvent } from "@dnd-kit/core/dist/types";
 import { ColumnData } from "@/types/shared";
 import { sortColumnsByOrder } from "@/lib/table";
 import SortableMenuItem from "./SortableMenuItem";
+import type { ColumnsContentVariant } from "./SortableMenuItem";
 
 export type SortableMenuSectionProps<TColumnData> = {
   selectedColumns: string[];
@@ -25,6 +26,7 @@ export type SortableMenuSectionProps<TColumnData> = {
   order: string[];
   onOrderChange: (order: string[]) => void;
   disabledSorting?: boolean;
+  variant?: ColumnsContentVariant;
 };
 
 const SortableMenuSection = <TColumnData,>({
@@ -34,6 +36,7 @@ const SortableMenuSection = <TColumnData,>({
   order,
   onOrderChange,
   disabledSorting,
+  variant,
 }: SortableMenuSectionProps<TColumnData>) => {
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -98,6 +101,7 @@ const SortableMenuSection = <TColumnData,>({
             onCheckboxChange={onCheckboxChange}
             disabled={column.disabled}
             disabledSorting={disabledSorting}
+            variant={variant}
           />
         ))}
       </SortableContext>

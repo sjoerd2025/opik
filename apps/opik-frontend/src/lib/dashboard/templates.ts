@@ -10,7 +10,7 @@ import { CHART_TYPE } from "@/constants/chart";
 import { TRACE_DATA_TYPE } from "@/constants/traces";
 import { LayoutDashboard, FlaskConical } from "lucide-react";
 
-import { BREAKDOWN_FIELD } from "@/components/shared/Dashboard/widgets/ProjectMetricsWidget/breakdown";
+import { BREAKDOWN_FIELD } from "@/types/dashboard";
 
 const EXPERIMENT_COMPARISON_TEMPLATE: DashboardTemplate = {
   id: createTemplateId(TEMPLATE_TYPE.EXPERIMENT_COMPARISON),

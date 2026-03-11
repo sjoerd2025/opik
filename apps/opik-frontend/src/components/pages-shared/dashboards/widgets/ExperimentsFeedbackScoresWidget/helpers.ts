@@ -112,7 +112,7 @@ export const widgetHelpers = {
   getDefaultConfig: () => ({
     filters: [],
     groups: [],
-    chartType: CHART_TYPE.line,
+    chartType: CHART_TYPE.bar,
     maxExperimentsCount: DEFAULT_MAX_EXPERIMENTS,
   }),
   calculateTitle: calculateExperimentsFeedbackScoresTitle,

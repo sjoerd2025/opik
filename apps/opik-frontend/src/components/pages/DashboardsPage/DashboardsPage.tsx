@@ -18,7 +18,11 @@ import TagCell from "@/components/shared/DataTableCells/TagCell";
 import TextCell from "@/components/shared/DataTableCells/TextCell";
 import useDashboardsList from "@/api/dashboards/useDashboardsList";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
-import { Dashboard, DASHBOARD_SCOPE } from "@/types/dashboard";
+import {
+  Dashboard,
+  DASHBOARD_SCOPE,
+  DASHBOARD_TYPE_LABELS,
+} from "@/types/dashboard";
 import { generateDashboardScopeFilter } from "@/lib/filters";
 import Loader from "@/components/shared/Loader/Loader";
 import AddEditCloneDashboardDialog from "@/components/pages-shared/dashboards/AddEditCloneDashboardDialog/AddEditCloneDashboardDialog";
@@ -47,17 +51,18 @@ import {
   getRowId,
 } from "@/components/shared/DataTable/utils";
 import { Filter } from "@/types/filters";
-import { DASHBOARD_TYPE_LABELS } from "@/types/dashboard";
-
-const DASHBOARD_TYPE_OPTIONS = Object.entries(DASHBOARD_TYPE_LABELS).map(
-  ([value, label]) => ({ value, label }),
-);
+import {
+  DASHBOARD_TYPE_OPTIONS,
+  DASHBOARD_TYPE_TAG_VARIANT,
+  renderDashboardTypeOption,
+} from "@/lib/dashboardTypeSelect";
 
 const FILTERS_CONFIG = {
   rowsMap: {
     type: {
       keyComponentProps: {
         options: DASHBOARD_TYPE_OPTIONS,
+        renderOption: renderDashboardTypeOption,
       },
     },
   },
@@ -150,6 +155,9 @@ const DashboardsPage: React.FunctionComponent = () => {
         cell: TagCell as never,
         accessorFn: (row: Dashboard) =>
           DASHBOARD_TYPE_LABELS[row.type] ?? row.type,
+        customMeta: {
+          variantMap: DASHBOARD_TYPE_TAG_VARIANT,
+        },
         sortable: true,
       },
       {

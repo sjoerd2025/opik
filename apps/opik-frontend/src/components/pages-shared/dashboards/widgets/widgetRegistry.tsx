@@ -1,19 +1,10 @@
-import {
-  NotebookText,
-  ChartLine,
-  Hash,
-  FlaskConical,
-  Trophy,
-} from "lucide-react";
+import { NotebookText, Hash, Trophy, ChartNoAxesCombined } from "lucide-react";
 import {
   WidgetResolver,
   WidgetComponents,
   WIDGET_CATEGORY,
-  WIDGET_TYPE,
 } from "@/types/dashboard";
 import { WIDGET_TYPES } from "@/lib/dashboard/utils";
-import { Permissions } from "@/types/permissions";
-import { DISABLED_EXPERIMENTS_TOOLTIP } from "@/constants/permissions";
 import ProjectMetricsWidget from "./ProjectMetricsWidget/ProjectMetricsWidget";
 import ProjectMetricsEditor from "./ProjectMetricsWidget/ProjectMetricsEditor";
 import { widgetHelpers as projectMetricsHelpers } from "./ProjectMetricsWidget/helpers";
@@ -30,11 +21,6 @@ import ExperimentsLeaderboardWidget from "./ExperimentsLeaderboardWidget/Experim
 import ExperimentsLeaderboardWidgetEditor from "./ExperimentsLeaderboardWidget/ExperimentsLeaderboardWidgetEditor";
 import { widgetHelpers as experimentLeaderboardHelpers } from "./ExperimentsLeaderboardWidget/helpers";
 
-const EXPERIMENT_WIDGET_TYPES = new Set<WIDGET_TYPE>([
-  WIDGET_TYPES.EXPERIMENTS_FEEDBACK_SCORES,
-  WIDGET_TYPES.EXPERIMENT_LEADERBOARD,
-]);
-
 export const widgetResolver: WidgetResolver = (
   type: string,
 ): WidgetComponents => {
@@ -46,12 +32,11 @@ export const widgetResolver: WidgetResolver = (
         getDefaultConfig: projectMetricsHelpers.getDefaultConfig,
         calculateTitle: projectMetricsHelpers.calculateTitle,
         metadata: {
-          title: "Project metrics",
-          description:
-            "Visualize project metrics like latency, cost, or usage over time using charts.",
-          icon: <ChartLine className="size-4" />,
+          title: "Time series",
+          description: "Visualize trends in project metrics over time.",
+          icon: <ChartNoAxesCombined className="size-4" />,
           category: WIDGET_CATEGORY.OBSERVABILITY,
-          iconColor: "text-[#5899DA]",
+          iconColor: "text-chart-blue",
           disabled: false,
         },
       };
@@ -62,12 +47,12 @@ export const widgetResolver: WidgetResolver = (
         getDefaultConfig: textMarkdownHelpers.getDefaultConfig,
         calculateTitle: textMarkdownHelpers.calculateTitle,
         metadata: {
-          title: "Markdown text",
+          title: "Markdown",
           description:
             "Add markdown or text for explanations, labels, or annotations.",
           icon: <NotebookText className="size-4" />,
           category: WIDGET_CATEGORY.GENERAL,
-          iconColor: "text-[#EF6868]",
+          iconColor: "text-chart-red",
           disabled: false,
         },
       };
@@ -78,12 +63,11 @@ export const widgetResolver: WidgetResolver = (
         getDefaultConfig: projectStatsCardHelpers.getDefaultConfig,
         calculateTitle: projectStatsCardHelpers.calculateTitle,
         metadata: {
-          title: "Project statistics",
-          description:
-            "Highlight key project numbers at a glance, such as average latency, or total cost.",
+          title: "Single metric",
+          description: "Highlight key project numbers at a glance.",
           icon: <Hash className="size-4" />,
           category: WIDGET_CATEGORY.OBSERVABILITY,
-          iconColor: "text-[#19A979]",
+          iconColor: "text-chart-green",
           disabled: false,
         },
       };
@@ -94,12 +78,11 @@ export const widgetResolver: WidgetResolver = (
         getDefaultConfig: experimentsFeedbackScoresHelpers.getDefaultConfig,
         calculateTitle: experimentsFeedbackScoresHelpers.calculateTitle,
         metadata: {
-          title: "Experiments metrics",
-          description:
-            "Visualize experiment metrics with filtering and grouping options.",
-          icon: <FlaskConical className="size-4" />,
+          title: "Metrics",
+          description: "Visualize experiment metrics over time or across runs.",
+          icon: <ChartNoAxesCombined className="size-4" />,
           category: WIDGET_CATEGORY.EVALUATION,
-          iconColor: "text-[#9B59B6]",
+          iconColor: "text-chart-blue",
           disabled: false,
         },
       };
@@ -110,12 +93,12 @@ export const widgetResolver: WidgetResolver = (
         getDefaultConfig: experimentLeaderboardHelpers.getDefaultConfig,
         calculateTitle: experimentLeaderboardHelpers.calculateTitle,
         metadata: {
-          title: "Experiment leaderboard",
+          title: "Leaderboard",
           description:
             "Rank and compare experiments across multiple metrics in a sortable table.",
           icon: <Trophy className="size-4" />,
           category: WIDGET_CATEGORY.EVALUATION,
-          iconColor: "text-[#FFD700]",
+          iconColor: "text-chart-yellow",
           disabled: false,
         },
       };
@@ -126,49 +109,14 @@ export const widgetResolver: WidgetResolver = (
         getDefaultConfig: textMarkdownHelpers.getDefaultConfig,
         calculateTitle: textMarkdownHelpers.calculateTitle,
         metadata: {
-          title: "Markdown text",
+          title: "Markdown",
           description:
             "Add markdown or text for explanations, labels, or annotations.",
           icon: <NotebookText className="size-4" />,
           category: WIDGET_CATEGORY.GENERAL,
-          iconColor: "text-[#EF6868]",
+          iconColor: "text-chart-red",
           disabled: false,
         },
       };
   }
-};
-
-const isExperimentWidgetType = (widgetType: string): boolean => {
-  return EXPERIMENT_WIDGET_TYPES.has(widgetType as WIDGET_TYPE);
-};
-
-export const applyWidgetPermissions = (
-  components: WidgetComponents,
-  widgetType: string,
-  permissions: Permissions,
-): WidgetComponents => {
-  const { canViewExperiments } = permissions;
-
-  if (isExperimentWidgetType(widgetType) && !canViewExperiments) {
-    return {
-      ...components,
-      metadata: {
-        ...components.metadata,
-        disabled: true,
-        disabledTooltip: DISABLED_EXPERIMENTS_TOOLTIP,
-      },
-    };
-  }
-
-  return components;
-};
-
-export const getAllWidgetTypes = (): string[] => {
-  return [
-    WIDGET_TYPES.PROJECT_METRICS,
-    WIDGET_TYPES.PROJECT_STATS_CARD,
-    WIDGET_TYPES.EXPERIMENTS_FEEDBACK_SCORES,
-    WIDGET_TYPES.EXPERIMENT_LEADERBOARD,
-    WIDGET_TYPES.TEXT_MARKDOWN,
-  ];
 };
