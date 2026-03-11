@@ -15,7 +15,7 @@ from opentelemetry import metrics
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
-from opik_backend.executor import CodeExecutorBase, ExecutionResult, DEFAULT_CPU_SHARES, DEFAULT_MEM_LIMIT
+from opik_backend.executor import CodeExecutorBase, ExecutionResult, DEFAULT_CPU_SHARES, DEFAULT_MEM_LIMIT, DEFAULT_CPU_LIMIT
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,18 @@ execution_outcome_counter = meter.create_counter(
     unit="1",
 )
 
+# Gauges for executor container resource usage (reported via Docker stats)
+executor_cpu_cores_gauge = meter.create_gauge(
+    name="executor_container_cpu_cores",
+    description="CPU usage of an executor container in fractional cores (e.g. 0.5 = 500m)",
+)
+
+executor_memory_bytes_gauge = meter.create_gauge(
+    name="executor_container_memory_bytes",
+    description="Memory usage of an executor container in bytes",
+    unit="bytes",
+)
+
 class DockerExecutor(CodeExecutorBase):
     def __init__(self):
         super().__init__()
@@ -88,6 +100,9 @@ class DockerExecutor(CodeExecutorBase):
         self.network_disabled = os.getenv("PYTHON_CODE_EXECUTOR_ALLOW_NETWORK", "false").lower() != "true"
         self.cpu_shares = int(os.getenv("PYTHON_CODE_EXECUTOR_CPU_SHARES", str(DEFAULT_CPU_SHARES)))
         self.mem_limit = os.getenv("PYTHON_CODE_EXECUTOR_MEM_LIMIT", DEFAULT_MEM_LIMIT)
+        cpu_limit_str = os.getenv("PYTHON_CODE_EXECUTOR_CPU_LIMIT")
+        self.nano_cpus = int(float(cpu_limit_str) * 1e9) if cpu_limit_str else DEFAULT_CPU_LIMIT
+        self.metrics_interval = int(os.getenv("PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS", "60"))
 
         self.client = docker.from_env()
         self.instance_id = str(uuid7())
@@ -101,8 +116,8 @@ class DockerExecutor(CodeExecutorBase):
 
         # Log container configuration for debugging
         logger.debug(f"Docker executor configuration: cpu_shares={self.cpu_shares}, mem_limit={self.mem_limit}, "
-                    f"exec_timeout={self.exec_timeout}s, max_parallel={self.max_parallel}, "
-                    f"network_disabled={self.network_disabled}")
+                    f"nano_cpus={self.nano_cpus}, exec_timeout={self.exec_timeout}s, "
+                    f"max_parallel={self.max_parallel}, network_disabled={self.network_disabled}")
 
         # Pre-warm the container pool
         self._pre_warm_container_pool()
@@ -120,6 +135,10 @@ class DockerExecutor(CodeExecutorBase):
 
         # Schedule the pool check to run at the configured interval
         schedule.every(self.pool_check_interval).seconds.do(self._check_pool)
+
+        # Schedule executor container resource metrics collection
+        logger.debug(f"Starting executor resource metrics collection with {self.metrics_interval}s interval")
+        schedule.every(self.metrics_interval).seconds.do(self._collect_executor_resource_metrics)
 
         # Start a background thread to run the scheduler
         self.releaser_executor.submit(self._run_scheduler)
@@ -184,6 +203,43 @@ class DockerExecutor(CodeExecutorBase):
         logger.debug(f"Current container pool size: {pool_size}")
         return pool_size
 
+    def _collect_executor_resource_metrics(self):
+        """Collect CPU and memory metrics from executor containers via Docker stats API."""
+        if self.stop_event.is_set():
+            return schedule.CancelJob
+
+        try:
+            containers = self.get_managed_containers()
+            for container in containers:
+                try:
+                    stats = container.stats(stream=False)
+                    short_id = container.short_id
+
+                    # Calculate CPU usage in fractional cores
+                    cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - \
+                                stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                    system_delta = stats["cpu_stats"]["system_cpu_usage"] - \
+                                   stats["precpu_stats"]["system_cpu_usage"]
+                    num_cpus = stats["cpu_stats"].get("online_cpus", 1)
+
+                    if system_delta > 0:
+                        cpu_cores = (cpu_delta / system_delta) * num_cpus
+                    else:
+                        cpu_cores = 0.0
+
+                    # Memory usage in bytes
+                    memory_bytes = stats["memory_stats"].get("usage", 0)
+
+                    executor_cpu_cores_gauge.set(cpu_cores, {"container_id": short_id})
+                    executor_memory_bytes_gauge.set(memory_bytes, {"container_id": short_id})
+
+                except Exception as e:
+                    logger.debug(f"Failed to collect stats for container {container.short_id}: {e}")
+        except Exception as e:
+            logger.error(f"Error collecting executor resource metrics: {e}")
+
+        return None  # Continue the job
+
     def _calculate_latency_ms(self, start_time):
         return (time.time() - start_time) * 1000  # Convert to milliseconds
 
@@ -192,7 +248,7 @@ class DockerExecutor(CodeExecutorBase):
         start_time = time.time()
         with self.tracer.start_as_current_span("docker.create_container"):
             
-            new_container = self.client.containers.run(
+            run_kwargs = dict(
                 image=f"{self.docker_registry}/{self.docker_image}:{self.docker_tag}",
                 command=["tail", "-f", "/dev/null"], # a never ending process so Docker won't kill the container
                 mem_limit=self.mem_limit,
@@ -200,8 +256,12 @@ class DockerExecutor(CodeExecutorBase):
                 detach=True,
                 network_disabled=self.network_disabled,
                 security_opt=["no-new-privileges"],
-                labels=self.container_labels
+                labels=self.container_labels,
             )
+            if self.nano_cpus is not None:
+                run_kwargs["nano_cpus"] = self.nano_cpus
+
+            new_container = self.client.containers.run(**run_kwargs)
 
             # Add the container to the pool
             self.container_pool.put(new_container)
