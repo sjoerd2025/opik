@@ -1,5 +1,6 @@
 package com.comet.opik.domain;
 
+import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.ExperimentItem;
 import com.comet.opik.api.ExperimentStatus;
@@ -23,6 +24,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,6 +68,7 @@ public class ExperimentItemService {
 
             return resolveProjectIdFromProjectName(experimentItemsWithValidIds)
                     .flatMap(this::populateProjectIdFromTraces)
+                    .flatMap(this::populateExecutionPolicy)
                     .flatMap(experimentItemDAO::insert)
                     .doOnSuccess(__ -> eventBus.post(new ExperimentItemsCreated(experimentIds, workspaceId, userName)))
                     .then();
@@ -153,6 +156,40 @@ public class ExperimentItemService {
                                 return item;
                             })
                             .collect(toSet());
+                });
+    }
+
+    private Mono<Set<ExperimentItem>> populateExecutionPolicy(Set<ExperimentItem> experimentItems) {
+        var experimentIds = experimentItems.stream()
+                .map(ExperimentItem::experimentId)
+                .collect(toSet());
+
+        var datasetItemIds = experimentItems.stream()
+                .map(ExperimentItem::datasetItemId)
+                .collect(toSet());
+
+        return experimentService.getExecutionPolicies(experimentIds)
+                .flatMap(experimentInfoMap -> {
+                    var datasetVersionIds = experimentInfoMap.values().stream()
+                            .map(ExperimentDAO.ExperimentPolicyInfo::datasetVersionId)
+                            .filter(Objects::nonNull)
+                            .collect(toSet());
+
+                    Mono<Map<UUID, Map<UUID, ExecutionPolicy>>> itemPoliciesMono = featureFlags
+                            .isDatasetVersioningEnabled() && !datasetVersionIds.isEmpty()
+                                    ? datasetItemVersionDAO
+                                            .getExecutionPoliciesByDatasetItemIds(datasetItemIds, datasetVersionIds)
+                                            .<Map<UUID, Map<UUID, ExecutionPolicy>>>collect(
+                                                    HashMap::new, (map, entry) -> map
+                                                            .computeIfAbsent(entry.datasetVersionId(),
+                                                                    k -> new HashMap<>())
+                                                            .put(entry.datasetItemId(), entry.policy()))
+                                    : Mono.just(Map.of());
+
+                    return itemPoliciesMono.map(policiesByVersion -> experimentItems.stream()
+                            .map(item -> ExecutionPolicyMapper.resolvePolicy(
+                                    item, experimentInfoMap, policiesByVersion))
+                            .collect(toSet()));
                 });
     }
 
