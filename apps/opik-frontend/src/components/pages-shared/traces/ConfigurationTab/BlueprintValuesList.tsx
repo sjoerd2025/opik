@@ -30,9 +30,7 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
       <div key={v.key} className="flex flex-col gap-2 py-4">
         <div className="flex items-center gap-2">
           <BlueprintTypeIcon type={v.type} />
-          <span className="comet-body-xs-accented text-foreground">
-            {v.key}
-          </span>
+          <span className="comet-body-s-accented text-foreground">{v.key}</span>
         </div>
         {v.description && (
           <TooltipWrapper content={v.description}>
