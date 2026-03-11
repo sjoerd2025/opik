@@ -202,7 +202,7 @@ const EvaluationSuiteItemPanelLayout: React.FC<
       open={isOpen}
       headerContent={headerContent}
       onClose={onClose}
-      horizontalNavigation={isNewItem ? undefined : horizontalNavigation}
+      horizontalNavigation={horizontalNavigation}
     >
       {isPending ? (
         <div className="flex size-full items-center justify-center">

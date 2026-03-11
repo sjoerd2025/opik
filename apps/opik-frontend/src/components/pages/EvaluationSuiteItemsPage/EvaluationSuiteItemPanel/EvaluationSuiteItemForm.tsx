@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useCodemirrorTheme } from "@/hooks/useCodemirrorTheme";
 import { useClampedIntegerInput } from "@/hooks/useClampedIntegerInput";
 import AssertionsField from "@/components/shared/AssertionField/AssertionsField";
+import { Description } from "@/components/ui/description";
+import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
 import { ExecutionPolicy, MAX_RUNS_PER_ITEM } from "@/types/evaluation-suites";
 import { EvaluationSuiteItemFormValues } from "./evaluationSuiteItemFormSchema";
 
@@ -29,6 +31,7 @@ interface EvaluationSuiteItemFormProps {
   suiteAssertions: string[];
   suitePolicy: ExecutionPolicy;
   onOpenSettings: () => void;
+  showDataDescription?: boolean;
 }
 
 const DescriptionSection: React.FC = () => {
@@ -47,7 +50,9 @@ const DescriptionSection: React.FC = () => {
   );
 };
 
-const DataSection: React.FC = () => {
+const DataSection: React.FC<{ showDescription?: boolean }> = ({
+  showDescription,
+}) => {
   const theme = useCodemirrorTheme({ editable: true });
   const { control } = useFormContext<EvaluationSuiteItemFormValues>();
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -92,6 +97,16 @@ const DataSection: React.FC = () => {
             </div>
             {jsonError && (
               <p className="comet-body-xs mt-1 text-destructive">{jsonError}</p>
+            )}
+            {showDescription && (
+              <Description>
+                {
+                  EXPLAINERS_MAP[
+                    EXPLAINER_ID
+                      .what_format_is_this_to_add_my_evaluation_suite_item
+                  ].description
+                }
+              </Description>
             )}
           </>
         )}
@@ -221,11 +236,12 @@ const EvaluationSuiteItemForm: React.FC<EvaluationSuiteItemFormProps> = ({
   suiteAssertions,
   suitePolicy,
   onOpenSettings,
+  showDataDescription,
 }) => {
   return (
     <div className="flex flex-col gap-6 p-6 pt-4">
       <DescriptionSection />
-      <DataSection />
+      <DataSection showDescription={showDataDescription} />
       <Separator />
       <EvaluationCriteriaSection
         suiteAssertions={suiteAssertions}

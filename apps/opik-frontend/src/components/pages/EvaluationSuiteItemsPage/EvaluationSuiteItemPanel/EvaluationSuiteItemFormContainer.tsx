@@ -22,6 +22,7 @@ interface EvaluationSuiteItemFormContainerProps {
   setHasUnsavedChanges?: (v: boolean) => void;
   formId?: string;
   onSubmit?: (values: EvaluationSuiteItemFormValues) => void;
+  showDataDescription?: boolean;
 }
 
 const EvaluationSuiteItemFormContainer: React.FC<
@@ -35,6 +36,7 @@ const EvaluationSuiteItemFormContainer: React.FC<
   setHasUnsavedChanges,
   formId,
   onSubmit,
+  showDataDescription,
 }) => {
   const form = useForm<EvaluationSuiteItemFormValues>({
     resolver: zodResolver(evaluationSuiteItemFormSchema),
@@ -65,6 +67,7 @@ const EvaluationSuiteItemFormContainer: React.FC<
           suiteAssertions={suiteAssertions}
           suitePolicy={suitePolicy}
           onOpenSettings={onOpenSettings}
+          showDataDescription={showDataDescription}
         />
       </form>
     </Form>

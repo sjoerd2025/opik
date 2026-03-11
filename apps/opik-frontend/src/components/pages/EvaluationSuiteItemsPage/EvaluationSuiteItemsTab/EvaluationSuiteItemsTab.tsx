@@ -589,7 +589,7 @@ function EvaluationSuiteItemsTab({
             size="sm"
             onClick={handleNewDatasetItemClick}
           >
-            Create suite item
+            Add suite item
           </Button>
         </div>
       </div>

@@ -20,6 +20,12 @@ import {
 
 const ADD_SUITE_ITEM_FORM_ID = "add-evaluation-suite-item-form";
 
+const DATA_PREFILLED_CONTENT = `{
+  "input": "<user question>",
+  "expected_output": "<expected response>",
+  "<any additional fields>": "<any value>"
+}`;
+
 interface AddEvaluationSuiteItemPanelProps {
   open: boolean;
   onClose: () => void;
@@ -42,12 +48,14 @@ const AddEvaluationSuiteItemPanelContent: React.FC<{
   const suiteId = useSuiteIdFromURL();
   const suiteAssertions = useEffectiveSuiteAssertions(suiteId);
   const suitePolicy = useEffectiveExecutionPolicy(suiteId);
-
+  const isEmptyDataset = columns.length === 0;
   const initialData = Object.fromEntries(columns.map((col) => [col.name, ""]));
 
   const initialValues: EvaluationSuiteItemFormValues = {
     description: "",
-    data: JSON.stringify(initialData, null, 2),
+    data: isEmptyDataset
+      ? DATA_PREFILLED_CONTENT
+      : JSON.stringify(initialData, null, 2),
     assertions: [],
     runsPerItem: suitePolicy.runs_per_item,
     passThreshold: suitePolicy.pass_threshold,
@@ -137,6 +145,7 @@ const AddEvaluationSuiteItemPanelContent: React.FC<{
           onOpenSettings={onOpenSettings}
           onSubmit={onValidSubmit}
           setHasUnsavedChanges={setHasUnsavedChanges}
+          showDataDescription={isEmptyDataset}
         />
       </div>
 

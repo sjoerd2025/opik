@@ -108,7 +108,7 @@ const AddDatasetItemDialog: React.FC<AddDatasetItemDialogProps> = ({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button type="submit" disabled={!isValid} onClick={submitHandler}>
-            Create suite item
+            Add suite item
           </Button>
         </DialogFooter>
       </DialogContent>
