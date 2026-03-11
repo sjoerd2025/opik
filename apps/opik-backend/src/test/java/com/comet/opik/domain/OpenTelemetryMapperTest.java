@@ -533,4 +533,80 @@ class OpenTelemetryMapperTest {
         assertThat(span.usage()).isNotNull();
         assertThat(span.usage().containsKey("total_tokens")).isFalse();
     }
+
+    @Test
+    void testGenAiUsageCostMappedToTotalEstimatedCost() {
+        var attributes = List.of(
+                KeyValue.newBuilder()
+                        .setKey("gen_ai.usage.cost")
+                        .setValue(AnyValue.newBuilder().setDoubleValue(0.0042))
+                        .build());
+
+        var spanBuilder = Span.builder()
+                .id(UUID.randomUUID())
+                .traceId(UUID.randomUUID())
+                .projectId(UUID.randomUUID())
+                .startTime(Instant.now());
+
+        OpenTelemetryMapper.enrichSpanWithAttributes(spanBuilder, attributes, null, null);
+
+        var span = spanBuilder.build();
+
+        assertThat(span.totalEstimatedCost()).isEqualByComparingTo("0.0042");
+        assertThat(span.totalEstimatedCostVersion()).isEmpty();
+    }
+
+    @Test
+    void testGenAiUsageCostNotAddedToUsageMap() {
+        var attributes = List.of(
+                KeyValue.newBuilder()
+                        .setKey("gen_ai.usage.cost")
+                        .setValue(AnyValue.newBuilder().setDoubleValue(0.0042))
+                        .build());
+
+        var spanBuilder = Span.builder()
+                .id(UUID.randomUUID())
+                .traceId(UUID.randomUUID())
+                .projectId(UUID.randomUUID())
+                .startTime(Instant.now());
+
+        OpenTelemetryMapper.enrichSpanWithAttributes(spanBuilder, attributes, null, null);
+
+        var span = spanBuilder.build();
+
+        assertThat(span.usage()).isNull();
+    }
+
+    @Test
+    void testGenAiUsageCostDoesNotAffectOtherUsageTokens() {
+        var attributes = List.of(
+                KeyValue.newBuilder()
+                        .setKey("gen_ai.usage.input_tokens")
+                        .setValue(AnyValue.newBuilder().setIntValue(100))
+                        .build(),
+                KeyValue.newBuilder()
+                        .setKey("gen_ai.usage.output_tokens")
+                        .setValue(AnyValue.newBuilder().setIntValue(50))
+                        .build(),
+                KeyValue.newBuilder()
+                        .setKey("gen_ai.usage.cost")
+                        .setValue(AnyValue.newBuilder().setDoubleValue(0.0025))
+                        .build());
+
+        var spanBuilder = Span.builder()
+                .id(UUID.randomUUID())
+                .traceId(UUID.randomUUID())
+                .projectId(UUID.randomUUID())
+                .startTime(Instant.now());
+
+        OpenTelemetryMapper.enrichSpanWithAttributes(spanBuilder, attributes, null, null);
+
+        var span = spanBuilder.build();
+
+        assertThat(span.totalEstimatedCost()).isEqualByComparingTo("0.0025");
+        assertThat(span.totalEstimatedCostVersion()).isEmpty();
+        assertThat(span.usage()).containsEntry("prompt_tokens", 100);
+        assertThat(span.usage()).containsEntry("completion_tokens", 50);
+        assertThat(span.usage()).doesNotContainKey("cost");
+    }
 }

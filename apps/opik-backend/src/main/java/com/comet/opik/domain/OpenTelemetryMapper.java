@@ -12,6 +12,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
@@ -126,6 +127,11 @@ public class OpenTelemetryMapper {
                         };
 
                         extractToJsonColumn(node, key, value);
+                        break;
+
+                    case COST :
+                        spanBuilder.totalEstimatedCost(BigDecimal.valueOf(value.getDoubleValue()));
+                        spanBuilder.totalEstimatedCostVersion("");
                         break;
 
                     case TAGS :
