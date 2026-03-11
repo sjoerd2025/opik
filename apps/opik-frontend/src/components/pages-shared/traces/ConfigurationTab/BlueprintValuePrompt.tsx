@@ -189,6 +189,7 @@ const BlueprintValuePrompt = forwardRef<
           template={promptVersion.template}
           templateStructure={prompt?.template_structure}
           truncate
+          labelClassName="comet-body-xs-accented mt-auto"
         />
       )}
     </div>
