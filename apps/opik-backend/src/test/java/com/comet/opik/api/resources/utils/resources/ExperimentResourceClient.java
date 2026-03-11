@@ -81,7 +81,8 @@ public class ExperimentResourceClient {
                 .usage(null)
                 .projectId(null)
                 .datasetVersionId(null)
-                .datasetVersionSummary(null);
+                .datasetVersionSummary(null)
+                .datasetItemCount(null);
     }
 
     public List<Experiment> generateExperimentList() {
