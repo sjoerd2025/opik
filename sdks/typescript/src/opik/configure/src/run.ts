@@ -22,6 +22,12 @@ type Args = {
   installDir?: string;
   default?: boolean;
   useLocal?: boolean;
+  deploymentType?: WizardOptions['deploymentType'];
+  url?: string;
+  apiKey?: string;
+  workspace?: string;
+  projectName?: string;
+  packageManager?: WizardOptions['packageManager'];
 };
 
 export async function runWizard(argv: Args) {
@@ -54,6 +60,12 @@ export async function runWizard(argv: Args) {
     installDir: resolvedInstallDir,
     default: finalArgs.default ?? false,
     useLocal: finalArgs.useLocal ?? false,
+    deploymentType: finalArgs.deploymentType,
+    url: finalArgs.url,
+    apiKey: finalArgs.apiKey,
+    workspace: finalArgs.workspace,
+    projectName: finalArgs.projectName,
+    packageManager: finalArgs.packageManager,
   };
 
   analytics.setTag('debug', wizardOptions.debug);
