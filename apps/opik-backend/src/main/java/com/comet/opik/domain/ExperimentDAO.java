@@ -1197,6 +1197,7 @@ class ExperimentDAO {
                 DISTINCT id, execution_policy
             FROM experiments
             WHERE id in :experiment_ids
+            AND workspace_id = :workspace_id
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -1736,9 +1737,9 @@ class ExperimentDAO {
         }
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> {
-                    var statement = connection.createStatement(FIND_EXECUTION_POLICY_BY_EXPERIMENT_IDS);
-                    statement.bind("experiment_ids", experimentIds.toArray(UUID[]::new));
-                    return statement.execute();
+                    var statement = connection.createStatement(FIND_EXECUTION_POLICY_BY_EXPERIMENT_IDS)
+                            .bind("experiment_ids", experimentIds.toArray(UUID[]::new));
+                    return makeFluxContextAware(bindWorkspaceIdToFlux(statement));
                 })
                 .flatMap(result -> result.map((row, rowMetadata) -> {
                     var id = row.get("id", UUID.class);

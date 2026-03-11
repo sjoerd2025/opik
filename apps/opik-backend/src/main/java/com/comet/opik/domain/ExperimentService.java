@@ -28,7 +28,6 @@ import com.comet.opik.api.sorting.ExperimentSortingFactory;
 import com.comet.opik.infrastructure.FeatureFlags;
 import com.comet.opik.infrastructure.OpikConfiguration;
 import com.comet.opik.infrastructure.auth.RequestContext;
-import com.comet.opik.utils.JsonUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.eventbus.EventBus;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
@@ -512,7 +511,7 @@ public class ExperimentService {
 
                     log.info("Using validated dataset version ID '{}' for experiment on dataset '{}'",
                             version.id(), datasetId);
-                    return new ResolvedVersion(version.id(), serializeExecutionPolicy(version.executionPolicy()));
+                    return new ResolvedVersion(version.id(), ExecutionPolicy.serialize(version.executionPolicy()));
                 }).subscribeOn(Schedulers.boundedElastic())
                         .onErrorResume(e -> {
                             if (e instanceof NotFoundException) {
@@ -531,20 +530,13 @@ public class ExperimentService {
                     var v = latestVersion.get();
                     log.info("No version specified, using latest version '{}' for experiment on dataset '{}'",
                             v.id(), datasetId);
-                    return new ResolvedVersion(v.id(), serializeExecutionPolicy(v.executionPolicy()));
+                    return new ResolvedVersion(v.id(), ExecutionPolicy.serialize(v.executionPolicy()));
                 }
                 log.warn("No latest version found for dataset '{}', experiment will have null dataset_version_id",
                         datasetId);
                 return null;
             }).subscribeOn(Schedulers.boundedElastic());
         });
-    }
-
-    private String serializeExecutionPolicy(ExecutionPolicy executionPolicy) {
-        if (executionPolicy == null) {
-            return "";
-        }
-        return JsonUtils.writeValueAsString(executionPolicy);
     }
 
     private boolean hasPromptVersionLinks(Experiment experiment) {

@@ -1458,6 +1458,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 execution_policy
             FROM dataset_item_versions
             WHERE id IN :datasetItemRowIds
+            AND workspace_id = :workspace_id
             ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
             LIMIT 1 BY id
             """;
@@ -3113,25 +3114,31 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return Mono.just(Map.of());
         }
 
-        return asyncTemplate.nonTransaction(connection -> {
-            var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_ROW_IDS)
-                    .bind("datasetItemRowIds", datasetItemRowIds.toArray(UUID[]::new));
+        return Mono.deferContextual(ctx -> {
+            String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
-            Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE, "get_execution_policies_by_row_ids");
+            return asyncTemplate.nonTransaction(connection -> {
+                var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_ROW_IDS)
+                        .bind("datasetItemRowIds", datasetItemRowIds.toArray(UUID[]::new))
+                        .bind("workspace_id", workspaceId);
 
-            return Flux.from(statement.execute())
-                    .flatMap(result -> result.map((row, rowMetadata) -> {
-                        var id = UUID.fromString(row.get("id", String.class));
-                        var policyJson = row.get("execution_policy", String.class);
-                        ExecutionPolicy policy = null;
-                        if (policyJson != null && !policyJson.isBlank()) {
-                            policy = JsonUtils.readValue(policyJson, ExecutionPolicy.class);
-                        }
-                        return Map.entry(id, Optional.ofNullable(policy));
-                    }))
-                    .filter(entry -> entry.getValue().isPresent())
-                    .collectMap(Map.Entry::getKey, entry -> entry.getValue().get())
-                    .doFinally(signalType -> endSegment(segment));
+                Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE,
+                        "get_execution_policies_by_row_ids");
+
+                return Flux.from(statement.execute())
+                        .flatMap(result -> result.map((row, rowMetadata) -> {
+                            var id = UUID.fromString(row.get("id", String.class));
+                            var policyJson = row.get("execution_policy", String.class);
+                            ExecutionPolicy policy = null;
+                            if (policyJson != null && !policyJson.isBlank()) {
+                                policy = JsonUtils.readValue(policyJson, ExecutionPolicy.class);
+                            }
+                            return Map.entry(id, Optional.ofNullable(policy));
+                        }))
+                        .filter(entry -> entry.getValue().isPresent())
+                        .collectMap(Map.Entry::getKey, entry -> entry.getValue().get())
+                        .doFinally(signalType -> endSegment(segment));
+            });
         });
     }
 
