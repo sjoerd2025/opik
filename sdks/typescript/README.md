@@ -21,12 +21,28 @@ The Opik TypeScript SDK allows you to integrate your TypeScript and JavaScript a
 
 Opik is an open-source LLM evaluation platform by [Comet](https://www.comet.com?from=llm&utm_source=opik&utm_medium=github&utm_content=ts_sdk_readme&utm_campaign=opik). For more information about the broader Opik ecosystem, visit our main [GitHub repository](https://github.com/comet-ml/opik), [Website](https://www.comet.com/site/products/opik/), or [Documentation](https://www.comet.com/docs/opik/).
 
+## Quick Start
+
+The fastest way to add Opik to an existing Node.js project is:
+
+```bash
+npx opik-ts configure
+```
+
+On Opik Cloud, the CLI validates your API key, suggests your default workspace automatically, and writes the required `OPIK_*` variables for you.
+
 ## Installation
 
 You can install the `opik` package using your favorite package manager.
 
 ```bash
 npm install opik
+```
+
+For OpenAI tracing, install the official OpenAI SDK together with the separate Opik integration package:
+
+```bash
+npm install opik openai opik-openai
 ```
 
 ## Opik Configuration
@@ -41,6 +57,8 @@ OPIK_URL_OVERRIDE="https://www.comet.com/opik/api"
 OPIK_PROJECT_NAME="your-project-name"
 OPIK_WORKSPACE="your-workspace-name"
 ```
+
+`OPIK_WORKSPACE` is required for Opik Cloud deployments.
 
 Or you can pass the configuration to the Opik client constructor.
 
@@ -108,7 +126,7 @@ await client.flush();
 Opik provides seamless integrations with popular AI frameworks and tools. Check out our integration packages:
 
 - **Vercel AI** - [`opik-vercel`](https://www.npmjs.com/package/opik-vercel)
-- **OpenAI** - [`opik-openai`](https://www.npmjs.com/package/opik-openai)
+- **OpenAI** - [`opik-openai`](https://www.npmjs.com/package/opik-openai) (install alongside `opik` and `openai`)
 - **LangChain** - [`opik-langchain`](https://www.npmjs.com/package/opik-langchain)
 - **Google Gemini** - [`opik-gemini`](https://www.npmjs.com/package/opik-gemini)
 
