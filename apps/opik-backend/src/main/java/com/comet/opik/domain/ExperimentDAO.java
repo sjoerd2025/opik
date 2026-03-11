@@ -1743,11 +1743,7 @@ class ExperimentDAO {
                 })
                 .flatMap(result -> result.map((row, rowMetadata) -> {
                     var id = row.get("id", UUID.class);
-                    var policyJson = row.get("execution_policy", String.class);
-                    ExecutionPolicy policy = null;
-                    if (policyJson != null && !policyJson.isEmpty()) {
-                        policy = JsonUtils.readValue(policyJson, ExecutionPolicy.class);
-                    }
+                    var policy = ExecutionPolicy.fromJson(row.get("execution_policy", String.class));
                     return Map.entry(id, policy != null ? policy : ExecutionPolicy.DEFAULT);
                 }));
     }

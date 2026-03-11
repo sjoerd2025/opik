@@ -25,4 +25,11 @@ public record ExecutionPolicy(
         }
         return JsonUtils.writeValueAsString(executionPolicy);
     }
+
+    public static ExecutionPolicy fromJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        return JsonUtils.readValue(json, ExecutionPolicy.class);
+    }
 }

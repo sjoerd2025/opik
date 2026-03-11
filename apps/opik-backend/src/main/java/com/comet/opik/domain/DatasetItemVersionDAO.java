@@ -1452,15 +1452,15 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             LIMIT 1 BY id
             """;
 
-    private static final String SELECT_EXECUTION_POLICIES_BY_ROW_IDS = """
+    private static final String SELECT_EXECUTION_POLICIES_BY_DATASET_ITEM_IDS = """
             SELECT DISTINCT
-                id,
+                dataset_item_id,
                 execution_policy
             FROM dataset_item_versions
-            WHERE id IN :datasetItemRowIds
+            WHERE dataset_item_id IN :datasetItemIds
             AND workspace_id = :workspace_id
             ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-            LIMIT 1 BY id
+            LIMIT 1 BY dataset_item_id
             """;
 
     private static final String SELECT_ITEMS_BY_DATASET_ITEM_IDS = """
@@ -3118,8 +3118,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
             return asyncTemplate.nonTransaction(connection -> {
-                var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_ROW_IDS)
-                        .bind("datasetItemRowIds", datasetItemRowIds.toArray(UUID[]::new))
+                var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_DATASET_ITEM_IDS)
+                        .bind("datasetItemIds", datasetItemRowIds.toArray(UUID[]::new))
                         .bind("workspace_id", workspaceId);
 
                 Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE,
@@ -3127,12 +3127,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
                 return Flux.from(statement.execute())
                         .flatMap(result -> result.map((row, rowMetadata) -> {
-                            var id = UUID.fromString(row.get("id", String.class));
-                            var policyJson = row.get("execution_policy", String.class);
-                            ExecutionPolicy policy = null;
-                            if (policyJson != null && !policyJson.isBlank()) {
-                                policy = JsonUtils.readValue(policyJson, ExecutionPolicy.class);
-                            }
+                            var id = UUID.fromString(row.get("dataset_item_id", String.class));
+                            var policy = ExecutionPolicy.fromJson(row.get("execution_policy", String.class));
                             return Map.entry(id, Optional.ofNullable(policy));
                         }))
                         .filter(entry -> entry.getValue().isPresent())
