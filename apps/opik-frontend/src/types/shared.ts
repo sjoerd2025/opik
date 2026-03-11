@@ -76,7 +76,13 @@ export type Explainer = {
   docHash?: string;
 };
 
-export type HeaderIconType = COLUMN_TYPE | "guardrails" | "tags" | "version";
+export type HeaderIconType =
+  | COLUMN_TYPE
+  | "guardrails"
+  | "tags"
+  | "version"
+  | "assertions"
+  | "execution_policy";
 
 export type ColumnData<T> = {
   id: string;
