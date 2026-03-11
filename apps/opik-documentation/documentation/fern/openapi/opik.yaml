@@ -2800,6 +2800,14 @@ paths:
         in: query
         schema:
           type: string
+      - name: exclude_category_names
+        in: query
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            default: suite_assertion
       responses:
         "200":
           description: Feedback Scores resource
@@ -5326,6 +5334,14 @@ paths:
           - tool
           - llm
           - guardrail
+      - name: exclude_category_names
+        in: query
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            default: suite_assertion
       responses:
         "200":
           description: Feedback Scores resource
@@ -5932,6 +5948,14 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: exclude_category_names
+        in: query
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            default: suite_assertion
       responses:
         "200":
           description: Feedback Scores resource
@@ -6882,7 +6906,6 @@ components:
       required:
       - key
       - type
-      - value
       type: object
       properties:
         key:
@@ -6890,7 +6913,6 @@ components:
           minLength: 0
           type: string
         value:
-          minLength: 1
           type: string
         type:
           type: string
@@ -7011,7 +7033,6 @@ components:
       required:
       - key
       - type
-      - value
       type: object
       properties:
         id:
@@ -7027,7 +7048,6 @@ components:
           minLength: 0
           type: string
         value:
-          minLength: 1
           type: string
         type:
           type: string
@@ -7106,7 +7126,6 @@ components:
       required:
       - key
       - type
-      - value
       type: object
       properties:
         id:
@@ -7122,7 +7141,6 @@ components:
           minLength: 0
           type: string
         value:
-          minLength: 1
           type: string
         type:
           type: string
@@ -14100,6 +14118,23 @@ components:
         mask_id:
           type: string
           format: uuid
+        metadata:
+          $ref: "#/components/schemas/LocalRunnerJobMetadata"
+    LocalRunnerJobMetadata:
+      type: object
+      properties:
+        dataset_id:
+          type: string
+          format: uuid
+        dataset_version_id:
+          type: string
+          format: uuid
+        dataset_item_version_id:
+          type: string
+          format: uuid
+        dataset_item_id:
+          type: string
+          format: uuid
     LocalRunnerPairResponse:
       type: object
       properties:
@@ -14144,6 +14179,8 @@ components:
         mask_id:
           type: string
           format: uuid
+        metadata:
+          $ref: "#/components/schemas/LocalRunnerJobMetadata"
         timeout:
           type: integer
           format: int32

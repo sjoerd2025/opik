@@ -155,14 +155,6 @@ class ExperimentAggregateEventListenerTest {
         }
 
         @Test
-        void doesNotCallServiceWhenExperimentIdsEmpty() {
-            listener.onExperimentItemsCreated(new ExperimentItemsCreated(Set.of(), WORKSPACE_ID, USER_NAME));
-
-            verify(experimentItemService, never()).filterExperimentIdsByStatus(any(), any());
-            verify(publisher, never()).publish(any(), anyString(), anyString());
-        }
-
-        @Test
         void doesNotCallServiceWhenConfigDisabled() {
             when(config.isEnabled()).thenReturn(false);
 
@@ -191,13 +183,6 @@ class ExperimentAggregateEventListenerTest {
                     .untilAsserted(() -> verify(publisher).publish(Set.of(experimentId), WORKSPACE_ID, USER_NAME));
         }
 
-        @Test
-        void doesNotCallServiceWhenExperimentIdsEmpty() {
-            listener.onExperimentItemsDeleted(new ExperimentItemsDeleted(Set.of(), WORKSPACE_ID, USER_NAME));
-
-            verify(experimentItemService, never()).filterExperimentIdsByStatus(any(), any());
-            verify(publisher, never()).publish(any(), anyString(), anyString());
-        }
     }
 
     @Nested

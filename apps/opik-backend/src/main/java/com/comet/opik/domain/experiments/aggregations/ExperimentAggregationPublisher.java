@@ -41,7 +41,7 @@ public interface ExperimentAggregationPublisher {
         public Mono<Void> publish(@NonNull Set<UUID> experimentIds, @NonNull String workspaceId,
                 @NonNull String userName) {
             if (!config.isEnabled() || experimentIds.isEmpty()) {
-                log.debug("Skipping publish: enabled='{}', experimentIds.size='{}'",
+                log.info("Skipping publish: enabled='{}', experimentIds.size='{}'",
                         config.isEnabled(), experimentIds.size());
                 return Mono.empty();
             }
