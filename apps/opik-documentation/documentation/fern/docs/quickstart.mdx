@@ -1,6 +1,7 @@
 ---
 headline: Quickstart | Opik Documentation
-og:description: Integrate Opik with your LLM application to log calls and chains efficiently.
+og:description:
+  Integrate Opik with your LLM application to log calls and chains efficiently.
   Get started with our step-by-step guide.
 og:site_name: Opik Documentation
 og:title: Quickstart Guide - Opik Integration
@@ -82,6 +83,7 @@ popular integrations:
         ```
 
         This will detect your project setup, install required dependencies, and help you configure environment variables.
+        On Opik Cloud, the wizard validates your API key and suggests your default workspace automatically.
       </Step>
       <Step>
         Log a trace using the Opik client:
@@ -159,10 +161,10 @@ popular integrations:
 
     <Steps>
       <Step>
-        Install the Opik TypeScript SDK:
+        Install the OpenAI SDK, the Opik SDK, and the OpenAI integration package:
 
         ```bash
-        npm install opik-openai
+        npm install opik openai opik-openai
         ```
       </Step>
       <Step>
@@ -173,6 +175,7 @@ popular integrations:
         ```
 
         This will detect your project setup, install required dependencies, and help you configure environment variables.
+        On Opik Cloud, the wizard validates your API key and suggests your default workspace automatically.
       </Step>
       <Step>
         Wrap your OpenAI client with the `trackOpenAI` function:
@@ -201,6 +204,7 @@ popular integrations:
         ```
 
         All OpenAI calls made using the `trackedOpenAI` will now be logged to Opik.
+        For a full Node.js and TypeScript walkthrough, see the [OpenAI integration guide](/integrations/openai-typescript).
 
       </Step>
     </Steps>
