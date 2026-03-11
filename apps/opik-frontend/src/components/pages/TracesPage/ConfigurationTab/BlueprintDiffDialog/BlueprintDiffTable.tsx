@@ -170,7 +170,7 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
                   {diff.label}
                 </span>
               </TableHead>
-            </TableRow> 
+            </TableRow>
           </TableHeader>
           <TableBody>
             {visiblePairs.map((pair) => (
