@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -176,33 +177,18 @@ public class ExperimentItemService {
 
                     Mono<Map<UUID, Map<UUID, ExecutionPolicy>>> itemPoliciesMono = featureFlags
                             .isDatasetVersioningEnabled() && !datasetVersionIds.isEmpty()
-                                    ? datasetItemVersionDAO.getExecutionPoliciesByDatasetItemIds(
-                                            datasetItemIds, datasetVersionIds)
+                                    ? datasetItemVersionDAO
+                                            .getExecutionPoliciesByDatasetItemIds(datasetItemIds, datasetVersionIds)
+                                            .<Map<UUID, Map<UUID, ExecutionPolicy>>>collect(
+                                                    HashMap::new, (map, entry) -> map
+                                                            .computeIfAbsent(entry.datasetVersionId(),
+                                                                    k -> new HashMap<>())
+                                                            .put(entry.datasetItemId(), entry.policy()))
                                     : Mono.just(Map.of());
 
                     return itemPoliciesMono.map(policiesByVersion -> experimentItems.stream()
-                            .map(item -> {
-                                if (item.executionPolicy() != null) {
-                                    return item;
-                                }
-                                var info = experimentInfoMap.get(item.experimentId());
-                                ExecutionPolicy policy = null;
-                                if (info != null && info.datasetVersionId() != null) {
-                                    var versionPolicies = policiesByVersion.get(info.datasetVersionId());
-                                    if (versionPolicies != null) {
-                                        policy = versionPolicies.get(item.datasetItemId());
-                                    }
-                                }
-                                if (policy == null && info != null) {
-                                    policy = info.policy();
-                                }
-                                if (policy == null) {
-                                    policy = ExecutionPolicy.DEFAULT;
-                                }
-                                return item.toBuilder()
-                                        .executionPolicy(policy)
-                                        .build();
-                            })
+                            .map(item -> ExecutionPolicyMapper.resolvePolicy(
+                                    item, experimentInfoMap, policiesByVersion))
                             .collect(toSet()));
                 });
     }

@@ -503,7 +503,7 @@ class ExperimentDAO {
                     experiment_id,
                     toNullable(sum(item_passed)) AS passed_count,
                     toNullable(count(*)) AS total_count,
-                    if(count(*) = 0, NULL, toNullable(toFloat64(sum(item_passed)) / toFloat64(count(*)))) AS pass_rate
+                    if(count(*) = 0, NULL, toNullable(toDecimal64(sum(item_passed) / count(*), 9))) AS pass_rate
                 FROM (
                     SELECT
                         experiment_id,
@@ -1100,7 +1100,7 @@ class ExperimentDAO {
                     experiment_id,
                     toNullable(sum(item_passed)) AS passed_count,
                     toNullable(count(*)) AS total_count,
-                    if(count(*) = 0, NULL, toNullable(toFloat64(sum(item_passed)) / toFloat64(count(*)))) AS pass_rate
+                    if(count(*) = 0, NULL, toNullable(toDecimal64(sum(item_passed) / count(*), 9))) AS pass_rate
                 FROM (
                     SELECT
                         experiment_id,
@@ -1487,9 +1487,7 @@ class ExperimentDAO {
     }
 
     private static BigDecimal getPassRateValue(Row row, String fieldName) {
-        return Optional.ofNullable(row.get(fieldName, Number.class))
-                .map(value -> BigDecimal.valueOf(value.doubleValue()).setScale(SCALE, RoundingMode.HALF_EVEN))
-                .orElse(null);
+        return row.get(fieldName, BigDecimal.class);
     }
 
     private List<PromptVersionLink> getPromptVersions(Row row) {
@@ -1731,10 +1729,10 @@ class ExperimentDAO {
                         row.get("id", UUID.class))));
     }
 
-    public record ExperimentPolicyInfo(ExecutionPolicy policy, UUID datasetVersionId) {
+    public record ExperimentPolicyInfo(UUID experimentId, ExecutionPolicy policy, UUID datasetVersionId) {
     }
 
-    public Flux<Map.Entry<UUID, ExperimentPolicyInfo>> getExecutionPoliciesByIds(@NonNull Set<UUID> experimentIds) {
+    public Flux<ExperimentPolicyInfo> getExecutionPoliciesByIds(@NonNull Set<UUID> experimentIds) {
         if (experimentIds.isEmpty()) {
             return Flux.empty();
         }
@@ -1746,13 +1744,13 @@ class ExperimentDAO {
                 })
                 .flatMap(result -> result.map((row, rowMetadata) -> {
                     var id = row.get("id", UUID.class);
-                    var policy = ExecutionPolicy.fromJson(row.get("execution_policy", String.class));
+                    var policy = ExecutionPolicyMapper.fromJson(row.get("execution_policy", String.class));
                     var versionIdStr = row.get("dataset_version_id", String.class);
                     var versionId = (versionIdStr != null && !versionIdStr.isBlank())
                             ? UUID.fromString(versionIdStr)
                             : null;
-                    return Map.entry(id, new ExperimentPolicyInfo(
-                            policy != null ? policy : ExecutionPolicy.DEFAULT, versionId));
+                    return new ExperimentPolicyInfo(id,
+                            policy != null ? policy : ExecutionPolicy.DEFAULT, versionId);
                 }));
     }
 

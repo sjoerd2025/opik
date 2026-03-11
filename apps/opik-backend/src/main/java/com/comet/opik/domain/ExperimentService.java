@@ -5,7 +5,6 @@ import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DatasetLastExperimentCreated;
 import com.comet.opik.api.DatasetVersion;
-import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.ExperimentBatchUpdate;
 import com.comet.opik.api.ExperimentGroupAggregationItem;
@@ -512,7 +511,8 @@ public class ExperimentService {
 
                     log.info("Using validated dataset version ID '{}' for experiment on dataset '{}'",
                             version.id(), datasetId);
-                    return new ResolvedVersion(version.id(), ExecutionPolicy.serialize(version.executionPolicy()));
+                    return new ResolvedVersion(version.id(),
+                            ExecutionPolicyMapper.serialize(version.executionPolicy()));
                 }).subscribeOn(Schedulers.boundedElastic())
                         .onErrorResume(e -> {
                             if (e instanceof NotFoundException) {
@@ -531,7 +531,7 @@ public class ExperimentService {
                     var v = latestVersion.get();
                     log.info("No version specified, using latest version '{}' for experiment on dataset '{}'",
                             v.id(), datasetId);
-                    return new ResolvedVersion(v.id(), ExecutionPolicy.serialize(v.executionPolicy()));
+                    return new ResolvedVersion(v.id(), ExecutionPolicyMapper.serialize(v.executionPolicy()));
                 }
                 log.warn("No latest version found for dataset '{}', experiment will have null dataset_version_id",
                         datasetId);
@@ -685,7 +685,7 @@ public class ExperimentService {
 
     public Mono<Map<UUID, ExperimentDAO.ExperimentPolicyInfo>> getExecutionPolicies(@NonNull Set<UUID> experimentIds) {
         return experimentDAO.getExecutionPoliciesByIds(experimentIds)
-                .collectMap(Map.Entry::getKey, Map.Entry::getValue);
+                .collectMap(ExperimentDAO.ExperimentPolicyInfo::experimentId);
     }
 
     @WithSpan

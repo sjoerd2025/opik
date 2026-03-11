@@ -38,7 +38,6 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -275,7 +274,10 @@ public interface DatasetItemVersionDAO {
      */
     Mono<List<WorkspaceAndResourceId>> getDatasetItemWorkspace(Set<UUID> datasetItemRowIds);
 
-    Mono<Map<UUID, Map<UUID, ExecutionPolicy>>> getExecutionPoliciesByDatasetItemIds(Set<UUID> datasetItemIds,
+    record DatasetItemPolicyEntry(UUID datasetVersionId, UUID datasetItemId, ExecutionPolicy policy) {
+    }
+
+    Flux<DatasetItemPolicyEntry> getExecutionPoliciesByDatasetItemIds(Set<UUID> datasetItemIds,
             Set<UUID> datasetVersionIds);
 
     /**
@@ -3111,11 +3113,11 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
     @Override
     @WithSpan
-    public Mono<Map<UUID, Map<UUID, ExecutionPolicy>>> getExecutionPoliciesByDatasetItemIds(
+    public Flux<DatasetItemPolicyEntry> getExecutionPoliciesByDatasetItemIds(
             @NonNull Set<UUID> datasetItemIds,
             @NonNull Set<UUID> datasetVersionIds) {
         if (datasetItemIds.isEmpty() || datasetVersionIds.isEmpty()) {
-            return Mono.just(Map.of());
+            return Flux.empty();
         }
 
         return Mono.deferContextual(ctx -> {
@@ -3134,21 +3136,14 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         .flatMap(result -> result.map((row, rowMetadata) -> {
                             var datasetItemId = UUID.fromString(row.get("dataset_item_id", String.class));
                             var versionId = UUID.fromString(row.get("dataset_version_id", String.class));
-                            var policy = ExecutionPolicy.fromJson(row.get("execution_policy", String.class));
-                            return Map.entry(versionId, Map.entry(datasetItemId, Optional.ofNullable(policy)));
+                            var policy = ExecutionPolicyMapper.fromJson(row.get("execution_policy", String.class));
+                            return new DatasetItemPolicyEntry(versionId, datasetItemId, policy);
                         }))
-                        .filter(entry -> entry.getValue().getValue().isPresent())
-                        .<Map<UUID, Map<UUID, ExecutionPolicy>>>collect(
-                                HashMap::new, (map, entry) -> {
-                                    var versionId = entry.getKey();
-                                    var datasetItemId = entry.getValue().getKey();
-                                    var policy = entry.getValue().getValue().get();
-                                    map.computeIfAbsent(versionId, k -> new HashMap<>())
-                                            .put(datasetItemId, policy);
-                                })
+                        .filter(entry -> entry.policy() != null)
+                        .collectList()
                         .doFinally(signalType -> endSegment(segment));
             });
-        });
+        }).flatMapMany(Flux::fromIterable);
     }
 
     @Override

@@ -1,6 +1,5 @@
 package com.comet.opik.domain;
 
-import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.ExperimentItem;
 import com.comet.opik.api.ExperimentStatus;
 import com.comet.opik.infrastructure.OpikConfiguration;
@@ -467,7 +466,7 @@ class ExperimentItemDAO {
 
                 statement.bind("created_by" + index, userName);
                 statement.bind("last_updated_by" + index, userName);
-                statement.bind("execution_policy" + index, ExecutionPolicy.serialize(item.executionPolicy()));
+                statement.bind("execution_policy" + index, ExecutionPolicyMapper.serialize(item.executionPolicy()));
                 index++;
             }
 
