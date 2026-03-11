@@ -658,6 +658,11 @@ public class ExperimentService {
                 .all(experimentWorkspace -> workspaceId.equals(experimentWorkspace.workspaceId()));
     }
 
+    public Mono<Map<UUID, ExecutionPolicy>> getExecutionPolicies(@NonNull Set<UUID> experimentIds) {
+        return experimentDAO.getExecutionPoliciesByIds(experimentIds)
+                .collectMap(Map.Entry::getKey, Map.Entry::getValue);
+    }
+
     @WithSpan
     public Mono<Void> finishExperiments(@NonNull Set<UUID> ids) {
         Preconditions.checkArgument(CollectionUtils.isNotEmpty(ids), "Argument 'ids' must not be empty");

@@ -274,6 +274,8 @@ public interface DatasetItemVersionDAO {
      */
     Mono<List<WorkspaceAndResourceId>> getDatasetItemWorkspace(Set<UUID> datasetItemRowIds);
 
+    Mono<Map<UUID, ExecutionPolicy>> getExecutionPoliciesByRowIds(Set<UUID> datasetItemRowIds);
+
     /**
      * Mapping from row ID to dataset_item_id.
      */
@@ -1444,6 +1446,16 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             SELECT DISTINCT
                 id,
                 workspace_id
+            FROM dataset_item_versions
+            WHERE id IN :datasetItemRowIds
+            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+            LIMIT 1 BY id
+            """;
+
+    private static final String SELECT_EXECUTION_POLICIES_BY_ROW_IDS = """
+            SELECT DISTINCT
+                id,
+                execution_policy
             FROM dataset_item_versions
             WHERE id IN :datasetItemRowIds
             ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
@@ -3090,6 +3102,35 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             row.get("workspace_id", String.class),
                             UUID.fromString(row.get("id", String.class)))))
                     .collectList()
+                    .doFinally(signalType -> endSegment(segment));
+        });
+    }
+
+    @Override
+    @WithSpan
+    public Mono<Map<UUID, ExecutionPolicy>> getExecutionPoliciesByRowIds(@NonNull Set<UUID> datasetItemRowIds) {
+        if (datasetItemRowIds.isEmpty()) {
+            return Mono.just(Map.of());
+        }
+
+        return asyncTemplate.nonTransaction(connection -> {
+            var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_ROW_IDS)
+                    .bind("datasetItemRowIds", datasetItemRowIds.toArray(UUID[]::new));
+
+            Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE, "get_execution_policies_by_row_ids");
+
+            return Flux.from(statement.execute())
+                    .flatMap(result -> result.map((row, rowMetadata) -> {
+                        var id = UUID.fromString(row.get("id", String.class));
+                        var policyJson = row.get("execution_policy", String.class);
+                        ExecutionPolicy policy = null;
+                        if (policyJson != null && !policyJson.isBlank()) {
+                            policy = JsonUtils.readValue(policyJson, ExecutionPolicy.class);
+                        }
+                        return Map.entry(id, Optional.ofNullable(policy));
+                    }))
+                    .filter(entry -> entry.getValue().isPresent())
+                    .collectMap(Map.Entry::getKey, entry -> entry.getValue().get())
                     .doFinally(signalType -> endSegment(segment));
         });
     }

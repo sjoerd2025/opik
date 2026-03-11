@@ -3,6 +3,7 @@ package com.comet.opik.domain;
 import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.DatasetLastExperimentCreated;
 import com.comet.opik.api.EvaluationMethod;
+import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.Experiment.ExperimentPage;
 import com.comet.opik.api.Experiment.PromptVersionLink;
@@ -256,7 +257,7 @@ class ExperimentDAO {
                 <endif>
             ), experiment_items_final AS (
                 SELECT DISTINCT
-                    id, experiment_id, trace_id, dataset_item_id
+                    id, experiment_id, trace_id, dataset_item_id, execution_policy
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN (SELECT id FROM experiments_final)
@@ -484,7 +485,7 @@ class ExperimentDAO {
                     ei.experiment_id AS experiment_id,
                     ei.dataset_item_id AS dataset_item_id,
                     ei.trace_id AS trace_id,
-                    JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                    JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
                     JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
                     if(
                         countIf(fs.name != '') = 0,
@@ -493,17 +494,6 @@ class ExperimentDAO {
                     ) AS run_passed
                 FROM experiment_items_final ei
                 INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
-                LEFT JOIN (
-                    SELECT dataset_item_id, dataset_version_id, execution_policy
-                    FROM dataset_item_versions
-                    WHERE workspace_id = :workspace_id
-                    AND (dataset_id, dataset_version_id) IN (
-                        SELECT DISTINCT dataset_id, dataset_version_id
-                        FROM experiments_eval_suite
-                        WHERE length(dataset_version_id) > 0
-                    )
-                ) div ON ei.dataset_item_id = div.dataset_item_id
-                    AND ef.dataset_version_id = div.dataset_version_id
                 LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
                 GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                          item_pass_threshold, suite_pass_threshold
@@ -922,7 +912,7 @@ class ExperimentDAO {
                 <if(filters)> AND <filters> <endif>
             ), experiment_items_final AS (
                 SELECT DISTINCT
-                    id, experiment_id, trace_id, dataset_item_id
+                    id, experiment_id, trace_id, dataset_item_id, execution_policy
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN (SELECT id FROM experiments_final)
@@ -1092,7 +1082,7 @@ class ExperimentDAO {
                     ei.experiment_id AS experiment_id,
                     ei.dataset_item_id AS dataset_item_id,
                     ei.trace_id AS trace_id,
-                    JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                    JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
                     JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
                     if(
                         countIf(fs.name != '') = 0,
@@ -1101,17 +1091,6 @@ class ExperimentDAO {
                     ) AS run_passed
                 FROM experiment_items_final ei
                 INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
-                LEFT JOIN (
-                    SELECT dataset_item_id, dataset_version_id, execution_policy
-                    FROM dataset_item_versions
-                    WHERE workspace_id = :workspace_id
-                    AND (dataset_id, dataset_version_id) IN (
-                        SELECT DISTINCT dataset_id, dataset_version_id
-                        FROM experiments_eval_suite
-                        WHERE length(dataset_version_id) > 0
-                    )
-                ) div ON ei.dataset_item_id = div.dataset_item_id
-                    AND ef.dataset_version_id = div.dataset_version_id
                 LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
                 GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                          item_pass_threshold, suite_pass_threshold
@@ -1207,6 +1186,15 @@ class ExperimentDAO {
     private static final String FIND_EXPERIMENT_AND_WORKSPACE_BY_EXPERIMENT_IDS = """
             SELECT
                 DISTINCT id, workspace_id
+            FROM experiments
+            WHERE id in :experiment_ids
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String FIND_EXECUTION_POLICY_BY_EXPERIMENT_IDS = """
+            SELECT
+                DISTINCT id, execution_policy
             FROM experiments
             WHERE id in :experiment_ids
             SETTINGS log_comment = '<log_comment>'
@@ -1740,6 +1728,27 @@ class ExperimentDAO {
                 .flatMap(result -> result.map((row, rowMetadata) -> new WorkspaceAndResourceId(
                         row.get("workspace_id", String.class),
                         row.get("id", UUID.class))));
+    }
+
+    public Flux<Map.Entry<UUID, ExecutionPolicy>> getExecutionPoliciesByIds(@NonNull Set<UUID> experimentIds) {
+        if (experimentIds.isEmpty()) {
+            return Flux.empty();
+        }
+        return Mono.from(connectionFactory.create())
+                .flatMapMany(connection -> {
+                    var statement = connection.createStatement(FIND_EXECUTION_POLICY_BY_EXPERIMENT_IDS);
+                    statement.bind("experiment_ids", experimentIds.toArray(UUID[]::new));
+                    return statement.execute();
+                })
+                .flatMap(result -> result.map((row, rowMetadata) -> {
+                    var id = row.get("id", UUID.class);
+                    var policyJson = row.get("execution_policy", String.class);
+                    ExecutionPolicy policy = null;
+                    if (policyJson != null && !policyJson.isEmpty()) {
+                        policy = JsonUtils.readValue(policyJson, ExecutionPolicy.class);
+                    }
+                    return Map.entry(id, policy != null ? policy : ExecutionPolicy.DEFAULT);
+                }));
     }
 
     @WithSpan
