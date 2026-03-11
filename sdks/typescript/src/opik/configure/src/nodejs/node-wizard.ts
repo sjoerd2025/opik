@@ -46,16 +46,20 @@ export async function runNodejsWizard(options: WizardOptions): Promise<void> {
   debug('Reading package.json');
   const packageJson = await getPackageDotJson(options);
 
+  debug('Determining package manager');
+  const packageManager = await getPackageManager(options);
+  debug(`Using package manager: ${packageManager.label}`);
+
   debug('Installing opik package');
-  const { packageManager: packageManagerFromInstallStep } =
-    await installPackage({
-      packageName: 'opik',
-      packageNameDisplayLabel: 'opik',
-      alreadyInstalled: !!packageJson?.dependencies?.['opik'],
-      forceInstall: options.forceInstall,
-      askBeforeUpdating: false,
-      installDir: options.installDir,
-    });
+  await installPackage({
+    packageName: 'opik',
+    packageNameDisplayLabel: 'opik',
+    alreadyInstalled: !!packageJson?.dependencies?.['opik'],
+    forceInstall: options.forceInstall,
+    askBeforeUpdating: false,
+    installDir: options.installDir,
+    packageManager,
+  });
   debug('Opik package installed successfully');
 
   debug('Checking for existing Opik configuration');
@@ -73,7 +77,7 @@ export async function runNodejsWizard(options: WizardOptions): Promise<void> {
 
   debug('Getting project data');
   const { projectApiKey, host, workspaceName, projectName, deploymentType } =
-    await getOrAskForProjectData({ useLocal: options.useLocal });
+    await getOrAskForProjectData(options);
   debug(
     `Project data obtained: deploymentType=${deploymentType}, workspace=${workspaceName}, project=${projectName}`,
   );
@@ -160,11 +164,6 @@ export async function runNodejsWizard(options: WizardOptions): Promise<void> {
     variableCount: Object.keys(environmentVariables).length,
   });
 
-  debug('Determining package manager');
-  const packageManagerForOutro =
-    packageManagerFromInstallStep ?? (await getPackageManager(options));
-  debug(`Using package manager: ${packageManagerForOutro}`);
-
   debug('Running prettier');
   await runPrettierStep({
     installDir: options.installDir,
@@ -225,7 +224,7 @@ export async function runNodejsWizard(options: WizardOptions): Promise<void> {
   const outroMessage = getOutroMessage({
     integration: Integration.nodejs,
     addedEditorRules: false,
-    packageManager: packageManagerForOutro,
+    packageManager,
     envFileChanged: addedEnvVariables ? relativeEnvFilePath : undefined,
     uploadedEnvVars,
   });
