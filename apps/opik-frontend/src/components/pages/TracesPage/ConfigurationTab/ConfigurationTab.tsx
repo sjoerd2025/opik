@@ -99,7 +99,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 
   return (
     <div className="flex gap-0">
-      <div className="w-[60vw] min-w-0 flex-1 [overflow-anchor:none]">
+      <div className="w-[50vw] min-w-0 flex-1 [overflow-anchor:none]">
         <div className="mx-6 mt-6">
           <p className="comet-body-s-accented">Agent configuration</p>
         </div>
