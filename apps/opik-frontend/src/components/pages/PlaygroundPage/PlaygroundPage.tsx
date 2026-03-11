@@ -79,7 +79,7 @@ const PlaygroundPage = () => {
   return (
     <div ref={ref} className="-mx-6 h-full">
       <div
-        className="flex h-full w-fit min-w-full"
+        className="flex min-h-full w-fit min-w-full"
         style={
           {
             "--min-prompt-width": "720px",

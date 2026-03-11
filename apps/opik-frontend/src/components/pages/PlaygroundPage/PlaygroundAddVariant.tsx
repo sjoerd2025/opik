@@ -76,39 +76,41 @@ const PlaygroundAddVariant = ({
   };
 
   return (
-    <div className="mt-16 flex shrink-0 items-start self-stretch border-r border-t bg-background px-3 pt-40">
-      <Popover open={addVariantOpen} onOpenChange={setAddVariantOpen}>
-        <PopoverTrigger asChild>
-          <div className="flex flex-col items-center gap-3">
-            <Button variant="secondary" size="icon-xs">
-              <Plus />
+    <div className="mt-16 flex shrink-0 items-start self-stretch border-r border-t bg-background px-3">
+      <div className="flex h-[calc(50vh-4rem)] items-center">
+        <Popover open={addVariantOpen} onOpenChange={setAddVariantOpen}>
+          <PopoverTrigger asChild>
+            <div className="flex flex-col items-center gap-3">
+              <Button variant="secondary" size="icon-xs">
+                <Plus />
+              </Button>
+              <span className="comet-body-xs whitespace-nowrap text-primary">
+                Add variant
+              </span>
+            </div>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-48 p-1" side="left">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={handleDuplicateLastPrompt}
+            >
+              <Copy className="mr-2 size-3.5" />
+              Duplicate variant
             </Button>
-            <span className="comet-body-xs whitespace-nowrap text-primary">
-              Add variant
-            </span>
-          </div>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-48 p-1" side="left">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleDuplicateLastPrompt}
-          >
-            <Copy className="mr-2 size-3.5" />
-            Duplicate variant
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleAddBlankPrompt}
-          >
-            <File className="mr-2 size-3.5" />
-            Blank variant
-          </Button>
-        </PopoverContent>
-      </Popover>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={handleAddBlankPrompt}
+            >
+              <File className="mr-2 size-3.5" />
+              Blank variant
+            </Button>
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 };
