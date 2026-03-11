@@ -7,6 +7,7 @@ import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import Loader from "@/components/shared/Loader/Loader";
 import { Tag } from "@/components/ui/tag";
 import { TableCell } from "@/components/ui/table";
+import TextDiff from "@/components/shared/CodeDiff/TextDiff";
 
 export type DiffSide = "base" | "diff";
 
@@ -41,17 +42,23 @@ export const EmptyDiffCell: React.FC = () => (
 export const PromptDiffPair: React.FC<{
   baseCommit: string;
   diffCommit: string;
-}> = ({ baseCommit, diffCommit }) => {
+  baseTemplate?: string;
+  diffTemplate?: string;
+}> = ({ baseCommit, diffCommit, baseTemplate, diffTemplate }) => {
   const { data: basePrompt, isLoading: baseLoading } = usePromptByCommit(
     { commitId: baseCommit },
-    { enabled: !!baseCommit },
+    { enabled: !!baseCommit && baseTemplate === undefined },
   );
   const { data: diffPrompt, isLoading: diffLoading } = usePromptByCommit(
     { commitId: diffCommit },
-    { enabled: !!diffCommit },
+    { enabled: !!diffCommit && diffTemplate === undefined },
   );
 
-  if (baseLoading || diffLoading) {
+  const isLoading =
+    (baseTemplate === undefined && baseLoading) ||
+    (diffTemplate === undefined && diffLoading);
+
+  if (isLoading) {
     return (
       <>
         <TableCell className="w-1/2 py-3 pr-2 align-top">
@@ -64,10 +71,28 @@ export const PromptDiffPair: React.FC<{
     );
   }
 
-  const baseText = basePrompt?.requested_version?.template ?? "";
-  const diffText = diffPrompt?.requested_version?.template ?? "";
+  const baseText =
+    baseTemplate ?? basePrompt?.requested_version?.template ?? "";
+  const diffText =
+    diffTemplate ?? diffPrompt?.requested_version?.template ?? "";
   const changed = baseText !== diffText;
   const commitsChanged = baseCommit !== diffCommit;
+
+  const renderDiffContent = (text: string, isBase: boolean) => {
+    if (!changed) {
+      return (
+        <div className="comet-code max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md border bg-primary-foreground p-2 text-sm text-muted-foreground">
+          {text || "(empty)"}
+        </div>
+      );
+    }
+
+    return (
+      <div className="comet-code max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md border bg-primary-foreground px-2.5 py-1.5 text-sm">
+        <TextDiff content1={baseText} content2={isBase ? baseText : diffText} />
+      </div>
+    );
+  };
 
   return (
     <>
@@ -87,12 +112,7 @@ export const PromptDiffPair: React.FC<{
               <GitCommitVertical className="size-3.5 shrink-0" />
               {baseCommit.slice(0, 8)}
             </Tag>
-            <DiffCellBox
-              text={baseText}
-              changed={changed}
-              side="base"
-              className="comet-code max-h-48 overflow-y-auto"
-            />
+            {renderDiffContent(baseText, true)}
           </div>
         ) : (
           <EmptyDiffCell />
@@ -114,12 +134,7 @@ export const PromptDiffPair: React.FC<{
               <GitCommitVertical className="size-3.5 shrink-0" />
               {diffCommit.slice(0, 8)}
             </Tag>
-            <DiffCellBox
-              text={diffText}
-              changed={changed}
-              side="diff"
-              className="comet-code max-h-48 overflow-y-auto"
-            />
+            {renderDiffContent(diffText, false)}
           </div>
         ) : (
           <EmptyDiffCell />

@@ -19,10 +19,21 @@ export type DiffPair = {
   baseValue?: BlueprintValue;
   diffValue?: BlueprintValue;
   changed?: boolean;
+  basePromptTemplate?: string;
+  diffPromptTemplate?: string;
 };
 
 const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
-  const { key, type, description, baseValue, diffValue, changed } = pair;
+  const {
+    key,
+    type,
+    description,
+    baseValue,
+    diffValue,
+    changed,
+    basePromptTemplate,
+    diffPromptTemplate,
+  } = pair;
   const isPrompt = type === BlueprintValueType.PROMPT;
 
   const baseText = baseValue ? formatBlueprintValue(baseValue) : undefined;
@@ -56,6 +67,8 @@ const BlueprintDiffRow: React.FC<{ pair: DiffPair }> = ({ pair }) => {
         <PromptDiffPair
           baseCommit={baseValue.value}
           diffCommit={diffValue.value}
+          baseTemplate={basePromptTemplate}
+          diffTemplate={diffPromptTemplate}
         />
       ) : (
         <>

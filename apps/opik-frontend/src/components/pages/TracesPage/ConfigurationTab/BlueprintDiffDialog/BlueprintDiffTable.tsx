@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BlueprintValueType } from "@/types/agent-configs";
+import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import Loader from "@/components/shared/Loader/Loader";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +18,9 @@ import BlueprintDiffRow, { type DiffPair } from "./BlueprintDiffRow";
 export type BlueprintVersionInfo = {
   label: string;
   blueprintId: string;
+  values?: BlueprintValue[];
+  description?: string;
+  promptTemplates?: Record<string, string>;
 };
 
 type BlueprintDiffTableProps = {
@@ -31,12 +34,29 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
 }) => {
   const [onlyDiff, setOnlyDiff] = useState(false);
 
-  const { data: baseConfig, isPending: baseLoading } = useAgentConfigById({
-    blueprintId: base.blueprintId,
-  });
-  const { data: diffConfig, isPending: diffLoading } = useAgentConfigById({
-    blueprintId: diff.blueprintId,
-  });
+  const { data: fetchedBaseConfig, isPending: baseLoading } =
+    useAgentConfigById({
+      blueprintId: base.values ? "" : base.blueprintId,
+    });
+  const { data: fetchedDiffConfig, isPending: diffLoading } =
+    useAgentConfigById({
+      blueprintId: diff.values ? "" : diff.blueprintId,
+    });
+
+  const baseConfig = useMemo(
+    () =>
+      base.values
+        ? { values: base.values, description: base.description ?? "" }
+        : fetchedBaseConfig,
+    [base.values, base.description, fetchedBaseConfig],
+  );
+  const diffConfig = useMemo(
+    () =>
+      diff.values
+        ? { values: diff.values, description: diff.description ?? "" }
+        : fetchedDiffConfig,
+    [diff.values, diff.description, fetchedDiffConfig],
+  );
 
   const pairs = useMemo<DiffPair[]>(() => {
     if (!baseConfig || !diffConfig) return [];
@@ -52,8 +72,13 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
         const dv = diffMap.get(key);
         const type = (dv?.type ?? bv?.type) as BlueprintValueType;
         const isPrompt = type === BlueprintValueType.PROMPT;
+        const basePromptTemplate = base.promptTemplates?.[key];
+        const diffPromptTemplate = diff.promptTemplates?.[key];
+        const promptCommitsMatch =
+          bv?.value === dv?.value && !basePromptTemplate && !diffPromptTemplate;
+
         const changed = isPrompt
-          ? bv?.value === dv?.value
+          ? promptCommitsMatch
             ? false
             : undefined
           : (bv ? formatBlueprintValue(bv) : undefined) !==
@@ -65,11 +90,14 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
           baseValue: bv,
           diffValue: dv,
           changed,
+          basePromptTemplate,
+          diffPromptTemplate,
         };
       });
-  }, [baseConfig, diffConfig]);
+  }, [baseConfig, diffConfig, base.promptTemplates, diff.promptTemplates]);
 
-  if (baseLoading || diffLoading) return <Loader />;
+  if ((!base.values && baseLoading) || (!diff.values && diffLoading))
+    return <Loader />;
 
   const descChanged =
     (baseConfig?.description ?? "") !== (diffConfig?.description ?? "");
@@ -142,7 +170,7 @@ const BlueprintDiffTable: React.FC<BlueprintDiffTableProps> = ({
                   {diff.label}
                 </span>
               </TableHead>
-            </TableRow>
+            </TableRow> 
           </TableHeader>
           <TableBody>
             {visiblePairs.map((pair) => (

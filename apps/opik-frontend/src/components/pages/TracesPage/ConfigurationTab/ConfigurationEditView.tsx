@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Info, Pencil } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Info, Pencil, Split } from "lucide-react";
 
 import { BlueprintValueType, ConfigHistoryItem } from "@/types/agent-configs";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
@@ -14,6 +14,7 @@ import BlueprintValuePrompt from "@/components/pages-shared/traces/Configuration
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useConfigurationSave } from "./useConfigurationSave";
+import BlueprintDiffDialog from "./BlueprintDiffDialog/BlueprintDiffDialog";
 
 type ConfigurationEditViewProps = {
   item: ConfigHistoryItem;
@@ -43,6 +44,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   >({});
   const originalValues = useRef<Record<string, string>>({});
   const initialized = useRef(false);
+  const isLatestVersion = version === latestVersion;
 
   const { handleSave, isSaving, errors, clearError, promptRefs } =
     useConfigurationSave({
@@ -51,7 +53,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       originalValues,
       description,
       projectId,
-      isLatestVersion: version === latestVersion,
+      isLatestVersion,
       onSaved,
     });
 
@@ -76,6 +78,31 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
     }
   };
 
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [diffPromptTemplates, setDiffPromptTemplates] = useState<
+    Record<string, string>
+  >({});
+
+  const currentValues = useMemo(() => {
+    if (!agentConfig) return [];
+    return agentConfig.values.map((v) =>
+      v.type === BlueprintValueType.PROMPT
+        ? v
+        : { ...v, value: draftValues[v.key] ?? v.value },
+    );
+  }, [agentConfig, draftValues]);
+
+  const handleShowDiff = () => {
+    const templates: Record<string, string> = {};
+    for (const [key, handle] of Object.entries(promptRefs.current)) {
+      if (handle && dirtyPromptKeys[key]) {
+        templates[key] = handle.getCurrentTemplate();
+      }
+    }
+    setDiffPromptTemplates(templates);
+    setDiffOpen(true);
+  };
+
   const hasErrors = Object.values(errors).some(Boolean);
 
   const hasChanges =
@@ -96,6 +123,15 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
             <Pencil className="size-2.5" />
             From v{version}
           </div>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={handleShowDiff}
+            disabled={!hasChanges}
+          >
+            <Split className="mr-1 size-3.5" />
+            Show diff
+          </Button>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -125,9 +161,9 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       </div>
 
       {version !== latestVersion && (
-        <Alert variant="callout" size="md" className="mb-4">
+        <Alert variant="callout" size="sm" className="mb-4">
           <Info />
-          <AlertDescription size="md">
+          <AlertDescription size="sm">
             You&apos;re creating a version from v{version}. More recent versions
             contain prompt updates that won&apos;t be included.
           </AlertDescription>
@@ -182,7 +218,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                 <div className="flex flex-col gap-1">
                   <BlueprintValuePrompt
                     value={v}
-                    isEditing
+                    isEditing={isLatestVersion}
                     ref={(el) => {
                       promptRefs.current[v.key] = el;
                     }}
@@ -234,6 +270,21 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
           );
         })}
       </div>
+      <BlueprintDiffDialog
+        open={diffOpen}
+        setOpen={setDiffOpen}
+        base={{
+          label: `v${version} (original)`,
+          blueprintId: item.id,
+        }}
+        diff={{
+          label: "Current edits",
+          blueprintId: item.id,
+          values: currentValues,
+          description,
+          promptTemplates: diffPromptTemplates,
+        }}
+      />
     </Card>
   );
 };

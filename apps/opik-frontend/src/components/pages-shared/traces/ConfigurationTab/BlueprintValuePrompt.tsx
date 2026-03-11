@@ -27,6 +27,7 @@ import {
 export interface BlueprintValuePromptHandle {
   saveVersion: () => Promise<{ key: string; commit: string } | null>;
   validate: () => string | null;
+  getCurrentTemplate: () => string;
 }
 
 type BlueprintValuePromptProps = {
@@ -93,6 +94,15 @@ const BlueprintValuePrompt = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
+      getCurrentTemplate: () => {
+        return isChatPrompt
+          ? JSON.stringify(
+              draftMessages.map((m) => ({ role: m.role, content: m.content })),
+              null,
+              2,
+            )
+          : draftTemplate;
+      },
       validate: () => {
         if (isChatPrompt) {
           const hasEmpty = draftMessages.some((m) => {
