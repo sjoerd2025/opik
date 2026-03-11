@@ -4,7 +4,10 @@ import { runNodejsWizard } from './nodejs/node-wizard';
 import type { WizardOptions } from './utils/types';
 
 import { getIntegrationDescription, Integration } from './lib/constants';
-import { readEnvironment } from './utils/environment';
+import {
+  isNonInteractiveEnvironment,
+  readEnvironment,
+} from './utils/environment';
 import clack from './utils/clack';
 import path from 'path';
 import { INTEGRATION_CONFIG, INTEGRATION_ORDER } from './lib/config';
@@ -26,6 +29,7 @@ type Args = {
   url?: string;
   apiKey?: string;
   workspace?: string;
+  trustUrl?: boolean;
   projectName?: string;
   packageManager?: WizardOptions['packageManager'];
 };
@@ -64,6 +68,7 @@ export async function runWizard(argv: Args) {
     url: finalArgs.url,
     apiKey: finalArgs.apiKey,
     workspace: finalArgs.workspace,
+    trustUrl: finalArgs.trustUrl,
     projectName: finalArgs.projectName,
     packageManager: finalArgs.packageManager,
   };
@@ -134,7 +139,7 @@ async function detectIntegration(): Promise<Integration | undefined> {
   }
 }
 
-async function getIntegrationForSetup() {
+export async function getIntegrationForSetup() {
   const detectedIntegration = await detectIntegration();
 
   if (detectedIntegration) {
@@ -142,6 +147,12 @@ async function getIntegrationForSetup() {
       `Detected integration: ${getIntegrationDescription(detectedIntegration)}`,
     );
     return detectedIntegration;
+  }
+
+  if (isNonInteractiveEnvironment()) {
+    throw new Error(
+      'Unable to detect the integration in non-interactive mode. Run `opik-ts configure` from the root of your Node.js project or rerun the command interactively.',
+    );
   }
 
   const integration: Integration = await abortIfCancelled(
