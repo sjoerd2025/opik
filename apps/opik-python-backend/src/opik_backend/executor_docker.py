@@ -101,7 +101,17 @@ class DockerExecutor(CodeExecutorBase):
         self.cpu_shares = int(os.getenv("PYTHON_CODE_EXECUTOR_CPU_SHARES", str(DEFAULT_CPU_SHARES)))
         self.mem_limit = os.getenv("PYTHON_CODE_EXECUTOR_MEM_LIMIT", DEFAULT_MEM_LIMIT)
         cpu_limit_str = os.getenv("PYTHON_CODE_EXECUTOR_CPU_LIMIT")
-        self.nano_cpus = int(float(cpu_limit_str) * 1e9) if cpu_limit_str else DEFAULT_CPU_LIMIT
+        if cpu_limit_str:
+            try:
+                cpu_limit = float(cpu_limit_str)
+                if cpu_limit <= 0:
+                    raise ValueError("must be positive")
+                self.nano_cpus = int(cpu_limit * 1e9)
+            except ValueError:
+                logger.warning(f"Invalid PYTHON_CODE_EXECUTOR_CPU_LIMIT value '{cpu_limit_str}', ignoring")
+                self.nano_cpus = DEFAULT_CPU_LIMIT
+        else:
+            self.nano_cpus = DEFAULT_CPU_LIMIT
         self.metrics_interval = int(os.getenv("PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS", "60"))
 
         self.client = docker.from_env()
@@ -216,19 +226,25 @@ class DockerExecutor(CodeExecutorBase):
                     short_id = container.short_id
 
                     # Calculate CPU usage in fractional cores
-                    cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - \
-                                stats["precpu_stats"]["cpu_usage"]["total_usage"]
-                    system_delta = stats["cpu_stats"]["system_cpu_usage"] - \
-                                   stats["precpu_stats"]["system_cpu_usage"]
-                    num_cpus = stats["cpu_stats"].get("online_cpus", 1)
+                    # precpu_stats can be empty on the first sample (Docker marks it omitempty)
+                    precpu = stats.get("precpu_stats", {})
+                    cpu_stats = stats.get("cpu_stats", {})
+                    cur_usage = cpu_stats.get("cpu_usage", {}).get("total_usage", 0)
+                    pre_usage = precpu.get("cpu_usage", {}).get("total_usage", 0)
+                    cur_system = cpu_stats.get("system_cpu_usage", 0)
+                    pre_system = precpu.get("system_cpu_usage", 0)
+                    num_cpus = cpu_stats.get("online_cpus", 1)
 
-                    if system_delta > 0:
+                    cpu_delta = cur_usage - pre_usage
+                    system_delta = cur_system - pre_system
+
+                    if system_delta > 0 and cpu_delta >= 0:
                         cpu_cores = (cpu_delta / system_delta) * num_cpus
                     else:
                         cpu_cores = 0.0
 
                     # Memory usage in bytes
-                    memory_bytes = stats["memory_stats"].get("usage", 0)
+                    memory_bytes = stats.get("memory_stats", {}).get("usage", 0)
 
                     executor_cpu_cores_gauge.set(cpu_cores, {"container_id": short_id})
                     executor_memory_bytes_gauge.set(memory_bytes, {"container_id": short_id})
