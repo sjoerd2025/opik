@@ -256,7 +256,7 @@ class ExperimentDAO {
                 <endif>
             ), experiment_items_final AS (
                 SELECT DISTINCT
-                    id, experiment_id, trace_id
+                    id, experiment_id, trace_id, dataset_item_id
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN (SELECT id FROM experiments_final)
@@ -482,7 +482,7 @@ class ExperimentDAO {
             pass_rate_runs AS (
                 SELECT
                     ei.experiment_id AS experiment_id,
-                    eif.dataset_item_id AS dataset_item_id,
+                    ei.dataset_item_id AS dataset_item_id,
                     ei.trace_id AS trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
                     JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
@@ -492,12 +492,6 @@ class ExperimentDAO {
                         if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
                     ) AS run_passed
                 FROM experiment_items_final ei
-                INNER JOIN (
-                    SELECT id, dataset_item_id
-                    FROM experiment_items
-                    WHERE workspace_id = :workspace_id
-                    AND experiment_id IN (SELECT id FROM experiments_eval_suite)
-                ) eif ON ei.id = eif.id
                 INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
                 LEFT JOIN (
                     SELECT dataset_item_id, dataset_version_id, execution_policy
@@ -508,10 +502,10 @@ class ExperimentDAO {
                         FROM experiments_eval_suite
                         WHERE length(dataset_version_id) > 0
                     )
-                ) div ON eif.dataset_item_id = div.dataset_item_id
+                ) div ON ei.dataset_item_id = div.dataset_item_id
                     AND ef.dataset_version_id = div.dataset_version_id
                 LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
-                GROUP BY ei.experiment_id, eif.dataset_item_id, ei.trace_id,
+                GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                          item_pass_threshold, suite_pass_threshold
             ),
             pass_rate_agg AS (
@@ -920,7 +914,7 @@ class ExperimentDAO {
     private static final String FIND_GROUPS_AGGREGATIONS = """
             WITH experiments_final AS (
                 SELECT
-                    id, dataset_id, dataset_version_id, metadata, tags, experiment_scores, evaluation_method, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids
+                    id, dataset_id, dataset_version_id, metadata, tags, experiment_scores, evaluation_method, execution_policy, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids
                 FROM experiments final
                 WHERE workspace_id = :workspace_id
                 <if(types)> AND type IN :types <endif>
@@ -928,7 +922,7 @@ class ExperimentDAO {
                 <if(filters)> AND <filters> <endif>
             ), experiment_items_final AS (
                 SELECT DISTINCT
-                    id, experiment_id, trace_id
+                    id, experiment_id, trace_id, dataset_item_id
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN (SELECT id FROM experiments_final)
@@ -1096,7 +1090,7 @@ class ExperimentDAO {
             pass_rate_runs AS (
                 SELECT
                     ei.experiment_id AS experiment_id,
-                    eif.dataset_item_id AS dataset_item_id,
+                    ei.dataset_item_id AS dataset_item_id,
                     ei.trace_id AS trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
                     JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
@@ -1106,12 +1100,6 @@ class ExperimentDAO {
                         if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
                     ) AS run_passed
                 FROM experiment_items_final ei
-                INNER JOIN (
-                    SELECT id, dataset_item_id
-                    FROM experiment_items
-                    WHERE workspace_id = :workspace_id
-                    AND experiment_id IN (SELECT id FROM experiments_eval_suite)
-                ) eif ON ei.id = eif.id
                 INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
                 LEFT JOIN (
                     SELECT dataset_item_id, dataset_version_id, execution_policy
@@ -1122,10 +1110,10 @@ class ExperimentDAO {
                         FROM experiments_eval_suite
                         WHERE length(dataset_version_id) > 0
                     )
-                ) div ON eif.dataset_item_id = div.dataset_item_id
+                ) div ON ei.dataset_item_id = div.dataset_item_id
                     AND ef.dataset_version_id = div.dataset_version_id
                 LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
-                GROUP BY ei.experiment_id, eif.dataset_item_id, ei.trace_id,
+                GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                          item_pass_threshold, suite_pass_threshold
             ),
             pass_rate_agg AS (
@@ -1291,6 +1279,7 @@ class ExperimentDAO {
                 status,
                 experiment_scores,
                 dataset_version_id,
+                execution_policy,
                 created_at,
                 last_updated_at
             )
@@ -1313,6 +1302,7 @@ class ExperimentDAO {
                 <if(status)> :status <else> status <endif> as status,
                 <if(experiment_scores)> :experiment_scores <else> experiment_scores <endif> as experiment_scores,
                 dataset_version_id,
+                execution_policy,
                 created_at,
                 now64(9) as last_updated_at
             FROM experiments
