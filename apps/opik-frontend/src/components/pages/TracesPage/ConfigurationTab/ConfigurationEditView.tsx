@@ -209,7 +209,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
               </div>
               {v.description && (
                 <TooltipWrapper content={v.description}>
-                  <span className="comet-body-xs w-fit max-w-full text-light-slate truncate">
+                  <span className="comet-body-xs w-fit max-w-full truncate text-light-slate">
                     {v.description}
                   </span>
                 </TooltipWrapper>

@@ -188,7 +188,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
           <span>{item.created_by}</span>
         </div>
 
-        <Separator className="mt-4 mb-2" />
+        <Separator className="mb-2 mt-4" />
 
         {isPending ? (
           <Loader />
