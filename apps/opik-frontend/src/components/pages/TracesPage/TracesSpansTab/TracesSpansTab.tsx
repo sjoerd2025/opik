@@ -1009,7 +1009,13 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
         : []),
       // Note: metadataColumnsData is NOT added here - it goes in columnSections instead
     ];
-  }, [type, handleThreadIdClick, isGuardrailsEnabled, isAgentConfigurationEnabled, versionMap]);
+  }, [
+    type,
+    handleThreadIdClick,
+    isGuardrailsEnabled,
+    isAgentConfigurationEnabled,
+    versionMap,
+  ]);
 
   const filtersColumnData = useMemo(() => {
     return [
