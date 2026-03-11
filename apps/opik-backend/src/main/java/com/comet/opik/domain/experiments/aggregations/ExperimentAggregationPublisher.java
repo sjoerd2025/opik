@@ -41,7 +41,7 @@ public interface ExperimentAggregationPublisher {
         public Mono<Void> publish(@NonNull Set<UUID> experimentIds, @NonNull String workspaceId,
                 @NonNull String userName) {
             if (!config.isEnabled() || experimentIds.isEmpty()) {
-                log.debug("Skipping publish: enabled='{}', experimentIds.size='{}'",
+                log.info("Skipping publish: enabled='{}', experimentIds.size='{}'",
                         config.isEnabled(), experimentIds.size());
                 return Mono.empty();
             }
@@ -58,7 +58,7 @@ public interface ExperimentAggregationPublisher {
                         return index.add(expiryTimestamp.toEpochMilli(), member)
                                 .then(bucket.put(ExperimentDenormalizationConfig.USER_NAME_FIELD, userName))
                                 .then(bucket.expire(Duration.ofMillis(config.getDebounceDelay().toMilliseconds() * 2)))
-                                .doOnSuccess(__ -> log.debug(
+                                .doOnSuccess(__ -> log.info(
                                         "Enqueued experiment '{}' for workspace '{}' in pending bucket with expiryTimestamp='{}'",
                                         experimentId, workspaceId, expiryTimestamp));
                     })

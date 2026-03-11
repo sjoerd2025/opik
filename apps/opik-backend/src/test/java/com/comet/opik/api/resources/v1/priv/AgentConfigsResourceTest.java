@@ -2,7 +2,6 @@ package com.comet.opik.api.resources.v1.priv;
 
 import com.comet.opik.api.AgentConfigCreate;
 import com.comet.opik.api.AgentConfigEnvUpdate;
-import com.comet.opik.api.PromptVersionAction;
 import com.comet.opik.api.error.ErrorMessage;
 import com.comet.opik.api.resources.utils.AuthTestUtils;
 import com.comet.opik.api.resources.utils.ClickHouseContainerUtils;
@@ -26,6 +25,7 @@ import com.comet.opik.extensions.RegisterApp;
 import com.comet.opik.infrastructure.DatabaseAnalyticsFactory;
 import com.comet.opik.podam.PodamFactoryUtils;
 import com.redis.testcontainers.RedisContainer;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
@@ -47,9 +47,12 @@ import ru.vyarus.dropwizard.guice.test.jupiter.ext.TestDropwizardAppExtension;
 import uk.co.jemos.podam.api.PodamFactory;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static com.comet.opik.api.resources.utils.AgentConfigValueAssertionUtils.assertConfigValue;
+import static com.comet.opik.api.resources.utils.AgentConfigValueAssertionUtils.assertConfigValues;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -276,23 +279,6 @@ class AgentConfigsResourceTest {
                             new ErrorMessage(List.of("blueprint.values[0].key must not be blank")),
                             ErrorMessage.class),
 
-                    // Value value validation
-                    arguments(
-                            AgentConfigCreate.builder()
-                                    .projectId(projectId)
-                                    .blueprint(validBlueprint.toBuilder()
-                                            .values(List.of(
-                                                    AgentConfigValue.builder()
-                                                            .key("test")
-                                                            .value(null)
-                                                            .type(ValueType.STRING)
-                                                            .build()))
-                                            .build())
-                                    .build(),
-                            422,
-                            new ErrorMessage(List.of("blueprint.values[0].value must not be blank")),
-                            ErrorMessage.class),
-
                     // Value type validation
                     arguments(
                             AgentConfigCreate.builder()
@@ -344,15 +330,60 @@ class AgentConfigsResourceTest {
                             new ErrorMessage(List.of("blueprint. Duplicate configuration keys are not allowed")),
                             ErrorMessage.class));
         }
+
+        @ParameterizedTest
+        @MethodSource
+        @DisplayName("Success: should create and retrieve config value for each value type")
+        void createAgentConfig__perValueType(ValueType valueType, String value) {
+            var projectName = UUID.randomUUID().toString();
+            var projectId = projectResourceClient.createProject(projectName, API_KEY, TEST_WORKSPACE);
+
+            var configValue = AgentConfigValue.builder()
+                    .key(RandomStringUtils.insecure().nextAlphanumeric(10))
+                    .value(value)
+                    .type(valueType)
+                    .build();
+
+            var blueprint = AgentBlueprint.builder()
+                    .type(BlueprintType.BLUEPRINT)
+                    .values(List.of(configValue))
+                    .build();
+
+            var blueprintId = agentConfigsResourceClient.createAgentConfig(
+                    AgentConfigCreate.builder().projectId(projectId).blueprint(blueprint).build(),
+                    API_KEY, TEST_WORKSPACE, HttpStatus.SC_CREATED);
+
+            var retrieved = agentConfigsResourceClient.getLatestBlueprint(projectId, null, API_KEY,
+                    TEST_WORKSPACE, HttpStatus.SC_OK);
+
+            assertThat(retrieved).isNotNull();
+            assertThat(retrieved.id()).isEqualTo(blueprintId);
+            assertThat(retrieved.values()).hasSize(1);
+
+            var retrievedValue = retrieved.values().getFirst();
+            assertConfigValue(configValue, retrievedValue);
+            assertThat(retrievedValue.value()).isEqualTo(value);
+        }
+
+        Stream<Arguments> createAgentConfig__perValueType() {
+            return Stream.of(
+                    arguments(ValueType.STRING, RandomStringUtils.insecure().nextAlphanumeric(10)),
+                    arguments(ValueType.INTEGER, RandomStringUtils.insecure().nextAlphanumeric(10)),
+                    arguments(ValueType.FLOAT, RandomStringUtils.insecure().nextAlphanumeric(10)),
+                    arguments(ValueType.BOOLEAN, RandomStringUtils.insecure().nextAlphanumeric(10)),
+                    arguments(ValueType.PROMPT, UUID.randomUUID().toString()),
+                    arguments(ValueType.PROMPT_COMMIT, UUID.randomUUID().toString()),
+                    arguments(ValueType.STRING, null),
+                    arguments(ValueType.INTEGER, null),
+                    arguments(ValueType.FLOAT, null),
+                    arguments(ValueType.BOOLEAN, null));
+        }
     }
 
     @Nested
     @DisplayName("Retrieve Agent Config:")
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     class RetrieveAgentConfig {
-
-        private static final String[] VALUE_IGNORED_FIELDS = new String[]{
-                "id", "projectId", "validFromBlueprintId", "validToBlueprintId"};
 
         private TestSetupData setupBlueprintsAndMask() {
             var projectName = UUID.randomUUID().toString();
@@ -470,11 +501,7 @@ class AgentConfigsResourceTest {
                     AgentConfigValue.builder().key("prompt_version").value("v1.0.0")
                             .type(ValueType.PROMPT_COMMIT).build());
 
-            assertThat(blueprint.values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(expectedValues);
+            assertConfigValues(expectedValues, blueprint.values());
         }
 
         @Test
@@ -500,11 +527,7 @@ class AgentConfigsResourceTest {
                     AgentConfigValue.builder().key("prompt_version").value("v1.0.0")
                             .type(ValueType.PROMPT_COMMIT).build());
 
-            assertThat(blueprint.values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(expectedValues);
+            assertConfigValues(expectedValues, blueprint.values());
         }
 
         @Test
@@ -529,11 +552,7 @@ class AgentConfigsResourceTest {
                             .type(ValueType.PROMPT_COMMIT).build(),
                     AgentConfigValue.builder().key("top_p").value("0.95").type(ValueType.FLOAT).build());
 
-            assertThat(blueprint.values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(expectedValues);
+            assertConfigValues(expectedValues, blueprint.values());
         }
 
         @Test
@@ -559,11 +578,7 @@ class AgentConfigsResourceTest {
                     AgentConfigValue.builder().key("prompt_version").value("v1.0.0")
                             .type(ValueType.PROMPT_COMMIT).build());
 
-            assertThat(blueprint.values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(expectedValues);
+            assertConfigValues(expectedValues, blueprint.values());
         }
 
         @Test
@@ -590,11 +605,7 @@ class AgentConfigsResourceTest {
                             .type(ValueType.PROMPT_COMMIT).build(),
                     AgentConfigValue.builder().key("top_p").value("0.95").type(ValueType.FLOAT).build());
 
-            assertThat(blueprint.values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(expectedValues);
+            assertConfigValues(expectedValues, blueprint.values());
         }
 
         @Test
@@ -612,11 +623,7 @@ class AgentConfigsResourceTest {
             var expectedValues = List.of(
                     AgentConfigValue.builder().key("temperature").value("0.5").type(ValueType.FLOAT).build());
 
-            assertThat(blueprint.values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(expectedValues);
+            assertConfigValues(expectedValues, blueprint.values());
         }
 
         @ParameterizedTest
@@ -878,9 +885,6 @@ class AgentConfigsResourceTest {
         private static final String[] BLUEPRINT_IGNORED_FIELDS = new String[]{
                 "id", "projectId", "createdBy", "createdAt", "lastUpdatedBy", "lastUpdatedAt", "values"};
 
-        private static final String[] VALUE_IGNORED_FIELDS = new String[]{
-                "id", "projectId", "validFromBlueprintId", "validToBlueprintId"};
-
         @Test
         @DisplayName("Success: get paginated history with tagged blueprints and delta values, excludes masks")
         void getHistory() {
@@ -959,19 +963,13 @@ class AgentConfigsResourceTest {
                     .ignoringFields(BLUEPRINT_IGNORED_FIELDS)
                     .isEqualTo(expectedBlueprints);
 
-            assertThat(historyPage.content().getFirst().values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(List.of(
-                            AgentConfigValue.builder().key("temperature").value("0.7").type(ValueType.FLOAT).build()));
+            assertConfigValues(
+                    List.of(AgentConfigValue.builder().key("temperature").value("0.7").type(ValueType.FLOAT).build()),
+                    historyPage.content().getFirst().values());
 
-            assertThat(historyPage.content().get(1).values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(List.of(
-                            AgentConfigValue.builder().key("model").value("gpt-4").type(ValueType.STRING).build()));
+            assertConfigValues(
+                    List.of(AgentConfigValue.builder().key("model").value("gpt-4").type(ValueType.STRING).build()),
+                    historyPage.content().get(1).values());
         }
 
         @Test
@@ -990,9 +988,17 @@ class AgentConfigsResourceTest {
         private static final String[] VALUE_IGNORED_FIELDS = new String[]{
                 "id", "projectId", "validFromBlueprintId", "validToBlueprintId"};
 
-        @Test
+        static Stream<Arguments> excludeProjectIdsForAutoUpdate() {
+            return Stream.of(
+                    arguments(null, "null exclude set"),
+                    arguments(Set.of(), "empty exclude set"));
+        }
+
+        @ParameterizedTest(name = "{1}")
+        @MethodSource("excludeProjectIdsForAutoUpdate")
         @DisplayName("Success: when new prompt version created, blueprint with that prompt is auto-updated")
-        void createPromptVersion__whenBlueprintReferencesPrompt__thenAutoUpdateBlueprint() {
+        void createPromptVersion__whenBlueprintReferencesPrompt__thenAutoUpdateBlueprint(
+                Set<UUID> excludeProjectIds, String description) {
             var projectName = UUID.randomUUID().toString();
             var projectId = projectResourceClient.createProject(projectName, API_KEY, TEST_WORKSPACE);
 
@@ -1019,7 +1025,8 @@ class AgentConfigsResourceTest {
                     AgentConfigCreate.builder().projectId(projectId).blueprint(blueprint1).build(),
                     API_KEY, TEST_WORKSPACE, HttpStatus.SC_CREATED);
 
-            var promptVersion2 = promptResourceClient.createPromptVersion(prompt, API_KEY, TEST_WORKSPACE);
+            var promptVersion2 = promptResourceClient.createPromptVersion(prompt, API_KEY, TEST_WORKSPACE,
+                    excludeProjectIds);
             var commit2 = promptVersion2.commit();
 
             Awaitility.await().untilAsserted(() -> {
@@ -1034,11 +1041,7 @@ class AgentConfigsResourceTest {
                         AgentConfigValue.builder().key("model").value("gpt-4").type(ValueType.STRING).build(),
                         AgentConfigValue.builder().key("system_prompt").value(commit2).type(ValueType.PROMPT).build());
 
-                assertThat(latestBlueprint.values())
-                        .usingRecursiveComparison()
-                        .ignoringFields(VALUE_IGNORED_FIELDS)
-                        .ignoringCollectionOrder()
-                        .isEqualTo(expectedValues);
+                assertConfigValues(expectedValues, latestBlueprint.values());
             });
         }
 
@@ -1094,11 +1097,7 @@ class AgentConfigsResourceTest {
                         AgentConfigValue.builder().key("user_prompt").value(prompt2Commit1).type(ValueType.PROMPT)
                                 .build());
 
-                assertThat(latestBlueprint.values())
-                        .usingRecursiveComparison()
-                        .ignoringFields(VALUE_IGNORED_FIELDS)
-                        .ignoringCollectionOrder()
-                        .isEqualTo(expectedValues);
+                assertConfigValues(expectedValues, latestBlueprint.values());
             });
         }
 
@@ -1244,8 +1243,8 @@ class AgentConfigsResourceTest {
         }
 
         @Test
-        @DisplayName("Success: no blueprint update when prompt version created with action=NO_ACTION")
-        void createPromptVersion__whenActionIsNoAction__thenBlueprintNotUpdated() throws InterruptedException {
+        @DisplayName("Success: no blueprint update when project is excluded via excludeBlueprintUpdateForProjects")
+        void createPromptVersion__whenProjectExcluded__thenBlueprintNotUpdated() throws InterruptedException {
             var projectName = UUID.randomUUID().toString();
             var projectId = projectResourceClient.createProject(projectName, API_KEY, TEST_WORKSPACE);
 
@@ -1273,7 +1272,7 @@ class AgentConfigsResourceTest {
                     API_KEY, TEST_WORKSPACE, HttpStatus.SC_CREATED);
 
             promptResourceClient.createPromptVersion(prompt, API_KEY, TEST_WORKSPACE,
-                    PromptVersionAction.NO_ACTION);
+                    Set.of(projectId));
 
             Thread.sleep(2000);
 
@@ -1288,11 +1287,7 @@ class AgentConfigsResourceTest {
                     AgentConfigValue.builder().key("model").value("gpt-4").type(ValueType.STRING).build(),
                     AgentConfigValue.builder().key("system_prompt").value(commit1).type(ValueType.PROMPT).build());
 
-            assertThat(latestBlueprint.values())
-                    .usingRecursiveComparison()
-                    .ignoringFields(VALUE_IGNORED_FIELDS)
-                    .ignoringCollectionOrder()
-                    .isEqualTo(expectedValues);
+            assertConfigValues(expectedValues, latestBlueprint.values());
         }
     }
 }
