@@ -386,6 +386,7 @@ export const useOptimizationData = () => {
     );
     if (unscoredCandidate) {
       return {
+        candidateId: unscoredCandidate.candidateId,
         stepIndex: unscoredCandidate.stepIndex,
         parentCandidateIds: unscoredCandidate.parentCandidateIds,
       };

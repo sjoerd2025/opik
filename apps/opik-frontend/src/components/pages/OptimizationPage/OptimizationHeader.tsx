@@ -139,7 +139,7 @@ const OptimizationHeader: React.FC<OptimizationHeaderProps> = ({
               id={optimization.dataset_id}
               name={`Go to ${optimization.dataset_name}`}
               resource={RESOURCE_TYPE.dataset}
-              className="self-start"
+              className="w-fit"
             />
           )}
         </div>

@@ -24,6 +24,22 @@ export const TRIAL_STATUS_COLORS: Record<TrialStatus, string> = {
   evaluating: "var(--color-orange)",
 };
 
+export const TRIAL_STATUS_LABELS: Record<TrialStatus, string> = {
+  baseline: "Baseline",
+  passed: "Passed",
+  pruned: "Pruned",
+  running: "Running",
+  evaluating: "Evaluating",
+};
+
+export const TRIAL_STATUS_ORDER: readonly TrialStatus[] = [
+  "baseline",
+  "passed",
+  "pruned",
+  "running",
+  "evaluating",
+] as const;
+
 export type CandidateDataPoint = {
   candidateId: string;
   stepIndex: number;
@@ -39,6 +55,7 @@ export type ParentChildEdge = {
 };
 
 export type InProgressInfo = {
+  candidateId: string;
   stepIndex: number;
   parentCandidateIds: string[];
 };
