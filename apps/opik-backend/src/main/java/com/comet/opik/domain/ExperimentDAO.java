@@ -18,6 +18,7 @@ import com.comet.opik.api.ExperimentUpdate;
 import com.comet.opik.api.FeedbackScoreAverage;
 import com.comet.opik.api.filter.Filter;
 import com.comet.opik.api.sorting.ExperimentSortingFactory;
+import com.comet.opik.domain.experiments.aggregations.AggregatedExperimentCounts;
 import com.comet.opik.domain.filter.FilterQueryBuilder;
 import com.comet.opik.domain.filter.FilterStrategy;
 import com.comet.opik.domain.sorting.SortingQueryBuilder;
@@ -1550,8 +1551,8 @@ class ExperimentDAO {
         var limit = 1;
         return getAggregationBranchCounts(id)
                 .flatMap(counts -> {
-                    boolean hasAggregated = counts.aggregated() > 0;
-                    boolean hasRaw = counts.notAggregated() > 0;
+                    boolean hasAggregated = counts.hasAggregated();
+                    boolean hasRaw = counts.hasRaw();
 
                     return Mono.from(connectionFactory.create())
                             .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
@@ -1577,6 +1578,8 @@ class ExperimentDAO {
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                     var template = getSTWithLogComment(FIND, "get_experiments_by_ids", workspaceId, ids.size());
                     template.add("ids_list", ids);
+                    template.add("has_aggregated", true);
+                    template.add("has_raw", true);
                     return Flux.from(get(template.render(), connection,
                             statement -> statement.bind("ids_list", ids.toArray(UUID[]::new)).bind("workspace_id",
                                     workspaceId).bind("zero_uuid", ExperimentGroupMappers.ZERO_UUID)));
@@ -1594,6 +1597,9 @@ class ExperimentDAO {
                     if (request.lastRetrievedId() != null) {
                         template.add("lastRetrievedId", request.lastRetrievedId());
                     }
+                    template.add("has_aggregated", true);
+                    template.add("has_raw", true);
+
                     template.add("limit", request.limit());
                     return Flux.from(get(template.render(), connection,
                             statement -> {
@@ -1734,8 +1740,8 @@ class ExperimentDAO {
                         var targetProjectIds = preQueryResults.getT1();
                         var counts = preQueryResults.getT2();
 
-                        boolean hasAggregated = counts.aggregated() > 0;
-                        boolean hasRaw = counts.notAggregated() > 0;
+                        boolean hasAggregated = counts.hasAggregated();
+                        boolean hasRaw = counts.hasRaw();
 
                         return countTotal(experimentSearchCriteria, targetProjectIds, hasAggregated, hasRaw)
                                 .flatMap(total -> find(page, size, experimentSearchCriteria, total,
@@ -1840,10 +1846,6 @@ class ExperimentDAO {
             bindSearchCriteria(statement, experimentSearchCriteria, true);
             return Flux.from(statement.execute());
         });
-    }
-
-    private record AggregatedExperimentCounts(long aggregated, long notAggregated) {
-        static final AggregatedExperimentCounts BOTH_BRANCHES = new AggregatedExperimentCounts(1, 1);
     }
 
     private Mono<AggregatedExperimentCounts> getAggregationBranchCounts(ExperimentSearchCriteria criteria) {

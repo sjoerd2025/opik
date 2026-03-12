@@ -12,6 +12,7 @@ import com.comet.opik.api.filter.DatasetItemFilter;
 import com.comet.opik.api.filter.ExperimentsComparisonFilter;
 import com.comet.opik.api.filter.Filter;
 import com.comet.opik.api.sorting.SortingFactoryDatasets;
+import com.comet.opik.domain.experiments.aggregations.AggregatedExperimentCounts;
 import com.comet.opik.domain.filter.FilterQueryBuilder;
 import com.comet.opik.domain.filter.FilterStrategy;
 import com.comet.opik.domain.sorting.SortingQueryBuilder;
@@ -429,11 +430,27 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             """;
 
     private static final String SELECT_AGGREGATED_EXPERIMENT_IDS = """
-            SELECT id
-            FROM experiment_aggregates FINAL
-            WHERE workspace_id = :workspace_id
-            AND dataset_id = :datasetId
-            AND id IN :experiment_ids
+            SELECT
+                count() AS total,
+                countIf(has_aggregated) AS aggregated,
+                countIf(NOT has_aggregated) AS not_aggregated
+            FROM (
+                SELECT
+                    e.id,
+                    notEmpty(agg.id) AS has_aggregated
+                FROM experiments e FINAL
+                LEFT JOIN (
+                    SELECT
+                        toString(id) AS id
+                    FROM experiment_aggregates
+                    WHERE workspace_id = :workspace_id
+                    AND dataset_id = :datasetId
+                    <if(experiment_ids)> AND id IN :experiment_ids <endif>
+                ) agg ON e.id = agg.id
+                WHERE e.workspace_id = :workspace_id
+                AND e.dataset_id = :datasetId
+                <if(experiment_ids)> AND e.id IN :experiment_ids <endif>
+            )
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -2443,17 +2460,16 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             // Run pre-queries in parallel: target project IDs and aggregated experiment IDs
             var targetProjectIdsMono = getTargetProjectIds(workspaceId, criteria.datasetId(),
                     criteria.experimentIds());
-            var aggregatedIdsMono = getAggregatedExperimentIds(workspaceId, criteria.datasetId(),
+            var branchCountsMono = getAggregationBranchCounts(workspaceId, criteria.datasetId(),
                     criteria.experimentIds());
 
-            return Mono.zip(targetProjectIdsMono, aggregatedIdsMono)
+            return Mono.zip(targetProjectIdsMono, branchCountsMono)
                     .flatMap(preQueryResults -> {
                         var targetProjectIds = preQueryResults.getT1();
-                        var aggregatedIds = preQueryResults.getT2();
+                        var counts = preQueryResults.getT2();
 
-                        boolean hasAggregated = !aggregatedIds.isEmpty();
-                        boolean hasRaw = CollectionUtils.isNotEmpty(criteria.experimentIds())
-                                && aggregatedIds.size() < criteria.experimentIds().size();
+                        boolean hasAggregated = counts.hasAggregated();
+                        boolean hasRaw = counts.hasRaw();
 
                         return asyncTemplate.nonTransaction(connection -> {
                             // Build the query using StringTemplate
@@ -2600,24 +2616,32 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
         });
     }
 
-    private Mono<Set<UUID>> getAggregatedExperimentIds(String workspaceId, UUID datasetId, Set<UUID> experimentIds) {
-        if (CollectionUtils.isEmpty(experimentIds)) {
-            return Mono.just(Set.of());
-        }
-
+    private Mono<AggregatedExperimentCounts> getAggregationBranchCounts(String workspaceId, UUID datasetId,
+            Set<UUID> experimentIds) {
         return asyncTemplate.nonTransaction(connection -> {
             ST template = TemplateUtils.newST(SELECT_AGGREGATED_EXPERIMENT_IDS);
+
+            if (CollectionUtils.isNotEmpty(experimentIds)) {
+                template.add("experiment_ids", experimentIds);
+            }
+
             template.add("log_comment",
-                    "get_aggregated_experiment_ids:workspace_id:" + workspaceId + ":dataset_id:" + datasetId);
+                    "get_aggregation_branch_counts:workspace_id:" + workspaceId + ":dataset_id:" + datasetId);
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId)
-                    .bind("datasetId", datasetId)
-                    .bind("experiment_ids", experimentIds.toArray(UUID[]::new));
+                    .bind("datasetId", datasetId);
+
+            if (CollectionUtils.isNotEmpty(experimentIds)) {
+                statement.bind("experiment_ids", experimentIds.toArray(UUID[]::new));
+            }
 
             return Flux.from(statement.execute())
-                    .flatMap(result -> result.map((row, metadata) -> row.get("id", UUID.class)))
-                    .collect(Collectors.toSet());
+                    .flatMap(result -> result.map((row, metadata) -> new AggregatedExperimentCounts(
+                            row.get("aggregated", Long.class),
+                            row.get("not_aggregated", Long.class))))
+                    .next()
+                    .defaultIfEmpty(AggregatedExperimentCounts.BOTH_BRANCHES);
         });
     }
 
@@ -3598,16 +3622,15 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
             var targetProjectIdsMono = getTargetProjectIds(workspaceId, datasetId, experimentIds);
-            var aggregatedIdsMono = getAggregatedExperimentIds(workspaceId, datasetId, experimentIds);
+            var branchCountsMono = getAggregationBranchCounts(workspaceId, datasetId, experimentIds);
 
-            return Mono.zip(targetProjectIdsMono, aggregatedIdsMono)
+            return Mono.zip(targetProjectIdsMono, branchCountsMono)
                     .flatMap(preQueryResults -> {
                         var targetProjectIds = preQueryResults.getT1();
-                        var aggregatedIds = preQueryResults.getT2();
+                        var counts = preQueryResults.getT2();
 
-                        boolean hasAggregated = !aggregatedIds.isEmpty();
-                        boolean hasRaw = CollectionUtils.isNotEmpty(experimentIds)
-                                && aggregatedIds.size() < experimentIds.size();
+                        boolean hasAggregated = counts.hasAggregated();
+                        boolean hasRaw = counts.hasRaw();
 
                         var template = TemplateUtils.newST(SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS_STATS);
 
