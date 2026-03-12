@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button, ButtonProps } from "@/components/ui/button";
+import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 
 import OpenAIModelConfigs from "@/components/pages-shared/llm/PromptModelSettings/providerConfigs/OpenAIModelConfigs";
 import AnthropicModelConfigs from "@/components/pages-shared/llm/PromptModelSettings/providerConfigs/AnthropicModelConfigs";
@@ -120,11 +121,13 @@ const PromptModelConfigs = ({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} disabled={disabled}>
-          <Settings2 />
-        </Button>
-      </DropdownMenuTrigger>
+      <TooltipWrapper content="Model parameters">
+        <DropdownMenuTrigger asChild>
+          <Button variant={variant} size={size} disabled={disabled}>
+            <Settings2 />
+          </Button>
+        </DropdownMenuTrigger>
+      </TooltipWrapper>
 
       <DropdownMenuContent
         className="max-h-[70vh] overflow-y-auto p-6"

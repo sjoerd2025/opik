@@ -17,6 +17,15 @@ export const PLAYGROUND_SELECTED_DATASET_KEY = "playground-selected-dataset";
 export const PLAYGROUND_SELECTED_DATASET_VERSION_KEY =
   "playground-selected-dataset-version";
 
+export const PLAYGROUND_PROMPT_COLORS = [
+  { bg: "#b8e54a", text: "hsl(var(--foreground))" },
+  { bg: "#a6ddfe", text: "hsl(var(--foreground))" },
+  { bg: "#6e3de8", text: "hsl(var(--background))" },
+  { bg: "#be48ea", text: "hsl(var(--background))" },
+  { bg: "#df5a40", text: "hsl(var(--background))" },
+  { bg: "#5356f1", text: "hsl(var(--background))" },
+];
+
 export const LLM_MESSAGE_ROLE_NAME_MAP = {
   [LLM_MESSAGE_ROLE.system]: "System",
   [LLM_MESSAGE_ROLE.assistant]: "Assistant",

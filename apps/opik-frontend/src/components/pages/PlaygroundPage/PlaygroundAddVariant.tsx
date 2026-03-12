@@ -80,8 +80,12 @@ const PlaygroundAddVariant = ({
       <div className="flex h-[calc(50vh-4rem)] items-center">
         <Popover open={addVariantOpen} onOpenChange={setAddVariantOpen}>
           <PopoverTrigger asChild>
-            <div className="flex flex-col items-center gap-3">
-              <Button variant="secondary" size="icon-xs">
+            <div className="group/variant flex cursor-pointer flex-col items-center gap-3">
+              <Button
+                variant="secondary"
+                size="icon-xs"
+                className="group-hover/variant:bg-secondary group-hover/variant:text-primary-hover"
+              >
                 <Plus />
               </Button>
               <span className="comet-body-xs whitespace-nowrap text-primary">

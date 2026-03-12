@@ -147,29 +147,33 @@ const PromptsSelectBox: React.FC<PromptsSelectBoxProps> = ({
         "Loaded prompt";
 
       return (
-        <TooltipWrapper
-          content={hasUnsavedChanges ? "Unsaved changes" : displayName}
-        >
-          <div className="flex max-w-44 items-center gap-1 px-2">
-            <FileTerminal className="size-3.5 shrink-0 text-lime-400" />
-            <span className="comet-body-xs-accented truncate">
-              {displayName}
-            </span>
-            {hasUnsavedChanges && (
-              <span className="mb-auto size-1 shrink-0 rounded-full bg-warning" />
-            )}
-            {onClear && (
-              <TooltipWrapper content="Detach loaded prompt">
-                <button
-                  className="ml-0.5 shrink-0 text-muted-slate hover:text-primary-hover"
-                  onClick={onClear}
-                >
-                  <XCircle className="size-3.5" />
-                </button>
-              </TooltipWrapper>
-            )}
-          </div>
-        </TooltipWrapper>
+        <div className="flex max-w-44 items-center gap-1 px-2">
+          <TooltipWrapper
+            content={hasUnsavedChanges ? "Unsaved changes" : displayName}
+          >
+            <div className="flex min-w-0 items-center gap-1">
+              <FileTerminal className="size-3.5 shrink-0 text-lime-400" />
+              <span className="comet-body-xs-accented truncate">
+                {displayName}
+              </span>
+              {hasUnsavedChanges && (
+                <span className="mb-auto size-1 shrink-0 rounded-full bg-warning" />
+              )}
+            </div>
+          </TooltipWrapper>
+          {onClear && (
+            <TooltipWrapper content="Detach loaded prompt">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="ml-0.5 shrink-0 text-muted-slate hover:text-primary-hover"
+                onClick={onClear}
+              >
+                <XCircle />
+              </Button>
+            </TooltipWrapper>
+          )}
+        </div>
       );
     }
 

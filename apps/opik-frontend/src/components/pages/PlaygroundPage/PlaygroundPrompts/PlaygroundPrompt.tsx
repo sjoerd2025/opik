@@ -20,7 +20,10 @@ import { Separator } from "@/components/ui/separator";
 
 import { getDefaultConfigByProvider } from "@/lib/playground";
 import { updateProviderConfig } from "@/lib/modelUtils";
-import { PLAYGROUND_LAST_PICKED_MODEL } from "@/constants/llm";
+import {
+  PLAYGROUND_LAST_PICKED_MODEL,
+  PLAYGROUND_PROMPT_COLORS,
+} from "@/constants/llm";
 import { generateDefaultLLMPromptMessage, getNextMessageType } from "@/lib/llm";
 import LLMPromptMessages from "@/components/pages-shared/llm/LLMPromptMessages/LLMPromptMessages";
 import PromptModelSelect from "@/components/pages-shared/llm/PromptModelSelect/PromptModelSelect";
@@ -45,16 +48,6 @@ import PromptsSelectBox from "@/components/pages-shared/llm/PromptsSelectBox/Pro
 import AddNewPromptVersionDialog from "@/components/pages-shared/llm/LLMPromptMessages/AddNewPromptVersionDialog";
 import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import useLoadChatPrompt from "@/hooks/useLoadChatPrompt";
-import { Tag, TagProps } from "@/components/ui/tag";
-
-const LETTER_VARIANTS: TagProps["variant"][] = [
-  "green",
-  "turquoise",
-  "purple",
-  "pink",
-  "red",
-  "blue",
-];
 
 interface PlaygroundPromptProps {
   workspaceName: string;
@@ -270,17 +263,23 @@ const PlaygroundPrompt = ({
     setShowSaveChatPromptDialog(true);
   }, []);
 
+  const promptColor =
+    PLAYGROUND_PROMPT_COLORS[index % PLAYGROUND_PROMPT_COLORS.length];
+
   return (
-    <div className="flex min-w-[var(--min-prompt-width)] max-w-[1440px] flex-1 flex-col border-r">
+    <div className="group/prompt flex min-w-[var(--min-prompt-width)] max-w-[1440px] flex-1 flex-col border-r">
       <div className="flex h-10 items-center justify-between gap-2 border-b px-4">
         <div className="flex items-center gap-1">
           <p className="comet-body-s-accented whitespace-nowrap">{name}</p>
-          <Tag
-            variant={LETTER_VARIANTS[index % LETTER_VARIANTS.length]}
-            size="md"
+          <span
+            className="comet-body-s-accented flex size-6 items-center justify-center rounded-md"
+            style={{
+              backgroundColor: promptColor.bg,
+              color: promptColor.text,
+            }}
           >
             {getAlphabetLetter(index)}
-          </Tag>
+          </span>
           <PromptModelSelect
             compact
             value={model}
@@ -291,21 +290,17 @@ const PlaygroundPrompt = ({
             onDeleteProvider={handleDeleteProvider}
             hasError={!model}
           />
-          <TooltipWrapper content="Model parameters">
-            <div>
-              <PromptModelConfigs
-                provider={provider}
-                model={model}
-                configs={configs}
-                onChange={handleUpdateConfig}
-                size="icon-xs"
-                variant="ghost"
-              />
-            </div>
-          </TooltipWrapper>
+          <PromptModelConfigs
+            provider={provider}
+            model={model}
+            configs={configs}
+            onChange={handleUpdateConfig}
+            size="icon-xs"
+            variant="ghost"
+          />
         </div>
 
-        <div className="flex items-center text-muted-slate">
+        <div className="flex items-center text-muted-slate transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prompt:opacity-100">
           <PromptsSelectBox
             compact
             value={selectedChatPromptId}
@@ -376,7 +371,7 @@ const PlaygroundPrompt = ({
         template={chatPromptTemplate}
         templateStructure={PROMPT_TEMPLATE_STRUCTURE.CHAT}
         defaultName={lastImportedPromptName}
-        onSave={(version, _promptName, savedPromptId) => {
+        onSave={(version, _, savedPromptId) => {
           setShowSaveChatPromptDialog(false);
 
           // Update the loaded chat prompt ID to the saved prompt
