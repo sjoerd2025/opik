@@ -8,6 +8,7 @@ import { COLUMN_TYPE, ColumnData } from "@/types/shared";
 import DataTable from "@/components/shared/DataTable/DataTable";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import TextCell from "@/components/shared/DataTableCells/TextCell";
+import AssertionPassRateCell from "@/components/pages/CompareExperimentsPage/ExperimentAssertionsTab/AssertionPassRateCell";
 import CompareExperimentsHeader from "@/components/pages-shared/experiments/CompareExperimentsHeader/CompareExperimentsHeader";
 import CompareExperimentsActionsPanel from "@/components/pages/CompareExperimentsPage/CompareExperimentsActionsPanel";
 import PageBodyStickyContainer from "@/components/layout/PageBodyStickyContainer/PageBodyStickyContainer";
@@ -15,11 +16,10 @@ import PageBodyStickyTableWrapper from "@/components/layout/PageBodyStickyTableW
 import Loader from "@/components/shared/Loader/Loader";
 import { convertColumnDataToColumn } from "@/lib/table";
 import { AssertionAggregation, Experiment } from "@/types/datasets";
-import { formatPassRate } from "@/components/shared/DataTableCells/PassRateCell";
 
 type AssertionRowData = {
   name: string;
-} & Record<string, string>;
+} & Record<string, AssertionAggregation | string | undefined>;
 
 type AssertionAggregationMap = Record<
   string,
@@ -57,11 +57,10 @@ function getAssertionRowsForExperiments({
   ).sort();
 
   return names.map((name) => {
-    const data = experimentsIds.reduce<Record<string, string>>((acc, id) => {
-      const agg = aggregationMap[id]?.[name];
-      acc[id] = agg
-        ? formatPassRate(agg.pass_rate, agg.passed_count, agg.total_count)
-        : "-";
+    const data = experimentsIds.reduce<
+      Record<string, AssertionAggregation | undefined>
+    >((acc, id) => {
+      acc[id] = aggregationMap[id]?.[name] ?? undefined;
       return acc;
     }, {});
 
@@ -116,7 +115,7 @@ const ExperimentAssertionsTab: React.FunctionComponent<
       retVal.push({
         accessorKey: id,
         header: CompareExperimentsHeader as never,
-        cell: TextCell as never,
+        cell: AssertionPassRateCell as never,
         meta: {
           type: COLUMN_TYPE.string,
           custom: {

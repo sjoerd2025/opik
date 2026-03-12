@@ -15,10 +15,10 @@ export const AssertionsListTooltipContent: React.FC<
   }
 
   return (
-    <div className="flex w-[200px] flex-col p-2">
+    <div className="flex w-[250px] flex-col p-2">
       <div className="flex items-center gap-1.5 px-1 pb-0.5 pt-1">
         <div className="flex size-4 items-center justify-center rounded bg-[#89DEFF]">
-          <CheckCheck className="size-2 text-foreground" />
+          <CheckCheck className="size-3 text-foreground" />
         </div>
         <span className="comet-body-xs-accented text-foreground">
           Assertions

@@ -58,7 +58,7 @@ const AssertionsField: React.FC<AssertionsFieldProps> = ({
         </div>
       )}
 
-      {hasReadOnly && hasEditable && <Separator />}
+      {hasReadOnly && hasEditable && <Separator className="my-1" />}
 
       {hasEditable && (
         <div className="flex flex-col gap-2">

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import sortBy from "lodash/sortBy";
 import { BooleanParam, useQueryParam } from "use-query-params";
 import { CircleCheck, Maximize2, Minimize2 } from "lucide-react";
@@ -10,6 +10,7 @@ import { Tag } from "@/components/ui/tag";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import DateTag from "@/components/shared/DateTag/DateTag";
 import useCompareExperimentsChartsData from "@/components/pages/CompareExperimentsPage/CompareExperimentsDetails/useCompareExperimentsChartsData";
+import useCompareAssertionsChartsData from "@/components/pages/CompareExperimentsPage/CompareExperimentsDetails/useCompareAssertionsChartsData";
 import ExperimentsRadarChart from "@/components/pages-shared/experiments/ExperimentsRadarChart/ExperimentsRadarChart";
 import ExperimentsBarChart from "@/components/pages-shared/experiments/ExperimentsBarChart/ExperimentsBarChart";
 import NavigationTag from "@/components/shared/NavigationTag";
@@ -29,6 +30,7 @@ import ViewSelector from "@/components/pages-shared/dashboards/ViewSelector/View
 import { VIEW_TYPE } from "@/types/dashboard";
 import { Separator } from "@/components/ui/separator";
 import ExperimentTagsList from "@/components/pages/CompareExperimentsPage/ExperimentTagsList";
+import { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 type CompareExperimentsDetailsProps = {
   experimentsIds: string[];
@@ -76,6 +78,16 @@ const CompareExperimentsDetails: React.FunctionComponent<
     experiments,
   });
 
+  const assertionsCharts = useCompareAssertionsChartsData({
+    isCompare,
+    experiments,
+  });
+
+  const renderPassRateTooltipValue = useCallback(
+    ({ value }: { value: ValueType }) => `${Number(value).toFixed(1)}%`,
+    [],
+  );
+
   const allEvalSuite = experiments.every(isEvalSuiteExperiment);
 
   const experimentTracesSearch = useMemo(
@@ -86,7 +98,7 @@ const CompareExperimentsDetails: React.FunctionComponent<
   );
 
   const renderCompareFeedbackScoresButton = () => {
-    if (!isCompare || allEvalSuite) return null;
+    if (!isCompare) return null;
 
     const text = showCharts ? "Collapse charts" : "Expand charts";
     const Icon = showCharts ? Minimize2 : Maximize2;
@@ -150,7 +162,35 @@ const CompareExperimentsDetails: React.FunctionComponent<
     if (!isCompare || !showCharts || isPending || view === VIEW_TYPE.DASHBOARDS)
       return null;
 
-    if (allEvalSuite) return null;
+    const charts = allEvalSuite
+      ? {
+          radarName: "Assertion pass rates",
+          radarChartId: "assertion-pass-rates-radar-chart",
+          radarData: assertionsCharts.radarChartData,
+          radarKeys: assertionsCharts.radarChartKeys,
+          radarLabelsMap: assertionsCharts.experimentLabelsMap,
+          radarTooltipValue: renderPassRateTooltipValue,
+          barName: "Assertion pass rates",
+          barChartId: "assertion-pass-rates-bar-chart",
+          barData: assertionsCharts.barChartData,
+          barKeys: assertionsCharts.barChartKeys,
+          barLabelsMap: undefined,
+          barTooltipValue: renderPassRateTooltipValue,
+        }
+      : {
+          radarName: "Feedback scores",
+          radarChartId: "feedback-scores-radar-chart",
+          radarData: radarChartData,
+          radarKeys: radarChartKeys,
+          radarLabelsMap: experimentLabelsMap,
+          radarTooltipValue: undefined,
+          barName: "Feedback scores distribution",
+          barChartId: "feedback-scores-bar-chart",
+          barData: barChartData,
+          barKeys: barChartKeys,
+          barLabelsMap: scoreLabelsMap,
+          barTooltipValue: undefined,
+        };
 
     return (
       <div className="mb-2 mt-4 overflow-auto">
@@ -159,24 +199,26 @@ const CompareExperimentsDetails: React.FunctionComponent<
             className="flex flex-row gap-4"
             style={{ "--chart-height": "240px" } as React.CSSProperties}
           >
-            {radarChartData.length > 1 && (
+            {charts.radarData.length > 1 && (
               <div className="w-1/3 min-w-[400px]">
                 <ExperimentsRadarChart
-                  name="Feedback scores"
-                  chartId="feedback-scores-radar-chart"
-                  data={radarChartData}
-                  keys={radarChartKeys}
-                  experimentLabelsMap={experimentLabelsMap}
+                  name={charts.radarName}
+                  chartId={charts.radarChartId}
+                  data={charts.radarData}
+                  keys={charts.radarKeys}
+                  experimentLabelsMap={charts.radarLabelsMap}
+                  renderTooltipValue={charts.radarTooltipValue}
                 />
               </div>
             )}
             <div className="min-w-[400px] flex-1">
               <ExperimentsBarChart
-                name="Feedback scores distribution"
-                chartId="feedback-scores-bar-chart"
-                data={barChartData}
-                keys={barChartKeys}
-                labelsMap={scoreLabelsMap}
+                name={charts.barName}
+                chartId={charts.barChartId}
+                data={charts.barData}
+                keys={charts.barKeys}
+                labelsMap={charts.barLabelsMap}
+                renderTooltipValue={charts.barTooltipValue}
               />
             </div>
           </div>
@@ -200,7 +242,9 @@ const CompareExperimentsDetails: React.FunctionComponent<
           {isCompare && view !== VIEW_TYPE.DASHBOARDS && (
             <Separator orientation="vertical" className="mx-2 h-6" />
           )}
-          <ViewSelector value={view} onChange={onViewChange} />
+          {!allEvalSuite && (
+            <ViewSelector value={view} onChange={onViewChange} />
+          )}
         </div>
       </div>
       <div className="mb-1 flex gap-2 overflow-x-auto">

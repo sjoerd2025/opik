@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import isUndefined from "lodash/isUndefined";
 import { JsonParam, StringParam, useQueryParam } from "use-query-params";
 
@@ -48,6 +48,16 @@ const CompareExperimentsPage: React.FunctionComponent = () => {
 
   const isEvalSuite = isEvalSuiteExperiment(memorizedExperiments[0]);
 
+  const hasAssertionAggregations = memorizedExperiments.some(
+    (e) => (e.assertion_aggregations ?? []).length > 0,
+  );
+
+  useEffect(() => {
+    if (isEvalSuite && view === VIEW_TYPE.DASHBOARDS) {
+      setView(VIEW_TYPE.DETAILS);
+    }
+  }, [isEvalSuite, view, setView]);
+
   const renderContent = () => {
     if (view === VIEW_TYPE.DETAILS) {
       return (
@@ -65,15 +75,17 @@ const CompareExperimentsPage: React.FunctionComponent = () => {
               <TabsTrigger variant="underline" value="config">
                 Configuration
               </TabsTrigger>
-              <TabsTrigger variant="underline" value="scores">
-                {isEvalSuite ? "Assertions" : "Feedback scores"}
-                {!isEvalSuite && (
-                  <ExplainerIcon
-                    className="ml-1"
-                    {...EXPLAINERS_MAP[EXPLAINER_ID.what_are_feedback_scores]}
-                  />
-                )}
-              </TabsTrigger>
+              {!(isEvalSuite && !hasAssertionAggregations) && (
+                <TabsTrigger variant="underline" value="scores">
+                  {isEvalSuite ? "Assertions" : "Feedback scores"}
+                  {!isEvalSuite && (
+                    <ExplainerIcon
+                      className="ml-1"
+                      {...EXPLAINERS_MAP[EXPLAINER_ID.what_are_feedback_scores]}
+                    />
+                  )}
+                </TabsTrigger>
+              )}
             </TabsList>
           </PageBodyStickyContainer>
           <TabsContent value="items">
@@ -90,21 +102,23 @@ const CompareExperimentsPage: React.FunctionComponent = () => {
               isPending={isPending}
             />
           </TabsContent>
-          <TabsContent value="scores">
-            {isEvalSuite ? (
-              <ExperimentAssertionsTab
-                experimentsIds={experimentsIds}
-                experiments={memorizedExperiments}
-                isPending={isPending}
-              />
-            ) : (
-              <ExperimentFeedbackScoresTab
-                experimentsIds={experimentsIds}
-                experiments={memorizedExperiments}
-                isPending={isPending}
-              />
-            )}
-          </TabsContent>
+          {!(isEvalSuite && !hasAssertionAggregations) && (
+            <TabsContent value="scores">
+              {isEvalSuite ? (
+                <ExperimentAssertionsTab
+                  experimentsIds={experimentsIds}
+                  experiments={memorizedExperiments}
+                  isPending={isPending}
+                />
+              ) : (
+                <ExperimentFeedbackScoresTab
+                  experimentsIds={experimentsIds}
+                  experiments={memorizedExperiments}
+                  isPending={isPending}
+                />
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       );
     }

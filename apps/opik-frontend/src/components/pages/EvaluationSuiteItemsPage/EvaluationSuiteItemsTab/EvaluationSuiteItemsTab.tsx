@@ -271,7 +271,7 @@ function EvaluationSuiteItemsTab({
         ? migrateSelectedColumns(
             storageKeys.selectedColumnsMigrationKey,
             SUITE_DEFAULT_SELECTED_COLUMNS,
-            ["last_updated_at"],
+            ["last_updated_at", "assertions"],
           )
         : DATASET_DEFAULT_SELECTED_COLUMNS,
     },

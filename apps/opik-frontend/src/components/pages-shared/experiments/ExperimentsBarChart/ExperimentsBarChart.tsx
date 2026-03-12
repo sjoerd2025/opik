@@ -1,5 +1,6 @@
 import ChartTooltipContent, {
   ChartTooltipRenderHeaderArguments,
+  ChartTooltipRenderValueArguments,
 } from "@/components/shared/Charts/ChartTooltipContent/ChartTooltipContent";
 import { renderScoreTooltipValue } from "@/lib/feedback-scores";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,9 @@ interface ExperimentsBarChartProps {
   data: BarDataPoint[];
   keys: string[];
   labelsMap?: Record<string, string>;
+  renderTooltipValue?: (
+    data: ChartTooltipRenderValueArguments,
+  ) => React.ReactNode;
 }
 
 const CHART_INNER_PADDING = 100;
@@ -39,6 +43,7 @@ const ExperimentsBarChart: React.FC<ExperimentsBarChartProps> = ({
   data,
   keys,
   labelsMap,
+  renderTooltipValue,
 }) => {
   const [activeBar, setActiveBar] = useState<string | null>(null);
   const [width, setWidth] = useState<number>(0);
@@ -156,7 +161,7 @@ const ExperimentsBarChart: React.FC<ExperimentsBarChartProps> = ({
                 content={
                   <ChartTooltipContent
                     renderHeader={renderChartTooltipHeader}
-                    renderValue={renderScoreTooltipValue}
+                    renderValue={renderTooltipValue ?? renderScoreTooltipValue}
                   />
                 }
               />

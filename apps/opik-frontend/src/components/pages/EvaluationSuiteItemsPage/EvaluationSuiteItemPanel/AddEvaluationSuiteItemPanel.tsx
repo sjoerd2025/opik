@@ -169,7 +169,7 @@ const AddEvaluationSuiteItemPanel: React.FC<
 > = ({ open, onClose, columns, onOpenSettings }) => {
   return (
     <ResizableSidePanel
-      panelId="add-evaluation-suite-item-panel"
+      panelId="evaluation-suite-item-panel"
       entity="item"
       open={open}
       onClose={onClose}

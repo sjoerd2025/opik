@@ -1,4 +1,3 @@
-import React from "react";
 import { CellContext } from "@tanstack/react-table";
 import get from "lodash/get";
 import isNumber from "lodash/isNumber";
@@ -13,17 +12,6 @@ export const formatPassRate = (
   totalCount: number,
 ): string => {
   return `${(passRate * 100).toFixed(1)}% (${passedCount}/${totalCount})`;
-};
-
-const PassRateTag: React.FC<{ passRate: number; label: string }> = ({
-  passRate,
-  label,
-}) => {
-  return (
-    <Tag variant={passRate === 1 ? "green" : "red"} size="md">
-      {label}
-    </Tag>
-  );
 };
 
 const PassRateCell = <TData,>(context: CellContext<TData, unknown>) => {
@@ -46,7 +34,9 @@ const PassRateCell = <TData,>(context: CellContext<TData, unknown>) => {
     >
       {hasData ? (
         <TooltipWrapper content={tooltip}>
-          <PassRateTag passRate={passRate} label={badgeLabel!} />
+          <Tag variant={passRate === 1 ? "green" : "red"} size="md">
+            {badgeLabel}
+          </Tag>
         </TooltipWrapper>
       ) : (
         <span className="truncate">-</span>
@@ -91,7 +81,9 @@ const PassRateAggregationCell = <TData,>(
     >
       {hasData ? (
         <TooltipWrapper content={tooltip}>
-          <PassRateTag passRate={passRate} label={badgeLabel!} />
+          <Tag variant={passRate === 1 ? "green" : "red"} size="md">
+            {badgeLabel}
+          </Tag>
         </TooltipWrapper>
       ) : (
         <span className="truncate text-light-slate">-</span>
