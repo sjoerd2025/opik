@@ -16,7 +16,6 @@ import AddEditCloneDashboardDialog from "@/components/pages-shared/dashboards/Ad
 import {
   useDashboardStore,
   selectHasUnsavedChanges,
-  selectMixedConfig,
 } from "@/store/DashboardStore";
 import { Dashboard } from "@/types/dashboard";
 
@@ -42,7 +41,6 @@ const DashboardSaveActions: React.FunctionComponent<
   const { toast } = useToast();
   const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
   const getDashboard = useDashboardStore((state) => state.getDashboard);
-  const mixedConfig = useDashboardStore(selectMixedConfig);
 
   const [isSaving, setIsSaving] = useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
@@ -195,9 +193,6 @@ const DashboardSaveActions: React.FunctionComponent<
         dashboard={saveAsDialogDashboard.current}
         onCreateSuccess={handleSaveAsSuccess}
         navigateOnCreate={navigateOnCreate}
-        defaultProjectId={mixedConfig?.projectIds?.[0]}
-        defaultExperimentIds={mixedConfig?.experimentIds?.slice()}
-        defaultExperimentDataSource={mixedConfig?.experimentDataSource}
       />
 
       {NavigationBlockerDialog}

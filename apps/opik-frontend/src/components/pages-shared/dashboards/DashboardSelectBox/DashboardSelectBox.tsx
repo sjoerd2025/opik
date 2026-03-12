@@ -16,10 +16,19 @@ import AddEditCloneDashboardDialog, {
 } from "@/components/pages-shared/dashboards/AddEditCloneDashboardDialog/AddEditCloneDashboardDialog";
 import useDashboardsList from "@/api/dashboards/useDashboardsList";
 import { cn } from "@/lib/utils";
+import {
+  generateDashboardScopeFilter,
+  generateDashboardTypeFilter,
+} from "@/lib/filters";
 import useAppStore from "@/store/AppStore";
 import { TEMPLATE_LIST } from "@/lib/dashboard/templates";
 import { isTemplateId } from "@/lib/dashboard/utils";
-import { Dashboard, DashboardTemplate } from "@/types/dashboard";
+import {
+  Dashboard,
+  DASHBOARD_SCOPE,
+  DASHBOARD_TYPE,
+  DashboardTemplate,
+} from "@/types/dashboard";
 import SearchInput from "@/components/shared/SearchInput/SearchInput";
 import ConfirmDialog from "@/components/shared/ConfirmDialog/ConfirmDialog";
 import useDashboardBatchDeleteMutation from "@/api/dashboards/useDashboardBatchDeleteMutation";
@@ -36,9 +45,9 @@ interface DashboardSelectBoxProps {
   buttonClassName?: string;
   onDashboardCreated?: (dashboardId: string) => void;
   onDashboardDeleted?: (deletedDashboardId: string) => void;
-  defaultProjectId?: string;
-  defaultExperimentIds?: string[];
   templates?: DashboardTemplate[];
+  dashboardType?: DASHBOARD_TYPE;
+  dashboardScope?: DASHBOARD_SCOPE;
 }
 
 interface DialogState {
@@ -59,9 +68,9 @@ const DashboardSelectBox: React.FC<DashboardSelectBoxProps> = ({
   buttonClassName,
   onDashboardCreated,
   onDashboardDeleted,
-  defaultProjectId,
-  defaultExperimentIds,
   templates = TEMPLATE_LIST,
+  dashboardType,
+  dashboardScope,
 }) => {
   const [isLoadedMore, setIsLoadedMore] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -80,9 +89,18 @@ const DashboardSelectBox: React.FC<DashboardSelectBoxProps> = ({
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const { mutate: deleteMutate } = useDashboardBatchDeleteMutation();
 
+  const processedFilters = useMemo(() => {
+    const filters = [
+      ...(dashboardScope ? generateDashboardScopeFilter(dashboardScope) : []),
+      ...(dashboardType ? generateDashboardTypeFilter(dashboardType) : []),
+    ];
+    return filters.length > 0 ? filters : undefined;
+  }, [dashboardScope, dashboardType]);
+
   const { data: dashboardsData } = useDashboardsList(
     {
       workspaceName,
+      filters: processedFilters,
       page: 1,
       size: !isLoadedMore ? DEFAULT_LOADED_DASHBOARDS : MAX_LOADED_DASHBOARDS,
     },
@@ -321,8 +339,8 @@ const DashboardSelectBox: React.FC<DashboardSelectBoxProps> = ({
         setOpen={closeDialog}
         onCreateSuccess={handleDialogCreateSuccess}
         navigateOnCreate={false}
-        defaultProjectId={defaultProjectId}
-        defaultExperimentIds={defaultExperimentIds}
+        dashboardType={dashboardType}
+        dashboardScope={dashboardScope}
       />
 
       <ConfirmDialog

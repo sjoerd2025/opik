@@ -15,7 +15,7 @@ import {
 import FiltersButton from "@/components/shared/FiltersButton/FiltersButton";
 import ThreadsFeedbackScoresSelect from "@/components/pages-shared/traces/TracesOrSpansFeedbackScoresSelect/ThreadsFeedbackScoresSelect";
 
-import MetricContainerChart from "./MetricChart/MetricChartContainer";
+import MetricContainerChart from "@/components/pages-shared/dashboards/widgets/ProjectMetricsWidget/MetricChart/MetricChartContainer";
 import { CHART_TYPE } from "@/constants/chart";
 import {
   DURATION_LABELS_MAP,
@@ -23,7 +23,7 @@ import {
   renderDurationTooltipValue,
   durationYTickFormatter,
   tokenYTickFormatter,
-} from "./utils";
+} from "@/components/pages-shared/dashboards/widgets/ProjectMetricsWidget/chartUtils";
 import { renderScoreTooltipValue } from "@/lib/feedback-scores";
 
 const THREAD_FILTER_COLUMNS: ColumnData<Thread>[] = [

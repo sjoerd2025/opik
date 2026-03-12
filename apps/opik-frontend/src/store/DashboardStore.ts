@@ -5,8 +5,8 @@ import { UniqueIdentifier } from "@dnd-kit/core";
 import uniqid from "uniqid";
 
 import {
-  BaseDashboardConfig,
   DashboardLayout,
+  DashboardRuntimeConfig,
   DashboardSection,
   DashboardSections,
   DashboardState,
@@ -17,7 +17,6 @@ import {
 import {
   generateEmptyDashboard,
   generateEmptySection,
-  generateEmptyConfig,
   getSectionById,
   updateWidgetWithGeneratedTitle,
 } from "@/lib/dashboard/utils";
@@ -28,12 +27,11 @@ import {
 } from "@/lib/dashboard/layout";
 import { migrateDashboardConfig } from "@/lib/dashboard/migrations";
 
-interface DashboardStoreState<TConfig = BaseDashboardConfig> {
+interface DashboardStoreState {
   sections: DashboardSections;
   version: number;
   lastModified: number;
-  config: TConfig | null;
-  runtimeConfig: Partial<TConfig>;
+  runtimeConfig: DashboardRuntimeConfig;
   onAddEditWidgetCallback:
     | ((params: AddEditWidgetCallbackParams) => void)
     | null;
@@ -42,7 +40,7 @@ interface DashboardStoreState<TConfig = BaseDashboardConfig> {
   hasUnsavedChanges: boolean;
 }
 
-interface DashboardActions<TConfig = BaseDashboardConfig> {
+interface DashboardActions {
   addSection: (title?: string) => string;
   addSectionAtPosition: (position: number, title?: string) => string;
   deleteSection: (sectionId: string) => void;
@@ -73,8 +71,7 @@ interface DashboardActions<TConfig = BaseDashboardConfig> {
   ) => void;
   updateLayout: (sectionId: string, layout: DashboardLayout) => void;
 
-  setConfig: (config: TConfig) => void;
-  setRuntimeConfig: (runtimeConfig: Partial<TConfig>) => void;
+  setRuntimeConfig: (runtimeConfig: DashboardRuntimeConfig) => void;
 
   setOnAddEditWidgetCallback: (
     callback: ((params: AddEditWidgetCallbackParams) => void) | null,
@@ -99,10 +96,9 @@ interface DashboardActions<TConfig = BaseDashboardConfig> {
   ) => DashboardWidget | undefined;
 }
 
-export type DashboardStore<TConfig = BaseDashboardConfig> =
-  DashboardStoreState<TConfig> & DashboardActions<TConfig>;
+export type DashboardStore = DashboardStoreState & DashboardActions;
 
-export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
+export const useDashboardStore = create<DashboardStore>()(
   devtools(
     (set, get) => {
       const initialDashboard = generateEmptyDashboard();
@@ -128,7 +124,6 @@ export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
         sections: initialDashboard.sections,
         version: initialDashboard.version,
         lastModified: initialDashboard.lastModified,
-        config: initialDashboard.config,
         runtimeConfig: {},
         onAddEditWidgetCallback: null,
         widgetResolver: null,
@@ -397,10 +392,6 @@ export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
           );
         },
 
-        setConfig: (config) => {
-          set({ config }, false, "setConfig");
-        },
-
         setRuntimeConfig: (runtimeConfig) => {
           set({ runtimeConfig }, false, "setRuntimeConfig");
         },
@@ -446,7 +437,6 @@ export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
               sections: emptyDashboard.sections,
               version: emptyDashboard.version,
               lastModified: Date.now(),
-              config: emptyDashboard.config,
             },
             false,
             "clearDashboard",
@@ -461,7 +451,6 @@ export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
               sections: migratedDashboard.sections,
               version: migratedDashboard.version,
               lastModified: migratedDashboard.lastModified,
-              config: migratedDashboard.config,
             },
             false,
             "loadDashboardFromBackend",
@@ -474,7 +463,6 @@ export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
             sections: state.sections,
             version: state.version,
             lastModified: state.lastModified,
-            config: state.config ?? generateEmptyConfig(),
           };
         },
 
@@ -521,58 +509,33 @@ export const selectUpdateWidget = (state: DashboardStore) => state.updateWidget;
 export const selectMoveWidget = (state: DashboardStore) => state.moveWidget;
 export const selectUpdateLayout = (state: DashboardStore) => state.updateLayout;
 
-export const selectMixedConfig = <TConfig = BaseDashboardConfig>(
-  state: DashboardStore<TConfig>,
-) => {
-  if (!state.config) return null;
-  return {
-    ...state.config,
-    ...state.runtimeConfig,
-  } as TConfig;
-};
+export const selectRuntimeConfig = (state: DashboardStore) =>
+  state.runtimeConfig;
 
-export const selectConfig = <TConfig = BaseDashboardConfig>(
-  state: DashboardStore<TConfig>,
-) => state.config;
+export const selectSetRuntimeConfig = (state: DashboardStore) =>
+  state.setRuntimeConfig;
+export const selectClearDashboard = (state: DashboardStore) =>
+  state.clearDashboard;
 
-export const selectSetConfig = (state: DashboardStore<BaseDashboardConfig>) =>
-  state.setConfig;
+export const selectOnAddEditWidgetCallback = (state: DashboardStore) =>
+  state.onAddEditWidgetCallback;
+export const selectSetOnAddEditWidgetCallback = (state: DashboardStore) =>
+  state.setOnAddEditWidgetCallback;
 
-export const selectSetRuntimeConfig = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.setRuntimeConfig;
-export const selectClearDashboard = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.clearDashboard;
+export const selectWidgetResolver = (state: DashboardStore) =>
+  state.widgetResolver;
+export const selectSetWidgetResolver = (state: DashboardStore) =>
+  state.setWidgetResolver;
 
-export const selectOnAddEditWidgetCallback = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.onAddEditWidgetCallback;
-export const selectSetOnAddEditWidgetCallback = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.setOnAddEditWidgetCallback;
+export const selectPreviewWidget = (state: DashboardStore) =>
+  state.previewWidget;
+export const selectSetPreviewWidget = (state: DashboardStore) =>
+  state.setPreviewWidget;
 
-export const selectWidgetResolver = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.widgetResolver;
-export const selectSetWidgetResolver = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.setWidgetResolver;
+export const selectUpdatePreviewWidget = (state: DashboardStore) =>
+  state.updatePreviewWidget;
 
-export const selectPreviewWidget = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.previewWidget;
-export const selectSetPreviewWidget = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.setPreviewWidget;
-
-export const selectUpdatePreviewWidget = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.updatePreviewWidget;
-
-export const selectHasUnsavedChanges = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.hasUnsavedChanges;
-export const selectSetHasUnsavedChanges = (
-  state: DashboardStore<BaseDashboardConfig>,
-) => state.setHasUnsavedChanges;
+export const selectHasUnsavedChanges = (state: DashboardStore) =>
+  state.hasUnsavedChanges;
+export const selectSetHasUnsavedChanges = (state: DashboardStore) =>
+  state.setHasUnsavedChanges;
