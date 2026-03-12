@@ -2,14 +2,14 @@ import React, { useCallback } from "react";
 import { ColumnPinningState, ColumnSort, Row } from "@tanstack/react-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { ROW_HEIGHT, OnChangeFn } from "@/types/shared";
-import { Experiment } from "@/types/datasets";
+import { AggregatedCandidate } from "@/types/optimizations";
 import { Card } from "@/components/ui/card";
 import DataTable from "@/components/shared/DataTable/DataTable";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import { DataTableWrapperProps } from "@/components/shared/DataTable/DataTableWrapper";
 import { TABLE_WRAPPER_ATTRIBUTE } from "@/components/layout/PageBodyStickyTableWrapper/PageBodyStickyTableWrapper";
 
-export const getRowId = (e: Experiment) => e.id;
+export const getRowId = (e: AggregatedCandidate) => e.id;
 
 export const DEFAULT_COLUMN_PINNING: ColumnPinningState = {
   left: [],
@@ -31,10 +31,10 @@ const StickyTableWrapperWithBorder: React.FC<DataTableWrapperProps> = ({
   );
 };
 
-interface CompareOptimizationsTrialsTableProps {
-  columns: ColumnDef<Experiment>[];
-  rows: Experiment[];
-  onRowClick: (row: Experiment) => void;
+interface OptimizationTrialsTableProps {
+  columns: ColumnDef<AggregatedCandidate>[];
+  rows: AggregatedCandidate[];
+  onRowClick: (row: AggregatedCandidate) => void;
   rowHeight: ROW_HEIGHT;
   noDataText: string;
   sortedColumns: ColumnSort[];
@@ -45,9 +45,7 @@ interface CompareOptimizationsTrialsTableProps {
   showLoadingOverlay?: boolean;
 }
 
-const CompareOptimizationsTrialsTable: React.FC<
-  CompareOptimizationsTrialsTableProps
-> = ({
+const OptimizationTrialsTable: React.FC<OptimizationTrialsTableProps> = ({
   columns,
   rows,
   onRowClick,
@@ -61,7 +59,7 @@ const CompareOptimizationsTrialsTable: React.FC<
   showLoadingOverlay,
 }) => {
   const getRowClassName = useCallback(
-    (row: Row<Experiment>) => {
+    (row: Row<AggregatedCandidate>) => {
       if (highlightedTrialId && row.id === highlightedTrialId) {
         return "comet-table-row-best";
       }
@@ -99,4 +97,4 @@ const CompareOptimizationsTrialsTable: React.FC<
   );
 };
 
-export default CompareOptimizationsTrialsTable;
+export default OptimizationTrialsTable;
