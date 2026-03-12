@@ -261,9 +261,9 @@ class DockerExecutor(CodeExecutorBase):
                     executor_memory_bytes_gauge.set(memory_bytes, {"container_id": short_id})
 
                 except Exception as e:
-                    logger.debug(f"Failed to collect stats for container {container.short_id}: {e}")
+                    logger.warning(f"Failed to collect stats for container {container.short_id}: {e}")
         except Exception as e:
-            logger.error(f"Error collecting executor resource metrics: {e}")
+            logger.warning(f"Error collecting executor resource metrics: {e}")
 
         return None  # Continue the job
 
