@@ -186,7 +186,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 feedback_scores_avg,
                 total_estimated_cost_sum,
                 total_estimated_cost_avg,
-                usage_avg
+                usage_avg,
+                pass_rate,
+                passed_count,
+                total_count
             FROM experiment_aggregates FINAL
             WHERE workspace_id = :workspace_id
             AND id = :experiment_id
@@ -2005,6 +2008,11 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         // usage_avg is Map(String, Float64), read as Map<String, Double>
         Map<String, Double> usageAvg = row.get("usage_avg", Map.class);
 
+        // pass_rate fields are non-nullable in experiment_aggregates (DEFAULT 0)
+        // Convert 0 defaults to null for non-evaluation-suite experiments
+        Long totalCount = row.get("total_count", Long.class);
+        boolean hasPassRate = totalCount != null && totalCount > 0;
+
         // Build Experiment with all fields from experiment_aggregates table
         return new Experiment(
                 id,
@@ -2035,9 +2043,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 promptVersions,
                 datasetVersionId,
                 null, // datasetVersionSummary - not in DB
-                null, // passRate - not in aggregates
-                null, // passedCount - not in aggregates
-                null); // totalCount - not in aggregates
+                hasPassRate ? getBigDecimal(row, "pass_rate") : null,
+                hasPassRate ? row.get("passed_count", Long.class) : null,
+                hasPassRate ? totalCount : null);
     }
 
     /**
