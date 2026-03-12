@@ -2043,7 +2043,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 promptVersions,
                 datasetVersionId,
                 null, // datasetVersionSummary - not in DB
-                hasPassRate ? getBigDecimal(row, "pass_rate") : null,
+                hasPassRate ? row.get("pass_rate", BigDecimal.class) : null,
                 hasPassRate ? row.get("passed_count", Long.class) : null,
                 hasPassRate ? totalCount : null);
     }
@@ -2063,9 +2063,6 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         return StringUtils.isNotBlank(value) ? UUID.fromString(value) : null;
     }
 
-    /**
-     * Helper to convert Double to BigDecimal.
-     */
     private BigDecimal getBigDecimal(Row row, String columnName) {
         Double value = row.get(columnName, Double.class);
         return value != null ? BigDecimal.valueOf(value) : null;
