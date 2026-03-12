@@ -2,23 +2,158 @@
  * Utility functions for optimization chart data processing
  */
 
+import { AggregatedCandidate } from "@/types/optimizations";
+
 export type FeedbackScore = {
   name: string;
   value: number;
 };
 
-export type DataRecord = {
-  entityId: string;
-  entityName: string;
-  createdDate: string;
-  value: number | null;
-  allFeedbackScores?: FeedbackScore[];
+export type TrialStatus = "baseline" | "passed" | "pruned" | "running";
+
+export const TRIAL_STATUS_COLORS: Record<TrialStatus, string> = {
+  baseline: "var(--color-gray)",
+  passed: "var(--color-blue)",
+  pruned: "var(--color-pink)",
+  running: "var(--color-yellow)",
 };
 
-// Color for the main objective - always uses this color for prominence
+export const TRIAL_STATUS_LABELS: Record<TrialStatus, string> = {
+  baseline: "Baseline",
+  passed: "Passed",
+  pruned: "Pruned",
+  running: "Running",
+};
+
+export const TRIAL_STATUS_ORDER: readonly TrialStatus[] = [
+  "baseline",
+  "passed",
+  "pruned",
+  "running",
+] as const;
+
+export type CandidateDataPoint = {
+  candidateId: string;
+  stepIndex: number;
+  parentCandidateIds: string[];
+  value: number | null;
+  status: TrialStatus;
+  name: string;
+};
+
+export type ParentChildEdge = {
+  parentCandidateId: string;
+  childCandidateId: string;
+};
+
+export type InProgressInfo = {
+  candidateId: string;
+  stepIndex: number;
+  parentCandidateIds: string[];
+};
+
+/**
+ * Compute status for each candidate:
+ * - Step 0 = "baseline"
+ * - score == null (still being evaluated) = "running"
+ * - scored higher than best parent = "passed"
+ * - scored equal or lower than best parent = "pruned"
+ */
+export const computeCandidateStatuses = (
+  candidates: AggregatedCandidate[],
+): Map<string, TrialStatus> => {
+  const statusMap = new Map<string, TrialStatus>();
+  if (!candidates.length) return statusMap;
+
+  const candidateById = new Map<string, AggregatedCandidate>();
+  for (const c of candidates) {
+    candidateById.set(c.candidateId, c);
+  }
+
+  for (const c of candidates) {
+    if (c.stepIndex === 0) {
+      statusMap.set(c.candidateId, "baseline");
+    } else if (c.score == null) {
+      statusMap.set(c.candidateId, "running");
+    } else {
+      const bestParentScore = c.parentCandidateIds.reduce<number | undefined>(
+        (best, pid) => {
+          const parent = candidateById.get(pid);
+          if (parent?.score == null) return best;
+          return best == null ? parent.score : Math.max(best, parent.score);
+        },
+        undefined,
+      );
+
+      if (bestParentScore == null || c.score > bestParentScore) {
+        statusMap.set(c.candidateId, "passed");
+      } else {
+        statusMap.set(c.candidateId, "pruned");
+      }
+    }
+  }
+
+  return statusMap;
+};
+
+/**
+ * Build scatter data points from aggregated candidates.
+ * Each candidate becomes one dot on the chart.
+ */
+export const buildCandidateChartData = (
+  candidates: AggregatedCandidate[],
+): CandidateDataPoint[] => {
+  const statusMap = computeCandidateStatuses(candidates);
+
+  return candidates
+    .slice()
+    .sort(
+      (a, b) =>
+        a.stepIndex - b.stepIndex || a.created_at.localeCompare(b.created_at),
+    )
+    .map((c) => ({
+      candidateId: c.candidateId,
+      stepIndex: c.stepIndex,
+      parentCandidateIds: c.parentCandidateIds,
+      value: c.score ?? null,
+      status: statusMap.get(c.candidateId) ?? "pruned",
+      name: c.name,
+    }));
+};
+
+/**
+ * Build parent-child edges from chart data.
+ */
+export const buildParentChildEdges = (
+  data: CandidateDataPoint[],
+): ParentChildEdge[] => {
+  const candidateIds = new Set(data.map((d) => d.candidateId));
+  const edges: ParentChildEdge[] = [];
+
+  for (const point of data) {
+    for (const parentId of point.parentCandidateIds) {
+      if (candidateIds.has(parentId)) {
+        edges.push({
+          parentCandidateId: parentId,
+          childCandidateId: point.candidateId,
+        });
+      }
+    }
+  }
+
+  return edges;
+};
+
+/**
+ * Get unique step indices from candidates, sorted.
+ */
+export const getUniqueSteps = (candidates: AggregatedCandidate[]): number[] => {
+  const steps = new Set(candidates.map((c) => c.stepIndex));
+  return Array.from(steps).sort((a, b) => a - b);
+};
+
 const MAIN_OBJECTIVE_COLOR = "var(--color-blue)";
 
-// Available chart colors for secondary scores in order of visual distinction
 const SECONDARY_SCORE_COLORS = [
   "var(--color-orange)",
   "var(--color-green)",
@@ -29,64 +164,18 @@ const SECONDARY_SCORE_COLORS = [
   "var(--color-burgundy)",
 ];
 
-/**
- * Extract all unique feedback score names from the data records,
- * excluding the main objective, sorted alphabetically
- */
-export const extractSecondaryScoreNames = (
-  data: DataRecord[],
-  mainObjective: string,
-): string[] => {
-  const scoreNamesSet = new Set<string>();
-
-  data.forEach((record) => {
-    record.allFeedbackScores?.forEach((score) => {
-      if (score.name !== mainObjective) {
-        scoreNamesSet.add(score.name);
-      }
-    });
-  });
-
-  // Sort alphabetically for consistent display order
-  return Array.from(scoreNamesSet).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: "base" }),
-  );
-};
-
-/**
- * Get the value for a specific feedback score from a record
- */
-export const getScoreValue = (
-  record: DataRecord,
-  scoreName: string,
-): number | null => {
-  if (!record.allFeedbackScores) return null;
-
-  const score = record.allFeedbackScores.find((s) => s.name === scoreName);
-  return score ? score.value : null;
-};
-
-/**
- * Generate a color map ensuring main objective and secondary scores have distinct colors
- * Secondary scores are sorted alphabetically to guarantee consistent color assignment
- */
 export const generateDistinctColorMap = (
   mainObjective: string,
   secondaryScores: string[],
 ): Record<string, string> => {
   const colorMap: Record<string, string> = {};
-
-  // Assign main objective color
   colorMap[mainObjective] = MAIN_OBJECTIVE_COLOR;
 
-  // Sort secondary scores alphabetically to ensure consistent color assignment
   const sortedSecondaryScores = [...secondaryScores].sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: "base" }),
   );
 
-  // Assign colors to secondary scores from the secondary color palette
   sortedSecondaryScores.forEach((scoreName, index) => {
-    // Use modulo to cycle through colors if we have more scores than colors
     colorMap[scoreName] =
       SECONDARY_SCORE_COLORS[index % SECONDARY_SCORE_COLORS.length];
   });

@@ -10,7 +10,7 @@ import { extractDisplayMessages } from "@/lib/llm";
 import useAppStore from "@/store/AppStore";
 import ResizableSection from "@/components/shared/ResizableSection/ResizableSection";
 
-interface CompareOptimizationsConfigurationProps {
+interface OptimizationConfigurationProps {
   studioConfig: OptimizationStudioConfig;
   datasetId: string;
   optimizationId: string;
@@ -37,9 +37,12 @@ const ConfigItem: React.FC<{ label: string; value: React.ReactNode }> = ({
   </div>
 );
 
-const CompareOptimizationsConfiguration: React.FC<
-  CompareOptimizationsConfigurationProps
-> = ({ studioConfig, datasetId, optimizationId, bestExperiment }) => {
+const OptimizationConfiguration: React.FC<OptimizationConfigurationProps> = ({
+  studioConfig,
+  datasetId,
+  optimizationId,
+  bestExperiment,
+}) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const { prompt, optimizer, evaluation, dataset_name, llm_model } =
     studioConfig;
@@ -98,10 +101,9 @@ const CompareOptimizationsConfiguration: React.FC<
                 label="Best trial configuration"
                 value={
                   <Link
-                    to="/$workspaceName/optimizations/$datasetId/$optimizationId/compare"
+                    to="/$workspaceName/optimizations/$optimizationId/trials"
                     params={{
                       workspaceName,
-                      datasetId,
                       optimizationId,
                     }}
                     target="_blank"
@@ -136,4 +138,4 @@ const CompareOptimizationsConfiguration: React.FC<
   );
 };
 
-export default CompareOptimizationsConfiguration;
+export default OptimizationConfiguration;
