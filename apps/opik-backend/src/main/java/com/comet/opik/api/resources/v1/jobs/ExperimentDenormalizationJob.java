@@ -9,7 +9,9 @@ import jakarta.inject.Singleton;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.DisallowConcurrentExecution;
+import org.quartz.InterruptableJob;
 import org.quartz.JobExecutionContext;
+import org.quartz.UnableToInterruptJobException;
 import org.redisson.api.RedissonReactiveClient;
 import org.redisson.api.stream.StreamAddArgs;
 import reactor.core.publisher.Flux;
@@ -18,6 +20,8 @@ import ru.vyarus.dropwizard.guice.module.yaml.bind.Config;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import static com.comet.opik.infrastructure.lock.LockService.Lock;
 
@@ -40,10 +44,11 @@ import static com.comet.opik.infrastructure.lock.LockService.Lock;
 @Slf4j
 @Singleton
 @DisallowConcurrentExecution
-public class ExperimentDenormalizationJob extends Job {
+public class ExperimentDenormalizationJob extends Job implements InterruptableJob {
 
     private static final Lock SCAN_LOCK_KEY = new Lock("experiment_denormalization_job:scan_lock");
 
+    private final AtomicBoolean interrupted = new AtomicBoolean(false);
     private final ExperimentDenormalizationConfig config;
     private final RedissonReactiveClient redisClient;
     private final LockService lockService;
@@ -65,7 +70,13 @@ public class ExperimentDenormalizationJob extends Job {
             return;
         }
 
-        log.debug("Starting experiment denormalization job - checking for pending experiments");
+        // Check for interruption before starting
+        if (interrupted.get()) {
+            log.info("Experiment denormalization job interrupted before execution, skipping");
+            return;
+        }
+
+        log.info("Starting experiment denormalization job - checking for pending experiments");
 
         lockService.bestEffortLock(
                 SCAN_LOCK_KEY,
@@ -75,18 +86,18 @@ public class ExperimentDenormalizationJob extends Job {
                                 "Failed to process pending experiment '{}'",
                                 experimentId, throwable))
                         .doOnComplete(
-                                () -> log.debug(
+                                () -> log.info(
                                         "Experiment denormalization job finished processing all ready experiments"))
                         .then()),
                 Mono.defer(() -> {
-                    log.debug(
+                    log.info(
                             "Could not acquire lock for scanning pending experiments, another job instance is running");
                     return Mono.empty();
                 }),
                 config.getJobLockTime().toJavaDuration(),
                 config.getJobLockWaitTime().toJavaDuration())
                 .subscribe(
-                        __ -> log.debug("Experiment denormalization job execution completed"),
+                        __ -> log.info("Experiment denormalization job execution completed"),
                         error -> log.error("Experiment denormalization job interrupted while acquiring lock", error));
     }
 
@@ -94,23 +105,37 @@ public class ExperimentDenormalizationJob extends Job {
      * Queries the ZSET index in pages for experiment IDs whose debounce window has elapsed (score &lt;= now).
      * Uses offset/count pagination to avoid materializing the entire ZSET into memory.
      * Since each processed experiment is removed from the ZSET, we always query from offset 0.
+     * A safety counter caps the number of expand iterations (using batchSize as the limit) to
+     * prevent infinite loops if entries fail to be removed (e.g., due to errors swallowed by onErrorContinue).
      */
     private Flux<String> getExperimentsReadyToProcess() {
         long nowMillis = Instant.now().toEpochMilli();
         int batchSize = config.getJobBatchSize();
         var index = redisClient.<String>getScoredSortedSet(ExperimentDenormalizationConfig.PENDING_SET_KEY);
+        var iterations = new int[]{0};
 
         log.debug("Checking for experiments ready to process (up to timestamp: '{}', batchSize: '{}')",
                 nowMillis, batchSize);
+
+        if (interrupted.get()) {
+            log.info("Experiment denormalization job interrupted before execution, skipping");
+            return Flux.empty();
+        }
 
         return index.valueRange(Double.NEGATIVE_INFINITY, true, nowMillis, true, 0, batchSize)
                 .expand(collection -> {
                     if (collection.size() < batchSize) {
                         return Mono.empty();
                     }
+                    iterations[0]++;
+                    if (iterations[0] >= batchSize) {
+                        log.warn("Reached maximum expand iterations '{}', stopping pagination to prevent infinite loop",
+                                batchSize);
+                        return Mono.empty();
+                    }
                     return index.valueRange(Double.NEGATIVE_INFINITY, true, nowMillis, true, 0, batchSize);
                 })
-                .flatMapIterable(collection -> collection)
+                .flatMapIterable(Function.identity())
                 .map(Object::toString);
     }
 
@@ -125,7 +150,7 @@ public class ExperimentDenormalizationJob extends Job {
         String workspaceId = member.substring(0, separatorIndex);
         String experimentIdStr = member.substring(separatorIndex + 1);
 
-        log.debug("Processing pending experiment: '{}' for workspace: '{}'", experimentIdStr, workspaceId);
+        log.info("Processing pending experiment: '{}' for workspace: '{}'", experimentIdStr, workspaceId);
 
         var bucket = redisClient.<String, String>getMap(ExperimentDenormalizationConfig.EXPERIMENT_KEY_PREFIX + member);
         var index = redisClient.getScoredSortedSet(ExperimentDenormalizationConfig.PENDING_SET_KEY);
@@ -140,7 +165,7 @@ public class ExperimentDenormalizationJob extends Job {
                             .build();
 
                     return stream.add(StreamAddArgs.entry(ExperimentDenormalizationConfig.PAYLOAD_FIELD, message))
-                            .doOnNext(id -> log.debug(
+                            .doOnNext(id -> log.info(
                                     "Enqueued aggregation message for experiment '{}' with stream id '{}'",
                                     experimentIdStr, id))
                             .then(bucket.delete())
@@ -151,7 +176,13 @@ public class ExperimentDenormalizationJob extends Job {
                     return index.remove(member);
                 }))
                 .then()
-                .doOnSuccess(__ -> log.debug("Successfully processed and removed pending experiment: '{}'",
+                .doOnSuccess(__ -> log.info("Successfully processed and removed pending experiment: '{}'",
                         experimentIdStr));
+    }
+
+    @Override
+    public void interrupt() throws UnableToInterruptJobException {
+        interrupted.set(true);
+        log.info("ExperimentDenormalizationJob reaper job interrupted");
     }
 }

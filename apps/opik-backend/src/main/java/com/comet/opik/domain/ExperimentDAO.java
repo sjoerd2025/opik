@@ -866,6 +866,7 @@ class ExperimentDAO {
                     <else>
                     AND id IN (SELECT trace_id FROM experiment_items_final)
                     <endif>
+                    AND id IN (SELECT trace_id FROM experiment_items_final)
                 ) t ON ei.trace_id = t.id
                 GROUP BY ei.experiment_id
             )
@@ -1027,9 +1028,8 @@ class ExperimentDAO {
                         WHERE workspace_id = :workspace_id
                         <if(has_target_projects)>
                         AND project_id IN :target_project_ids
-                        <else>
-                        AND id IN (SELECT trace_id FROM experiment_items_final)
                         <endif>
+                        AND id IN (SELECT trace_id FROM experiment_items_final)
                     ) t ON ei.trace_id = t.id
                     GROUP BY ei.experiment_id
                 ) ep ON ef.id = ep.experiment_id
