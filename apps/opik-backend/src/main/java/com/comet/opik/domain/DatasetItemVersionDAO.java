@@ -695,10 +695,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 AND eia.dataset_item_id IN (SELECT id FROM dataset_items_agg_resolved WHERE <dataset_item_filters>)
                 <endif>
             )
-            SELECT COUNT(DISTINCT dataset_item_id) AS count
+            SELECT COUNT(DISTINCT di_id) AS count
             FROM (
                 <if(has_aggregated)>
-                SELECT eia.dataset_item_id
+                SELECT eia.dataset_item_id AS di_id
                 FROM item_agg_count AS eia
                 <if(search)>
                 LEFT JOIN dataset_items_agg_resolved di ON di.id = eia.dataset_item_id
@@ -709,7 +709,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
 
                 <if(has_raw)>
-                SELECT ei.dataset_item_id
+                SELECT ei.dataset_item_id AS di_id
                 FROM experiment_items_final AS ei
                 LEFT JOIN dataset_items_resolved AS di ON di.id = ei.dataset_item_id
                 <if(search)>
