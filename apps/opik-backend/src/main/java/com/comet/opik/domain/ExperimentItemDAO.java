@@ -173,9 +173,6 @@ class ExperimentItemDAO {
                 AND id IN (SELECT id FROM experiment_items_ids)
                 ORDER BY id DESC, last_updated_at DESC
                 LIMIT 1 BY id
-            ), experiment_item_aggr_trace_scope AS (
-                SELECT DISTINCT trace_id
-                FROM experiment_item_aggregates_final
             ), feedback_scores_combined_raw AS (
                   SELECT
                       workspace_id,
@@ -373,7 +370,21 @@ class ExperimentItemDAO {
             ), comments_per_trace AS (
                   SELECT
                       entity_id,
-                      groupUniqArray(tuple(comment_id, text, comment_created_at, comment_last_updated_at, comment_created_by, comment_last_updated_by, entity_id)) AS comments_array_agg
+                      toJSONString(groupUniqArray(CAST(
+                          (comment_id, text,
+                           concat(replaceOne(toString(comment_created_at), ' ', 'T'), 'Z'),
+                           concat(replaceOne(toString(comment_last_updated_at), ' ', 'T'), 'Z'),
+                           comment_created_by, comment_last_updated_by, entity_id),
+                          'Tuple(
+                              id FixedString(36),
+                              text String,
+                              created_at String,
+                              last_updated_at String,
+                              created_by String,
+                              last_updated_by String,
+                              entity_id FixedString(36)
+                          )'
+                      ))) AS comments_array_agg
                   FROM comments_final
                   GROUP BY entity_id
             )
@@ -391,7 +402,7 @@ class ExperimentItemDAO {
                       <if(truncate)> replaceRegexpAll(if(notEmpty(ei.input_slim), ei.input_slim, ei.input), '<truncate>', '"[image]"') <else> ei.input <endif> AS input,
                       <if(truncate)> replaceRegexpAll(if(notEmpty(ei.output_slim), ei.output_slim, ei.output), '<truncate>', '"[image]"') <else> ei.output <endif> AS output,
                       ei.feedback_scores_array AS feedback_scores_array,
-                      co.comments_array_agg AS comments_array_agg,
+                      ei.comments_array_agg AS comments_array_agg,
                       ei.total_estimated_cost AS total_estimated_cost,
                       ei.usage AS usage,
                       ei.duration AS duration,
@@ -401,28 +412,6 @@ class ExperimentItemDAO {
                       ei.last_updated_by AS last_updated_by,
                       ei.visibility_mode AS trace_visibility_mode
                   FROM experiment_item_aggregates_final AS ei
-                  LEFT JOIN (
-                      SELECT
-                          entity_id,
-                          groupUniqArray(tuple(comment_id, text, comment_created_at, comment_last_updated_at, comment_created_by, comment_last_updated_by, entity_id)) AS comments_array_agg
-                      FROM (
-                          SELECT
-                              id AS comment_id,
-                              text,
-                              created_at AS comment_created_at,
-                              last_updated_at AS comment_last_updated_at,
-                              created_by AS comment_created_by,
-                              last_updated_by AS comment_last_updated_by,
-                              entity_id
-                          FROM comments
-                          WHERE workspace_id = :workspace_id
-                          <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                          AND entity_id IN (SELECT trace_id FROM experiment_item_aggr_trace_scope)
-                          ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
-                          LIMIT 1 BY id
-                      ) AS c
-                      GROUP BY entity_id
-                  ) AS co ON ei.trace_id = co.entity_id
                   <endif>
 
                   <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
