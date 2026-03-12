@@ -172,6 +172,14 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [checkNullablePermission],
   );
 
+  const canUpdateOnlineEvaluationRules = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.ONLINE_EVALUATION_RULE_UPDATE,
+      ),
+    [checkNullablePermission],
+  );
+
   const canUpdateAlerts = useMemo(
     () => checkNullablePermission(ManagementPermissionsNames.ALERT_UPDATE),
     [checkNullablePermission],
@@ -195,6 +203,7 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     canUpdateAIProviders,
     canCreateProjects,
     canWriteComments,
+    canUpdateOnlineEvaluationRules,
     canUpdateAlerts,
     isPending: isEnabled && isPending,
   };
