@@ -1057,7 +1057,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                            eia.usage,
                            eia.visibility_mode,
                            eia.metadata,
-                           di.description
+                           di.description,
+                           '' -- OPIK-4666: placeholder for execution_policy, replace with eia.execution_policy once column is added to experiment_item_aggregates
                 )) AS experiment_items_array
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
