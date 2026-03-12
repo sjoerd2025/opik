@@ -137,12 +137,13 @@ class DockerExecutor(CodeExecutorBase):
             return DEFAULT_CPU_LIMIT
         try:
             cpu_limit = float(cpu_limit_str)
-            if cpu_limit <= 0:
-                raise ValueError("must be positive")
-            return int(cpu_limit * 1e9)
         except ValueError:
             logger.warning(f"Invalid PYTHON_CODE_EXECUTOR_CPU_LIMIT value '{cpu_limit_str}', ignoring")
             return DEFAULT_CPU_LIMIT
+        if cpu_limit <= 0:
+            logger.warning(f"PYTHON_CODE_EXECUTOR_CPU_LIMIT must be positive, got '{cpu_limit_str}', ignoring")
+            return DEFAULT_CPU_LIMIT
+        return int(cpu_limit * 1e9)
 
     def _start_pool_monitor(self):
         """Start a background thread that periodically checks and fills the container pool."""
