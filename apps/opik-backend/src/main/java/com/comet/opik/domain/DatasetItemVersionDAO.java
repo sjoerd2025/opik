@@ -1183,30 +1183,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         eia.last_updated_by,
                         eia.metadata,
                         eia.feedback_scores,
-                        co.comments_array_agg
+                        eia.comments_array_agg
                     FROM experiment_item_aggregates AS eia FINAL
-                    LEFT JOIN (
-                        SELECT
-                            entity_id,
-                            groupUniqArray(tuple(c.*)) AS comments_array_agg
-                        FROM (
-                            SELECT
-                                id AS comment_id,
-                                text,
-                                created_at AS comment_created_at,
-                                last_updated_at AS comment_last_updated_at,
-                                created_by AS comment_created_by,
-                                last_updated_by AS comment_last_updated_by,
-                                entity_id
-                            FROM comments
-                            WHERE workspace_id = :workspace_id
-                            <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                            AND entity_id IN (SELECT trace_id FROM experiment_item_aggr_trace_scope)
-                            ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
-                            LIMIT 1 BY id
-                        ) AS c
-                        GROUP BY entity_id
-                    ) AS co ON eia.trace_id = co.entity_id
                     WHERE eia.workspace_id = :workspace_id
                     AND eia.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
                     <if(push_top_limit)>AND eia.dataset_item_id IN (SELECT dataset_item_id FROM top_dataset_items)<endif>
@@ -1387,7 +1365,23 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     LEFT JOIN (
                         SELECT
                             entity_id,
-                            groupUniqArray(tuple(c.*)) AS comments_array_agg
+                            toJSONString(groupUniqArray(CAST(tuple(
+                                c.comment_id,
+                                c.text,
+                                concat(replaceOne(toString(c.comment_created_at), ' ', 'T'), 'Z'),
+                                concat(replaceOne(toString(c.comment_last_updated_at), ' ', 'T'), 'Z'),
+                                c.comment_created_by,
+                                c.comment_last_updated_by,
+                                c.entity_id
+                            ), 'Tuple(
+                                id FixedString(36),
+                                text String,
+                                created_at String,
+                                last_updated_at String,
+                                created_by String,
+                                last_updated_by String,
+                                entity_id FixedString(36)
+                            )'))) AS comments_array_agg
                         FROM comments_final AS c
                         GROUP BY entity_id
                     ) AS co ON t.id = co.entity_id

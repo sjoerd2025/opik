@@ -66,7 +66,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToFlux;
-import static com.comet.opik.domain.CommentResultMapper.getComments;
+import static com.comet.opik.domain.CommentResultMapper.parseCommentsFromJson;
 import static com.comet.opik.infrastructure.DatabaseUtils.getSTWithLogComment;
 import static com.comet.opik.utils.AsyncUtils.makeFluxContextAware;
 import static com.comet.opik.utils.JsonUtils.getJsonNodeOrDefault;
@@ -313,6 +313,7 @@ class ExperimentDAO {
                     if(isFinite(ea.total_estimated_cost_avg), toDecimal128(ea.total_estimated_cost_avg, 12), toDecimal128(0, 12)) AS total_estimated_cost_avg,
                     mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.feedback_scores_avg) AS feedback_scores_avg,
                     ea.experiment_scores AS experiment_scores,
+                    ea.comments_array_agg AS comments_array_agg,
                     if(ea.total_count = 0, NULL, ea.pass_rate) AS pass_rate,
                     if(ea.total_count = 0, NULL, ea.passed_count) AS passed_count,
                     if(ea.total_count = 0, NULL, ea.total_count) AS total_count
@@ -511,7 +512,23 @@ class ExperimentDAO {
                 LEFT JOIN (
                     SELECT
                         entity_id,
-                        groupArray(tuple(*)) AS comments_array
+                        groupArray(CAST(tuple(
+                            id,
+                            text,
+                            concat(replaceOne(toString(created_at), ' ', 'T'), 'Z'),
+                            concat(replaceOne(toString(last_updated_at), ' ', 'T'), 'Z'),
+                            created_by,
+                            last_updated_by,
+                            entity_id
+                        ), 'Tuple(
+                            id FixedString(36),
+                            text String,
+                            created_at String,
+                            last_updated_at String,
+                            created_by String,
+                            last_updated_by String,
+                            entity_id FixedString(36)
+                        )')) AS comments_array
                     FROM (
                         SELECT
                             id,
@@ -604,47 +621,12 @@ class ExperimentDAO {
                     agg.usage as usage,
                     agg.total_estimated_cost_sum as total_estimated_cost,
                     agg.total_estimated_cost_avg as total_estimated_cost_avg,
-                    ca.comments_array_agg as comments_array_agg,
+                    agg.comments_array_agg as comments_array_agg,
                     if(agg.total_count = 0, NULL, agg.pass_rate) AS pass_rate,
                     if(agg.total_count = 0, NULL, agg.passed_count) AS passed_count,
                     if(agg.total_count = 0, NULL, agg.total_count) AS total_count
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
-                LEFT JOIN (
-                    SELECT
-                        ei.experiment_id,
-                        groupUniqArrayArray(tc.comments_array) as comments_array_agg
-                    FROM (
-                        select distinct experiment_id, trace_id from experiment_item_aggregates
-                        WHERE workspace_id = :workspace_id
-                        and experiment_id in (select id from experiments_from_aggregates)
-                    ) ei
-                    LEFT JOIN (
-                        SELECT
-                            entity_id,
-                            groupArray(tuple(*)) AS comments_array
-                        FROM (
-                            SELECT
-                                id,
-                                text,
-                                created_at,
-                                last_updated_at,
-                                created_by,
-                                last_updated_by,
-                                entity_id
-                            FROM comments
-                            WHERE workspace_id = :workspace_id
-                            AND entity_type = :entity_type
-                            <if(has_target_projects)>
-                            AND project_id IN :target_project_ids
-                            <endif>
-                            ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
-                            LIMIT 1 BY id
-                        )
-                        GROUP BY entity_id
-                    ) AS tc ON ei.trace_id = tc.entity_id
-                    GROUP BY ei.experiment_id
-                ) AS ca ON e.id = ca.experiment_id
                 WHERE 1=1
                 <if(feedback_scores_aggregated_filters)>
                 AND (<feedback_scores_aggregated_filters>)
@@ -697,7 +679,7 @@ class ExperimentDAO {
                     ed.usage as usage,
                     ed.total_estimated_cost_sum as total_estimated_cost,
                     ed.total_estimated_cost_avg as total_estimated_cost_avg,
-                    ca.comments_array_agg as comments_array_agg,
+                    toJSONString(ca.comments_array_agg) as comments_array_agg,
                     pra.pass_rate as pass_rate,
                     pra.passed_count as passed_count,
                     pra.total_count as total_count
@@ -1759,7 +1741,7 @@ class ExperimentDAO {
                     .createdBy(row.get("created_by", String.class))
                     .lastUpdatedBy(row.get("last_updated_by", String.class))
                     .feedbackScores(getFeedbackScores(row, "feedback_scores"))
-                    .comments(getComments(row.get("comments_array_agg", List[].class)))
+                    .comments(parseCommentsFromJson(row.get("comments_array_agg", String.class)))
                     .traceCount(row.get("trace_count", Long.class))
                     .duration(ExperimentGroupMappers.getDuration(row))
                     .totalEstimatedCost(ExperimentGroupMappers.getCostValue(row, "total_estimated_cost"))
