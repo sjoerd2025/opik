@@ -396,6 +396,13 @@ public class DatasetResourceClient {
 
     public DatasetItemPage getDatasetItemsWithExperimentItems(UUID datasetId, List<UUID> experimentIds, String search,
             List<? extends Filter> filters, String apiKey, String workspaceName) {
+        return getDatasetItemsWithExperimentItems(datasetId, experimentIds, search, filters, null, null, null, apiKey,
+                workspaceName);
+    }
+
+    public DatasetItemPage getDatasetItemsWithExperimentItems(UUID datasetId, List<UUID> experimentIds, String search,
+            List<? extends Filter> filters, List<?> sorting, Integer page, Integer size,
+            String apiKey, String workspaceName) {
         var experimentIdsQueryParam = JsonUtils.writeValueAsString(experimentIds);
 
         var webTarget = client.target(RESOURCE_PATH.formatted(baseURI))
@@ -411,6 +418,18 @@ public class DatasetResourceClient {
 
         if (CollectionUtils.isNotEmpty(filters)) {
             webTarget = webTarget.queryParam("filters", toURLEncodedQueryParam(filters));
+        }
+
+        if (sorting != null && !sorting.isEmpty()) {
+            webTarget = webTarget.queryParam("sorting", toURLEncodedQueryParam(sorting));
+        }
+
+        if (page != null) {
+            webTarget = webTarget.queryParam("page", page);
+        }
+
+        if (size != null) {
+            webTarget = webTarget.queryParam("size", size);
         }
 
         try (var response = webTarget

@@ -48,7 +48,7 @@ class ExperimentItemMapper {
                         .filter(str -> !str.isBlank())
                         .map(JsonUtils::getJsonNodeFromStringWithFallback)
                         .orElse(null))
-                .feedbackScores(getFeedbackScores(row.get("feedback_scores_array", List[].class)))
+                .feedbackScores(getFeedbackScores(row.get("feedback_scores_array", String.class)))
                 .comments(getComments(row.get("comments_array_agg", List[].class)))
                 .duration(row.get("duration", Double.class))
                 .totalEstimatedCost(row.get("total_estimated_cost", BigDecimal.class).compareTo(BigDecimal.ZERO) == 0

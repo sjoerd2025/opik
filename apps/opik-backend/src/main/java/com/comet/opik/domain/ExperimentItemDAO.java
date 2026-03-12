@@ -272,19 +272,43 @@ class ExperimentItemDAO {
             ), feedback_scores_per_trace AS (
                   SELECT
                       entity_id,
-                      groupUniqArray(tuple(
-                          entity_id,
-                          name,
-                          category_name,
-                          value,
-                          reason,
-                          source,
-                          created_at,
-                          last_updated_at,
-                          created_by,
-                          last_updated_by,
-                          value_by_author
-                      )) AS feedback_scores_array
+                      toJSONString(
+                          groupUniqArray(
+                              tuple(
+                                  name = name,
+                                  category_name = category_name,
+                                  value = value,
+                                  reason = reason,
+                                  source = toString(source),
+                                  created_at = concat(replaceOne(toString(created_at), ' ', 'T'), 'Z'),
+                                  last_updated_at = concat(replaceOne(toString(last_updated_at), ' ', 'T'), 'Z'),
+                                  created_by = created_by,
+                                  last_updated_by = last_updated_by,
+                                  value_by_author = mapFromArrays(
+                                      mapKeys(value_by_author),
+                                      arrayMap(
+                                          v -> CAST(
+                                              (
+                                                  v.1,
+                                                  v.2,
+                                                  v.3,
+                                                  toString(v.4),
+                                                  concat(replaceOne(toString(v.5), ' ', 'T'), 'Z')
+                                              ),
+                                              'Tuple(
+                                                  value Decimal(18,9),
+                                                  reason String,
+                                                  category_name String,
+                                                  source String,
+                                                  last_updated_at String
+                                              )'
+                                          ),
+                                          mapValues(value_by_author)
+                                      )
+                                  )
+                              )
+                          )
+                      ) AS feedback_scores_array
                   FROM feedback_scores_final
                   GROUP BY entity_id
             ), comments_per_trace AS (
@@ -306,7 +330,7 @@ class ExperimentItemDAO {
                       ei.project_id,
                       <if(truncate)> replaceRegexpAll(if(notEmpty(ei.input_slim), ei.input_slim, ei.input), '<truncate>', '"[image]"') <else> ei.input <endif> AS input,
                       <if(truncate)> replaceRegexpAll(if(notEmpty(ei.output_slim), ei.output_slim, ei.output), '<truncate>', '"[image]"') <else> ei.output <endif> AS output,
-                      JSONExtract(ei.feedback_scores_array, 'Array(Tuple(entity_id String, name String, category_name String, value Decimal64(9), reason String, source String, created_at DateTime64(9, ''UTC''), last_updated_at DateTime64(9, ''UTC''), created_by String, last_updated_by String, value_by_author Map(String, Tuple(value Decimal64(9), reason String, category_name String, source String, last_updated_at DateTime64(9, ''UTC'')))))') as feedback_scores_array,
+                      ei.feedback_scores_array,
                       cp.comments_array_agg,
                       ei.total_estimated_cost,
                       ei.usage,
@@ -378,7 +402,7 @@ class ExperimentItemDAO {
                   LEFT JOIN comments_per_trace AS cp ON ei.trace_id = cp.entity_id
               )  as final_result
               ORDER BY final_result.id DESC, final_result.last_updated_at DESC
-              SETTINGS log_comment = '<log_comment>'
+              SETTINGS log_comment = '<log_comment>', output_format_json_named_tuples_as_objects = 1
               ;
               """;
 
