@@ -112,7 +112,7 @@ class ExperimentServiceTest {
                 sortingFactory,
                 responseBuilder,
                 featureFlags,
-                config,      
+                config,
                 experimentGroupEnricher,
                 experimentAggregatesService,
                 experimentAggregationPublisher);
