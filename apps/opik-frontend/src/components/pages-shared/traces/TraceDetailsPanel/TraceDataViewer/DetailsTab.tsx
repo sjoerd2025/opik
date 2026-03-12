@@ -9,6 +9,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import SyntaxHighlighter from "@/components/shared/SyntaxHighlighter/SyntaxHighlighter";
+import MarkdownPreview from "@/components/shared/MarkdownPreview/MarkdownPreview";
 import AttachmentsList from "./AttachmentsList";
 import EventsList from "./EventsList";
 import Loader from "@/components/shared/Loader/Loader";
@@ -28,19 +29,35 @@ const DetailsTab: React.FunctionComponent<DetailsTabProps> = ({
   const { media, transformedInput, transformedOutput } = useUnifiedMedia(data);
 
   const hasError = Boolean(data.error_info);
-  const hasMetadata = Boolean(data.metadata);
   const hasTokenUsage = Boolean(data.usage);
+
+  const metadataRecord = data.metadata as Record<string, unknown> | undefined;
+  const sourceCode =
+    typeof metadataRecord?.source_code === "string"
+      ? metadataRecord.source_code
+      : null;
+
+  const metadataWithoutSourceCode = useMemo(() => {
+    if (!data.metadata) return null;
+    if (!sourceCode) return data.metadata;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { source_code, ...rest } = metadataRecord as Record<string, unknown>;
+    return Object.keys(rest).length > 0 ? rest : null;
+  }, [data.metadata, metadataRecord, sourceCode]);
+
+  const hasMetadata = Boolean(metadataWithoutSourceCode);
 
   // Compute default open sections based on what's available
   const openSections = useMemo(() => {
     const sections = ["input", "output", "events"];
     if (hasError) sections.unshift("error");
+    if (sourceCode) sections.push("source_code");
     if (hasMetadata) sections.push("metadata");
     if (hasTokenUsage) sections.push("usage");
     // Attachments is handled by AttachmentsList which manages its own accordion
     sections.unshift("attachments");
     return sections;
-  }, [hasError, hasMetadata, hasTokenUsage]);
+  }, [hasError, hasMetadata, hasTokenUsage, sourceCode]);
 
   return (
     <MediaProvider media={media}>
@@ -106,6 +123,17 @@ const DetailsTab: React.FunctionComponent<DetailsTabProps> = ({
           </AccordionContent>
         </AccordionItem>
         <EventsList data={data} isLoading={isLoading} search={search} />
+        {sourceCode && (
+          <AccordionItem className="group" value="source_code">
+            <AccordionTrigger>Source code</AccordionTrigger>
+            <AccordionContent
+              forceMount
+              className="group-data-[state=closed]:hidden"
+            >
+              <MarkdownPreview>{sourceCode}</MarkdownPreview>
+            </AccordionContent>
+          </AccordionItem>
+        )}
         {hasMetadata && (
           <AccordionItem className="group" value="metadata">
             <AccordionTrigger>Metadata</AccordionTrigger>
@@ -115,7 +143,7 @@ const DetailsTab: React.FunctionComponent<DetailsTabProps> = ({
             >
               <SyntaxHighlighter
                 withSearch
-                data={data.metadata}
+                data={metadataWithoutSourceCode!}
                 search={search}
               />
             </AccordionContent>
