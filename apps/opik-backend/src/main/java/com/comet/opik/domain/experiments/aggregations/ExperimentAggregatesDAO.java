@@ -2063,12 +2063,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         return StringUtils.isNotBlank(value) ? UUID.fromString(value) : null;
     }
 
-    /**
-     * Helper to convert Double to BigDecimal.
-     */
     private BigDecimal getBigDecimal(Row row, String columnName) {
-        Double value = row.get(columnName, Double.class);
-        return value != null ? BigDecimal.valueOf(value) : null;
+        return row.get(columnName, BigDecimal.class);
     }
 
     /**
