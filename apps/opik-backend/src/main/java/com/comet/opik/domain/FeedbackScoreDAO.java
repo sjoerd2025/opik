@@ -770,7 +770,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete feedback_scores: workspaces={}, cutoffId={}", workspaceIds.size(), cutoffId);
+        log.info("Retention delete feedback_scores: workspaces='{}', cutoffId='{}'", workspaceIds.size(), cutoffId);
 
         return asyncTemplate.nonTransaction(connection -> {
             var template1 = getSTWithLogComment(DELETE_FOR_RETENTION,

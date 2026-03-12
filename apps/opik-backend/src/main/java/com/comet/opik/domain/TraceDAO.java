@@ -3743,7 +3743,7 @@ class TraceDAOImpl implements TraceDAO {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete traces: workspaces={}, cutoffId={}", workspaceIds.size(), cutoffId);
+        log.info("Retention delete traces: workspaces='{}', cutoffId='{}'", workspaceIds.size(), cutoffId);
 
         var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_traces", null,
                 workspaceIds.size());

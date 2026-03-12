@@ -2719,7 +2719,7 @@ public class SpanDAO {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete spans: workspaces={}, cutoffId={}", workspaceIds.size(), cutoffId);
+        log.info("Retention delete spans: workspaces='{}', cutoffId='{}'", workspaceIds.size(), cutoffId);
 
         var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_spans", null,
                 workspaceIds.size());

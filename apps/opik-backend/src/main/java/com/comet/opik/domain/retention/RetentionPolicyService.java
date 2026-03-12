@@ -64,7 +64,7 @@ public class RetentionPolicyService {
                     }
 
                     Map<RetentionPeriod, List<String>> grouped = groupByRetention(rules);
-                    log.info("Retention cycle: {} rules across {} retention levels",
+                    log.info("Retention cycle: '{}' rules across '{}' retention levels",
                             rules.size(), grouped.size());
 
                     return executeDeletes(grouped, now);
@@ -110,7 +110,7 @@ public class RetentionPolicyService {
     }
 
     private Mono<Long> logAndSkip(String table, int batchSize, Throwable error) {
-        log.error("Retention delete failed: table={}, batchSize={}", table, batchSize, error);
+        log.error("Retention delete failed: table='{}', batchSize='{}'", table, batchSize, error);
         return Mono.just(0L);
     }
 
