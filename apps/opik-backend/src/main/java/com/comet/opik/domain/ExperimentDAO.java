@@ -3,6 +3,7 @@ package com.comet.opik.domain;
 import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.DatasetLastExperimentCreated;
 import com.comet.opik.api.EvaluationMethod;
+import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.Experiment.ExperimentPage;
 import com.comet.opik.api.Experiment.PromptVersionLink;
@@ -61,6 +62,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToFlux;
@@ -169,7 +171,8 @@ class ExperimentDAO {
                 optimization_id,
                 status,
                 experiment_scores,
-                dataset_version_id
+                dataset_version_id,
+                execution_policy
             )
             SELECT
                 if(
@@ -192,7 +195,8 @@ class ExperimentDAO {
                 new.optimization_id,
                 new.status,
                 new.experiment_scores,
-                new.dataset_version_id
+                new.dataset_version_id,
+                new.execution_policy
             FROM (
                 SELECT
                 :id AS id,
@@ -211,7 +215,8 @@ class ExperimentDAO {
                 :optimization_id AS optimization_id,
                 :status AS status,
                 :experiment_scores AS experiment_scores,
-                :dataset_version_id AS dataset_version_id
+                :dataset_version_id AS dataset_version_id,
+                :execution_policy AS execution_policy
             ) AS new
             LEFT JOIN (
                 SELECT
@@ -307,14 +312,17 @@ class ExperimentDAO {
                     if(isFinite(ea.total_estimated_cost_sum), toDecimal128(ea.total_estimated_cost_sum, 12), toDecimal128(0, 12)) AS total_estimated_cost_sum,
                     if(isFinite(ea.total_estimated_cost_avg), toDecimal128(ea.total_estimated_cost_avg, 12), toDecimal128(0, 12)) AS total_estimated_cost_avg,
                     mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.feedback_scores_avg) AS feedback_scores_avg,
-                    ea.experiment_scores AS experiment_scores
+                    ea.experiment_scores AS experiment_scores,
+                    if(ea.total_count = 0, NULL, ea.pass_rate) AS pass_rate,
+                    if(ea.total_count = 0, NULL, ea.passed_count) AS passed_count,
+                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count
                 FROM experiment_aggregates ea FINAL
                 WHERE ea.workspace_id = :workspace_id
                 <if(experiment_ids)> AND id IN :experiment_ids <endif>
                 AND ea.id IN (SELECT id FROM experiments_resolved)
             ), experiment_items_final AS (
                 SELECT DISTINCT
-                    id, experiment_id, trace_id
+                    id, experiment_id, trace_id, dataset_item_id, execution_policy
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 <if(experiment_ids)> AND experiment_id IN :experiment_ids <endif>
@@ -525,6 +533,44 @@ class ExperimentDAO {
                     GROUP BY entity_id
                 ) AS tc ON ei.trace_id = tc.entity_id
                 GROUP BY ei.experiment_id
+            ),
+            pass_rate_agg AS (
+                SELECT
+                    experiment_id,
+                    toNullable(sum(item_passed)) AS passed_count,
+                    toNullable(count(*)) AS total_count,
+                    if(count(*) = 0, NULL, toNullable(toDecimal64(sum(item_passed) / count(*), 9))) AS pass_rate
+                FROM (
+                    SELECT
+                        experiment_id,
+                        dataset_item_id,
+                        if(sum(run_passed) >=
+                           if(item_pass_threshold > 0, item_pass_threshold,
+                              if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
+                           1, 0) AS item_passed
+                    FROM (
+                        SELECT
+                            ei.experiment_id AS experiment_id,
+                            ei.dataset_item_id AS dataset_item_id,
+                            ei.trace_id AS trace_id,
+                            JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                            JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
+                            if(
+                                countIf(fs.name != '') = 0,
+                                1,
+                                if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                            ) AS run_passed
+                        FROM experiment_items_final ei
+                        INNER JOIN experiments_final ef
+                            ON ei.experiment_id = ef.id
+                            AND ef.evaluation_method = 'evaluation_suite'
+                        LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                        GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
+                                 item_pass_threshold, suite_pass_threshold
+                    )
+                    GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
+                )
+                GROUP BY experiment_id
             )
             SELECT
                 *
@@ -558,7 +604,10 @@ class ExperimentDAO {
                     agg.usage as usage,
                     agg.total_estimated_cost_sum as total_estimated_cost,
                     agg.total_estimated_cost_avg as total_estimated_cost_avg,
-                    ca.comments_array_agg as comments_array_agg
+                    ca.comments_array_agg as comments_array_agg,
+                    if(agg.total_count = 0, NULL, agg.pass_rate) AS pass_rate,
+                    if(agg.total_count = 0, NULL, agg.passed_count) AS passed_count,
+                    if(agg.total_count = 0, NULL, agg.total_count) AS total_count
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
                 LEFT JOIN (
@@ -648,12 +697,16 @@ class ExperimentDAO {
                     ed.usage as usage,
                     ed.total_estimated_cost_sum as total_estimated_cost,
                     ed.total_estimated_cost_avg as total_estimated_cost_avg,
-                    ca.comments_array_agg as comments_array_agg
+                    ca.comments_array_agg as comments_array_agg,
+                    pra.pass_rate as pass_rate,
+                    pra.passed_count as passed_count,
+                    pra.total_count as total_count
                 FROM experiments_final AS e
                 LEFT JOIN experiment_durations AS ed ON e.id = ed.experiment_id
                 LEFT JOIN feedback_scores_agg AS fs ON e.id = fs.experiment_id
                 LEFT JOIN experiment_scores_agg AS es ON e.id = es.experiment_id
                 LEFT JOIN comments_agg AS ca ON e.id = ca.experiment_id
+                LEFT JOIN pass_rate_agg AS pra ON e.id = pra.experiment_id
                 WHERE 1=1
                 <if(feedback_scores_filters)>
                 AND e.id IN (
@@ -1083,7 +1136,7 @@ class ExperimentDAO {
     private static final String FIND_GROUPS_AGGREGATIONS = """
             WITH experiments_resolved AS (
                 SELECT
-                    id, dataset_id, metadata, tags, experiment_scores, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids
+                    id, dataset_id, dataset_version_id, metadata, tags, experiment_scores, evaluation_method, execution_policy, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids
                 FROM experiments final
                 WHERE workspace_id = :workspace_id
                 <if(types)> AND type IN :types <endif>
@@ -1110,13 +1163,16 @@ class ExperimentDAO {
                     if(isFinite(ea.total_estimated_cost_sum), toDecimal128(ea.total_estimated_cost_sum, 12), toDecimal128(0, 12)) AS total_estimated_cost_sum,
                     if(isFinite(ea.total_estimated_cost_avg), toDecimal128(ea.total_estimated_cost_avg, 12), toDecimal128(0, 12)) AS total_estimated_cost_avg,
                     mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.feedback_scores_avg) AS feedback_scores,
-                    ea.experiment_scores AS experiment_scores
+                    ea.experiment_scores AS experiment_scores,
+                    if(ea.total_count = 0, NULL, ea.pass_rate) AS pass_rate,
+                    if(ea.total_count = 0, NULL, ea.passed_count) AS passed_count,
+                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count
                 FROM experiment_aggregates AS ea FINAL
                 WHERE ea.workspace_id = :workspace_id
                 AND ea.id IN (SELECT id FROM experiments_from_aggregates)
             ), experiment_items_final AS (
                 SELECT DISTINCT
-                    id, experiment_id, trace_id
+                    id, experiment_id, trace_id, dataset_item_id, execution_policy
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN (SELECT id FROM experiments_final)
@@ -1277,6 +1333,44 @@ class ExperimentDAO {
                       AND length(JSON_VALUE(score, '$.name')) > 0
                 ) AS es
                 GROUP BY experiment_id
+            ),
+            pass_rate_agg AS (
+                SELECT
+                    experiment_id,
+                    toNullable(sum(item_passed)) AS passed_count,
+                    toNullable(count(*)) AS total_count,
+                    if(count(*) = 0, NULL, toNullable(toDecimal64(sum(item_passed) / count(*), 9))) AS pass_rate
+                FROM (
+                    SELECT
+                        experiment_id,
+                        dataset_item_id,
+                        if(sum(run_passed) >=
+                           if(item_pass_threshold > 0, item_pass_threshold,
+                              if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
+                           1, 0) AS item_passed
+                    FROM (
+                        SELECT
+                            ei.experiment_id AS experiment_id,
+                            ei.dataset_item_id AS dataset_item_id,
+                            ei.trace_id AS trace_id,
+                            JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                            JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
+                            if(
+                                countIf(fs.name != '') = 0,
+                                1,
+                                if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                            ) AS run_passed
+                        FROM experiment_items_final ei
+                        INNER JOIN experiments_final ef
+                            ON ei.experiment_id = ef.id
+                            AND ef.evaluation_method = 'evaluation_suite'
+                        LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                        GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
+                                 item_pass_threshold, suite_pass_threshold
+                    )
+                    GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
+                )
+                GROUP BY experiment_id
             )
             SELECT
                 count(DISTINCT id) as experiment_count,
@@ -1286,6 +1380,9 @@ class ExperimentDAO {
                 avgMap(feedback_scores) as feedback_scores,
                 avgMap(experiment_scores) as experiment_scores,
                 avgMap(duration) as duration,
+                avg(pass_rate) as pass_rate_avg,
+                sum(passed_count) as passed_count_sum,
+                sum(total_count) as total_count_sum,
                 <groupSelects>
             FROM (
                 SELECT
@@ -1300,7 +1397,10 @@ class ExperimentDAO {
                     agg.total_estimated_cost_sum as total_estimated_cost,
                     agg.total_estimated_cost_avg as total_estimated_cost_avg,
                     agg.project_ids as project_ids,
-                    if(empty(agg.project_ids), '', agg.project_ids[1]) as project_id
+                    if(empty(agg.project_ids), '', agg.project_ids[1]) as project_id,
+                    agg.pass_rate as pass_rate,
+                    agg.passed_count as passed_count,
+                    agg.total_count as total_count
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
                 WHERE 1=1
@@ -1325,11 +1425,15 @@ class ExperimentDAO {
                     ed.total_estimated_cost_sum as total_estimated_cost,
                     ed.total_estimated_cost_avg as total_estimated_cost_avg,
                     ed.project_ids as project_ids,
-                    if(empty(ed.project_ids), '', ed.project_ids[1]) as project_id
+                    if(empty(ed.project_ids), '', ed.project_ids[1]) as project_id,
+                    pra.pass_rate as pass_rate,
+                    pra.passed_count as passed_count,
+                    pra.total_count as total_count
                 FROM experiments_final AS e
                 LEFT JOIN experiment_durations AS ed ON e.id = ed.experiment_id
                 LEFT JOIN feedback_scores_agg AS fs ON e.id = fs.experiment_id
                 LEFT JOIN experiment_scores_agg AS es ON e.id = es.experiment_id
+                LEFT JOIN pass_rate_agg AS pra ON e.id = pra.experiment_id
                 WHERE 1=1
                 <if(project_id)>
                 AND has(project_ids, :project_id)
@@ -1352,7 +1456,10 @@ class ExperimentDAO {
                 null AS total_estimated_cost,
                 null AS total_estimated_cost_avg,
                 null AS usage,
-                null AS comments_array_agg
+                null AS comments_array_agg,
+                null AS pass_rate,
+                null AS passed_count,
+                null AS total_count
             FROM experiments
             WHERE workspace_id = :workspace_id
             AND ilike(name, CONCAT('%', :name, '%'))
@@ -1367,6 +1474,16 @@ class ExperimentDAO {
                 DISTINCT id, workspace_id
             FROM experiments
             WHERE id in :experiment_ids
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String FIND_EXECUTION_POLICY_BY_EXPERIMENT_IDS = """
+            SELECT
+                DISTINCT id, execution_policy, dataset_version_id
+            FROM experiments
+            WHERE id in :experiment_ids
+            AND workspace_id = :workspace_id
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -1437,6 +1554,7 @@ class ExperimentDAO {
                 status,
                 experiment_scores,
                 dataset_version_id,
+                execution_policy,
                 created_at,
                 last_updated_at
             )
@@ -1459,6 +1577,7 @@ class ExperimentDAO {
                 <if(status)> :status <else> status <endif> as status,
                 <if(experiment_scores)> :experiment_scores <else> experiment_scores <endif> as experiment_scores,
                 dataset_version_id,
+                execution_policy,
                 created_at,
                 now64(9) as last_updated_at
             FROM experiments
@@ -1476,13 +1595,14 @@ class ExperimentDAO {
     private final @NonNull GroupingQueryBuilder groupingQueryBuilder;
 
     @WithSpan
-    Mono<Void> insert(@NonNull Experiment experiment) {
+    Mono<Void> insert(@NonNull Experiment experiment, @NonNull String executionPolicyJson) {
         return Mono.from(connectionFactory.create())
-                .flatMapMany(connection -> insert(experiment, connection))
+                .flatMapMany(connection -> insert(experiment, executionPolicyJson, connection))
                 .then();
     }
 
-    private Publisher<? extends Result> insert(Experiment experiment, Connection connection) {
+    private Publisher<? extends Result> insert(Experiment experiment, String executionPolicyJson,
+            Connection connection) {
         var statement = connection.createStatement(INSERT)
                 .bind("id", experiment.id())
                 .bind("dataset_id", experiment.datasetId())
@@ -1501,7 +1621,8 @@ class ExperimentDAO {
                         .orElse(""))
                 .bind("dataset_version_id", Optional.ofNullable(experiment.datasetVersionId())
                         .map(UUID::toString)
-                        .orElse(""));
+                        .orElse(""))
+                .bind("execution_policy", executionPolicyJson);
 
         if (CollectionUtils.isNotEmpty(experiment.tags())) {
             statement.bind("tags", experiment.tags().toArray(String[]::new));
@@ -1659,12 +1780,15 @@ class ExperimentDAO {
                             .filter(str -> !str.isBlank())
                             .map(UUID::fromString)
                             .orElse(null))
+                    .passRate(getPassRateValue(row, "pass_rate"))
+                    .passedCount(row.get("passed_count", Long.class))
+                    .totalCount(row.get("total_count", Long.class))
                     .build();
         });
     }
 
-    private static BigDecimal getP(List<BigDecimal> durations, int index) {
-        return durations.get(index);
+    private static BigDecimal getPassRateValue(Row row, String fieldName) {
+        return row.get(fieldName, BigDecimal.class);
     }
 
     private List<PromptVersionLink> getPromptVersions(Row row) {
@@ -1776,7 +1900,6 @@ class ExperimentDAO {
 
             var template = newFindTemplate(FIND, experimentSearchCriteria, "find_experiments", workspaceId);
 
-            // Add target project IDs flag to template (from separate query to reduce table scans)
             if (CollectionUtils.isNotEmpty(targetProjectIds)) {
                 template.add("has_target_projects", true);
             }
@@ -1795,7 +1918,6 @@ class ExperimentDAO {
                     .bind("workspace_id", workspaceId)
                     .bind("zero_uuid", ExperimentGroupMappers.ZERO_UUID);
 
-            // Bind target project IDs (from separate query to reduce table scans)
             if (CollectionUtils.isNotEmpty(targetProjectIds)) {
                 statement.bind("target_project_ids", targetProjectIds.toArray(UUID[]::new));
             }
@@ -2008,6 +2130,31 @@ class ExperimentDAO {
                         row.get("id", UUID.class))));
     }
 
+    public record ExperimentPolicyInfo(UUID experimentId, ExecutionPolicy policy, UUID datasetVersionId) {
+    }
+
+    public Flux<ExperimentPolicyInfo> getExecutionPoliciesByIds(@NonNull Set<UUID> experimentIds) {
+        if (experimentIds.isEmpty()) {
+            return Flux.empty();
+        }
+        return Mono.from(connectionFactory.create())
+                .flatMapMany(connection -> {
+                    var statement = connection.createStatement(FIND_EXECUTION_POLICY_BY_EXPERIMENT_IDS)
+                            .bind("experiment_ids", experimentIds.toArray(UUID[]::new));
+                    return makeFluxContextAware(bindWorkspaceIdToFlux(statement));
+                })
+                .flatMap(result -> result.map((row, rowMetadata) -> {
+                    var id = row.get("id", UUID.class);
+                    var policy = ExecutionPolicyMapper.fromJson(row.get("execution_policy", String.class));
+                    var versionIdStr = row.get("dataset_version_id", String.class);
+                    var versionId = (versionIdStr != null && !versionIdStr.isBlank())
+                            ? UUID.fromString(versionIdStr)
+                            : null;
+                    return new ExperimentPolicyInfo(id,
+                            policy != null ? policy : ExecutionPolicy.DEFAULT, versionId);
+                }));
+    }
+
     @WithSpan
     public Mono<Long> delete(Set<UUID> ids) {
 
@@ -2141,7 +2288,8 @@ class ExperimentDAO {
     }
 
     @WithSpan
-    public Flux<ExperimentGroupAggregationItem> findGroupsAggregations(@NonNull ExperimentGroupCriteria criteria) {
+    public Flux<ExperimentGroupAggregationItem> findGroupsAggregations(
+            @NonNull ExperimentGroupCriteria criteria) {
         log.info("Finding experiment groups aggregations by criteria '{}'", criteria);
 
         return executeQueryWithTargetProjects(
@@ -2151,20 +2299,6 @@ class ExperimentDAO {
                 this::mapExperimentGroupAggregationItem);
     }
 
-    /**
-     * Helper method to execute group queries with target project optimization.
-     * Handles the common pattern of:
-     * 1. Fetching target project IDs to reduce table scans
-     * 2. Building the query template with has_target_projects flag
-     * 3. Binding criteria and target project IDs
-     * 4. Executing the query with context-aware workspace binding
-     *
-     * @param queryTemplate The SQL query template (FIND_GROUPS or FIND_GROUPS_AGGREGATIONS)
-     * @param queryName The query name for logging
-     * @param criteria The experiment group criteria
-     * @param resultMapper Function to map Result to the desired type
-     * @return Flux of mapped results
-     */
     private <T> Flux<T> executeQueryWithTargetProjects(
             String queryTemplate,
             String queryName,
@@ -2184,7 +2318,6 @@ class ExperimentDAO {
                                 .flatMapMany(connection -> {
                                     var template = newGroupTemplate(queryTemplate, criteria, queryName, workspaceId);
 
-                                    // Add target project IDs flag to template (from separate query to reduce table scans)
                                     if (hasTargetProjects) {
                                         template.add("has_target_projects", true);
                                     }
@@ -2193,7 +2326,6 @@ class ExperimentDAO {
 
                                     bindGroupCriteria(statement, criteria);
 
-                                    // Bind target project IDs (from separate query to reduce table scans)
                                     if (hasTargetProjects) {
                                         statement.bind("target_project_ids", targetProjectIds.toArray(UUID[]::new));
                                     }
@@ -2307,8 +2439,39 @@ class ExperimentDAO {
 
     private Publisher<ExperimentGroupAggregationItem> mapExperimentGroupAggregationItem(Result result,
             int groupsCount) {
-        return result.map(
-                (row, rowMetadata) -> ExperimentGroupMappers.toExperimentGroupAggregationItem(row, groupsCount));
+        return result.map((row, rowMetadata) -> {
+
+            var groupValues = IntStream.range(0, groupsCount)
+                    .mapToObj(i -> "group_" + i)
+                    .map(columnName -> row.get(columnName, String.class))
+                    .toList();
+
+            var experimentCount = row.get("experiment_count", Long.class);
+            var traceCount = row.get("trace_count", Long.class);
+            var totalEstimatedCost = ExperimentGroupMappers.getCostValue(row, "total_estimated_cost");
+            var totalEstimatedCostAvg = ExperimentGroupMappers.getCostValue(row, "total_estimated_cost_avg");
+            var duration = ExperimentGroupMappers.getDuration(row);
+            var feedbackScores = getFeedbackScores(row, "feedback_scores");
+            var experimentScores = getFeedbackScores(row, "experiment_scores");
+
+            var passRateAvg = getPassRateValue(row, "pass_rate_avg");
+            var passedCountSum = row.get("passed_count_sum", Long.class);
+            var totalCountSum = row.get("total_count_sum", Long.class);
+
+            return ExperimentGroupAggregationItem.builder()
+                    .groupValues(groupValues)
+                    .experimentCount(experimentCount)
+                    .traceCount(traceCount)
+                    .totalEstimatedCost(totalEstimatedCost)
+                    .totalEstimatedCostAvg(totalEstimatedCostAvg)
+                    .duration(duration)
+                    .feedbackScores(feedbackScores)
+                    .experimentScores(experimentScores)
+                    .passRateAvg(passRateAvg)
+                    .passedCountSum(passedCountSum)
+                    .totalCountSum(totalCountSum)
+                    .build();
+        });
     }
 
     @WithSpan

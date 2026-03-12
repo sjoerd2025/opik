@@ -7,7 +7,9 @@ import com.comet.opik.api.ExperimentUpdate;
 import com.comet.opik.api.sorting.ExperimentSortingFactory;
 import com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesService;
 import com.comet.opik.domain.experiments.aggregations.ExperimentAggregationPublisher;
+import com.comet.opik.infrastructure.ExperimentAggregatesConfig;
 import com.comet.opik.infrastructure.FeatureFlags;
+import com.comet.opik.infrastructure.OpikConfiguration;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import com.comet.opik.podam.PodamFactoryUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,6 +31,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -77,6 +80,9 @@ class ExperimentServiceTest {
     private FeatureFlags featureFlags;
 
     @Mock
+    private OpikConfiguration config;
+
+    @Mock
     private ExperimentGroupEnricher experimentGroupEnricher;
 
     @Mock
@@ -90,6 +96,9 @@ class ExperimentServiceTest {
 
     @BeforeEach
     void setUp() {
+        var aggregatesConfig = new ExperimentAggregatesConfig();
+        lenient().when(config.getExperimentAggregates()).thenReturn(aggregatesConfig);
+
         experimentService = new ExperimentService(
                 experimentDAO,
                 experimentItemDAO,
@@ -103,6 +112,7 @@ class ExperimentServiceTest {
                 sortingFactory,
                 responseBuilder,
                 featureFlags,
+                config,      
                 experimentGroupEnricher,
                 experimentAggregatesService,
                 experimentAggregationPublisher);

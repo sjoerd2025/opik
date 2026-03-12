@@ -68,6 +68,7 @@ import java.util.stream.Collectors;
 
 import static com.comet.opik.domain.ExperimentGroupMappers.bindGroupCriteria;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.FeedbackScoreAggregations;
+import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.PassRateAggregation;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.SpanAggregations;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.TraceAggregations;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesUtils.BatchResult;
@@ -420,6 +421,80 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             ;
             """;
 
+    private static final String GET_PASS_RATE_AGGREGATION = """
+            WITH experiment_items_scope AS (
+                SELECT DISTINCT dataset_item_id, trace_id, execution_policy, id, experiment_id
+                FROM experiment_items FINAL
+                WHERE workspace_id = :workspace_id
+                AND experiment_id = :experiment_id
+            ), experiment_data AS (
+                SELECT execution_policy, id
+                FROM experiments FINAL
+                WHERE workspace_id = :workspace_id
+                AND id = :experiment_id
+                AND evaluation_method = 'evaluation_suite'
+            ), feedback_scores_combined AS (
+                SELECT
+                    entity_id,
+                    name,
+                    value
+                FROM feedback_scores
+                WHERE entity_type = 'trace'
+                AND workspace_id = :workspace_id
+                AND project_id = :project_id
+                UNION ALL
+                SELECT
+                    entity_id,
+                    name,
+                    value
+                FROM authored_feedback_scores
+                WHERE entity_type = 'trace'
+                AND workspace_id = :workspace_id
+                AND project_id = :project_id
+            ), feedback_scores_final AS (
+                SELECT
+                    entity_id,
+                    name,
+                    if(count() = 1, any(value), toDecimal64(avg(value), 9)) AS value
+                FROM feedback_scores_combined fc
+                INNER JOIN experiment_items_scope ei ON fc.entity_id = ei.trace_id
+                GROUP BY entity_id, name
+            ), runs AS (
+                SELECT
+                    ei.dataset_item_id,
+                    ei.trace_id,
+                    JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                    JSONExtractUInt(ed.execution_policy, 'pass_threshold') AS suite_pass_threshold,
+                    if(
+                        countIf(fs.name != '') = 0,
+                        1,
+                        if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                    ) AS run_passed
+                FROM experiment_items_scope ei
+                INNER JOIN experiment_data ed ON ei.experiment_id = ed.id
+                LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                GROUP BY ei.dataset_item_id, ei.trace_id,
+                         item_pass_threshold, suite_pass_threshold
+            ), items AS (
+                SELECT
+                    dataset_item_id,
+                    if(sum(run_passed) >=
+                       if(item_pass_threshold > 0, item_pass_threshold,
+                          if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
+                       1, 0) AS item_passed
+                FROM runs
+                GROUP BY dataset_item_id, item_pass_threshold, suite_pass_threshold
+            )
+            SELECT
+                :experiment_id as experiment_id,
+                toDecimal64(if(count(*) = 0, 0, sum(item_passed) / count(*)), 9) AS pass_rate,
+                sum(item_passed) AS passed_count,
+                count(*) AS total_count
+            FROM items
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
     /**
      * Insert experiment aggregate
      */
@@ -453,7 +528,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 total_estimated_cost_avg,
                 total_estimated_cost_percentiles,
                 usage_avg,
-                usage_total_tokens_percentiles
+                usage_total_tokens_percentiles,
+                pass_rate,
+                passed_count,
+                total_count
             )
             SETTINGS log_comment = '<log_comment>'
             VALUES (
@@ -484,7 +562,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 :total_estimated_cost_avg,
                 mapFromArrays(:total_estimated_cost_percentiles_keys, :total_estimated_cost_percentiles_values),
                 mapFromArrays(:usage_avg_keys, :usage_avg_values),
-                mapFromArrays(:usage_total_tokens_percentiles_keys, :usage_total_tokens_percentiles_values)
+                mapFromArrays(:usage_total_tokens_percentiles_keys, :usage_total_tokens_percentiles_values),
+                :pass_rate,
+                :passed_count,
+                :total_count
             )
             ;
             """;
@@ -1219,48 +1300,49 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     return getExperimentItemsCount(experimentId)
                             .flatMap(itemsCount -> {
                                 if (itemsCount == 0) {
-                                    // Handle experiments with zero items - insert empty aggregate row
                                     return insertExperimentAggregate(
                                             experimentData,
                                             createEmptyTraceAggregations(experimentId),
                                             createEmptySpanAggregations(experimentId),
                                             createEmptyFeedbackScoreAggregations(experimentId),
+                                            createEmptyPassRateAggregation(experimentId),
                                             0L);
                                 }
 
-                                // Get project_id for experiments with items; wrap in Optional so that
-                                // the Mono always emits and we can branch on presence in flatMap
-                                // (avoids switchIfEmpty on Mono<Void>, which always fires)
                                 return getProjectId(experimentId)
                                         .map(Optional::of)
                                         .defaultIfEmpty(Optional.empty())
                                         .flatMap(projectIdOpt -> {
                                             if (projectIdOpt.isEmpty()) {
-                                                // Fallback: items exist but all referenced traces were deleted
                                                 return insertExperimentAggregate(
                                                         experimentData,
                                                         createEmptyTraceAggregations(experimentId),
                                                         createEmptySpanAggregations(experimentId),
                                                         createEmptyFeedbackScoreAggregations(experimentId),
+                                                        createEmptyPassRateAggregation(experimentId),
                                                         itemsCount);
                                             }
 
-                                            // Fetch aggregations using project_id for filtering
                                             var projectId = projectIdOpt.get();
                                             return Mono.zip(
                                                     getTraceAggregations(experimentId, projectId),
                                                     getSpanAggregations(experimentId, projectId),
-                                                    getFeedbackScoreAggregations(experimentId, projectId))
+                                                    getFeedbackScoreAggregations(experimentId, projectId),
+                                                    getPassRateAggregation(experimentId, projectId)
+                                                            .defaultIfEmpty(
+                                                                    createEmptyPassRateAggregation(experimentId)))
                                                     .flatMap(tuple -> {
                                                         var traceAgg = tuple.getT1();
                                                         var spanAgg = tuple.getT2();
                                                         var feedbackAgg = tuple.getT3();
+                                                        var passRateAgg = tuple.getT4();
 
                                                         return insertExperimentAggregate(
                                                                 experimentData,
                                                                 traceAgg,
                                                                 spanAgg,
                                                                 feedbackAgg,
+                                                                passRateAgg,
                                                                 itemsCount);
                                                     });
                                         });
@@ -1356,6 +1438,12 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 this::mapFeedbackScoreAggregations);
     }
 
+    private Mono<PassRateAggregation> getPassRateAggregation(UUID experimentId, UUID projectId) {
+        return queryExperimentAggregation(
+                GET_PASS_RATE_AGGREGATION, "getPassRateAggregation", experimentId, projectId,
+                this::mapPassRateAggregation);
+    }
+
     /**
      * Executes a single-row aggregation query scoped to a workspace, experiment, and project.
      * Handles the repeated context-aware execution, parameter binding, and singleOrEmpty pattern
@@ -1400,6 +1488,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             TraceAggregations traceAgg,
             SpanAggregations spanAgg,
             FeedbackScoreAggregations feedbackAgg,
+            PassRateAggregation passRateAgg,
             long itemsCount) {
 
         return asyncTemplate.nonTransaction(connection -> {
@@ -1472,7 +1561,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     .bind("usage_total_tokens_percentiles_keys", usageTotalTokensPercentilesArrays.keys())
                     .bind("usage_total_tokens_percentiles_values", usageTotalTokensPercentilesArrays.values())
                     .bind("feedback_scores_avg_keys", feedbackScoresAvgArrays.keys())
-                    .bind("feedback_scores_avg_values", feedbackScoresAvgArrays.values());
+                    .bind("feedback_scores_avg_values", feedbackScoresAvgArrays.values())
+                    .bind("pass_rate", passRateAgg.passRate())
+                    .bind("passed_count", passRateAgg.passedCount())
+                    .bind("total_count", passRateAgg.totalCount());
 
             return makeMonoContextAware((userName, workspaceId) -> Mono.from(statement.execute()).then());
         });
@@ -1767,6 +1859,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .build();
     }
 
+    private PassRateAggregation mapPassRateAggregation(Row row) {
+        return PassRateAggregation.builder()
+                .experimentId(getUUID(row, "experiment_id"))
+                .passRate(row.get("pass_rate", BigDecimal.class))
+                .passedCount(row.get("passed_count", Long.class))
+                .totalCount(row.get("total_count", Long.class))
+                .build();
+    }
+
     private ExperimentItemData mapExperimentItemData(Row row) {
         return ExperimentItemData.builder()
                 .id(getUUID(row, "id"))
@@ -1933,7 +2034,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 null, // promptVersion (singular) - not in DB
                 promptVersions,
                 datasetVersionId,
-                null); // datasetVersionSummary - not in DB
+                null, // datasetVersionSummary - not in DB
+                null, // passRate - not in aggregates
+                null, // passedCount - not in aggregates
+                null); // totalCount - not in aggregates
     }
 
     /**
@@ -2138,6 +2242,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .experimentId(experimentId)
                 .feedbackScoresPercentiles(Map.of())
                 .feedbackScoresAvg(Map.of())
+                .build();
+    }
+
+    private PassRateAggregation createEmptyPassRateAggregation(UUID experimentId) {
+        return PassRateAggregation.builder()
+                .experimentId(experimentId)
+                .passRate(BigDecimal.ZERO)
+                .passedCount(0L)
+                .totalCount(0L)
                 .build();
     }
 
