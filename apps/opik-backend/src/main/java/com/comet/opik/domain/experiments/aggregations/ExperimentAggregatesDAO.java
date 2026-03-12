@@ -1036,6 +1036,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 di.dataset_item_id AS dataset_item_id,
                 di.dataset_id AS dataset_id,
                 di.data AS data,
+                di.description AS description,
                 di.source AS source,
                 di.trace_id AS trace_id,
                 di.span_id AS span_id,
@@ -1049,7 +1050,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 groupArray((eia.id, eia.experiment_id, eia.dataset_item_id, eia.trace_id,
                            <if(truncate)> eia.input_slim <else> eia.input <endif>,
                            <if(truncate)> eia.output_slim <else> eia.output <endif>,
-                           JSONExtract(eia.feedback_scores_array, 'Array(Tuple(entity_id String, name String, category_name String, value Decimal64(9), reason String, source String, created_at String, last_updated_at String, created_by String, last_updated_by String, value_by_author Map(String, Tuple(value Decimal64(9), reason String, category_name String, source String, last_updated_at String))))'),
+                           eia.feedback_scores_array,
                            eia.created_at, eia.last_updated_at, eia.created_by, eia.last_updated_by,
                            ca.comments_array,
                            toFloat64(eia.duration),
@@ -1079,7 +1080,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 OR multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms)
             )
             <endif>
-            GROUP BY di.id, di.dataset_item_id, di.dataset_id, di.data, di.source, di.trace_id, di.span_id, di.tags,
+            GROUP BY di.id, di.dataset_item_id, di.dataset_id, di.data, di.description, di.source, di.trace_id, di.span_id, di.tags,
                      di.evaluators, di.execution_policy, di.item_created_at, di.item_last_updated_at,
                      di.item_created_by, di.item_last_updated_by
             ORDER BY di.id DESC

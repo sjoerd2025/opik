@@ -901,15 +901,21 @@ class ExperimentAggregatesIntegrationTest {
             List<String> feedbackScores, String apiKey, String workspaceName) {
 
         // Create dataset item
+        var datasetItemIndex = new java.util.concurrent.atomic.AtomicInteger(0);
         var datasetItems = PodamFactoryUtils.manufacturePojoList(factory, DatasetItem.class)
                 .stream()
-                .map(item -> item.toBuilder()
-                        .datasetId(datasetId)
-                        .traceId(null)
-                        .experimentItems(null)
-                        .spanId(null)
-                        .source(DatasetItemSource.SDK)
-                        .build())
+                .map(item -> {
+                    int dIdx = datasetItemIndex.getAndIncrement();
+                    return item.toBuilder()
+                            .datasetId(datasetId)
+                            .traceId(null)
+                            .experimentItems(null)
+                            .spanId(null)
+                            .source(DatasetItemSource.SDK)
+                            .description("desc-" + (char) ('a' + dIdx) + "-" + UUID.randomUUID())
+                            .tags(Set.of("tag-" + (char) ('a' + dIdx) + "-" + UUID.randomUUID()))
+                            .build();
+                })
                 .toList();
 
         var batch = DatasetItemBatch.builder()
@@ -920,19 +926,24 @@ class ExperimentAggregatesIntegrationTest {
         datasetResourceClient.createDatasetItems(batch, workspaceName, apiKey);
 
         // Create experiment item
+        var itemIndex = new java.util.concurrent.atomic.AtomicInteger(0);
         List<ExperimentItem> experimentItems = datasetItems.stream()
                 .map(datasetItem -> {
+                    int idx = itemIndex.getAndIncrement();
 
-                    // Create trace with output containing the dataset ID (common across experiments) and experiment ID
-                    // This allows filtering by a common value while maintaining experiment-specific data
+                    // Create trace with output containing unique values per item for stable sorting
                     var outputNode = JsonUtils.getJsonNodeFromString(
-                            "{\"result\": \"" + datasetId.toString() + "-" + experimentId.toString() + "\"}");
-                    var trace = factory.manufacturePojo(Trace.class)
+                            "{\"result\": \"output-" + (char) ('a' + idx) + "-" + UUID.randomUUID() + "\"}");
+                    var baseTrace = factory.manufacturePojo(Trace.class)
                             .toBuilder()
                             .projectName(projectName)
                             .usage(null)
                             .visibilityMode(null)
                             .output(outputNode)
+                            .build();
+                    // Override endTime to produce distinct durations per trace for stable sorting
+                    var trace = baseTrace.toBuilder()
+                            .endTime(baseTrace.startTime().plusSeconds((idx + 1) * 10L))
                             .build();
 
                     traceResourceClient.createTrace(trace, apiKey, workspaceName);
@@ -1889,6 +1900,119 @@ class ExperimentAggregatesIntegrationTest {
         assertThat(afterAggregation).isNotNull();
 
         assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
+    }
+
+    @ParameterizedTest(name = "Sort by {0} {1}")
+    @MethodSource("sortingAndPaginationTestCases")
+    @DisplayName("Sorting and pagination with push-top-limit: results before and after aggregates match")
+    void sortingAndPaginationIsConsistentBeforeAndAfterAggregates(
+            String fieldName, com.comet.opik.api.sorting.Direction direction) {
+
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment1 = createExperiment(dataset, apiKey, workspaceName);
+        var experiment2 = createExperiment(dataset, apiKey, workspaceName);
+
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+
+        // Create enough dataset items to test pagination (2 calls × default PODAM list size)
+        createExperimentItemWithData(experiment1.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+        createExperimentItemWithData(experiment2.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var experimentIds = Set.of(experiment1.id(), experiment2.id());
+        // Replace wildcard placeholder with actual key from test data
+        var resolvedFieldName = fieldName.replace("feedback_scores.*",
+                "feedback_scores." + feedbackScoreNames.getFirst());
+        var sorting = List.of(new com.comet.opik.api.sorting.SortingField(resolvedFieldName, direction));
+        int pageSize = 2;
+
+        // Query BEFORE populating aggregates (raw branch only)
+        var beforePage1 = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), List.copyOf(experimentIds), null, null, sorting, 1, pageSize, apiKey, workspaceName);
+        var beforePage2 = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), List.copyOf(experimentIds), null, null, sorting, 2, pageSize, apiKey, workspaceName);
+
+        assertThat(beforePage1).isNotNull();
+        assertThat(beforePage1.content()).hasSize(pageSize);
+        assertThat(beforePage2).isNotNull();
+
+        // Populate aggregates for all experiments
+        List.of(experiment1.id(), experiment2.id()).forEach(id -> experimentAggregatesService.populateAggregations(id)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block());
+
+        // Query AFTER populating aggregates (aggregated branch — push-top-limit may activate)
+        var afterPage1 = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), List.copyOf(experimentIds), null, null, sorting, 1, pageSize, apiKey, workspaceName);
+        var afterPage2 = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), List.copyOf(experimentIds), null, null, sorting, 2, pageSize, apiKey, workspaceName);
+
+        assertThat(afterPage1).isNotNull();
+        assertThat(afterPage1.content()).hasSize(pageSize);
+        assertThat(afterPage2).isNotNull();
+
+        // Verify total counts match
+        assertThat(afterPage1.total())
+                .as("Total count should match before/after aggregation for sort by %s %s", resolvedFieldName, direction)
+                .isEqualTo(beforePage1.total());
+
+        // Verify page 1 items match exactly (same order) before and after aggregation
+        var beforePage1Ids = beforePage1.content().stream().map(DatasetItem::id).toList();
+        var afterPage1Ids = afterPage1.content().stream().map(DatasetItem::id).toList();
+        assertThat(afterPage1Ids)
+                .as("Page 1 item IDs should match exactly before/after aggregation for sort by %s %s",
+                        resolvedFieldName, direction)
+                .containsExactlyElementsOf(beforePage1Ids);
+
+        // Verify page 2 items match exactly (same order) before and after aggregation
+        var beforePage2Ids = beforePage2.content().stream().map(DatasetItem::id).toList();
+        var afterPage2Ids = afterPage2.content().stream().map(DatasetItem::id).toList();
+        assertThat(afterPage2Ids)
+                .as("Page 2 item IDs should match exactly before/after aggregation for sort by %s %s",
+                        resolvedFieldName, direction)
+                .containsExactlyElementsOf(beforePage2Ids);
+
+        // Verify no overlap between pages
+        assertThat(afterPage1Ids)
+                .as("Page 1 and page 2 should not overlap for sort by %s %s", resolvedFieldName, direction)
+                .doesNotContainAnyElementsOf(afterPage2Ids);
+    }
+
+    static Stream<Arguments> sortingAndPaginationTestCases() {
+        return Stream.of(
+                // Static dataset item fields
+                Arguments.of("id", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("id", com.comet.opik.api.sorting.Direction.DESC),
+                Arguments.of("description", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("description", com.comet.opik.api.sorting.Direction.DESC),
+                Arguments.of("tags", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("tags", com.comet.opik.api.sorting.Direction.DESC),
+                Arguments.of("created_at", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("created_at", com.comet.opik.api.sorting.Direction.DESC),
+                Arguments.of("last_updated_at", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("last_updated_at", com.comet.opik.api.sorting.Direction.DESC),
+                // Aggregated experiment item fields
+                Arguments.of("duration", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("duration", com.comet.opik.api.sorting.Direction.DESC),
+                Arguments.of("total_estimated_cost", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("total_estimated_cost", com.comet.opik.api.sorting.Direction.DESC),
+                // Wildcard fields (feedback_scores.* resolved at runtime from test data)
+                Arguments.of("feedback_scores.*", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("feedback_scores.*", com.comet.opik.api.sorting.Direction.DESC),
+                Arguments.of("usage.completion_tokens", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("usage.completion_tokens", com.comet.opik.api.sorting.Direction.DESC),
+                Arguments.of("output.result", com.comet.opik.api.sorting.Direction.ASC),
+                Arguments.of("output.result", com.comet.opik.api.sorting.Direction.DESC));
     }
 
 }
