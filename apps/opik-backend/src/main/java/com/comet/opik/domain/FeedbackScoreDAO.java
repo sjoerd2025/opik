@@ -64,6 +64,17 @@ public interface FeedbackScoreDAO {
 
     Mono<List<String>> getProjectsTraceThreadsFeedbackScoreNames(List<UUID> projectId,
             Set<String> excludeCategoryNames);
+
+    /**
+     * Bulk delete feedback scores for data retention enforcement.
+     * Uses UUID v7 cutoff on entity_id as an efficient time-based filter instead of created_at,
+     * since entity_id is part of the sort key (workspace_id, project_id, entity_type, entity_id, name).
+     * Deletes from both feedback_scores and authored_feedback_scores tables.
+     *
+     * @param workspaceIds workspaces whose feedback scores should be purged
+     * @param cutoffId     UUID v7 representing the retention cutoff instant — all scores with entity_id &lt; cutoffId are deleted
+     */
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
 }
 
 @Singleton
@@ -146,6 +157,14 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             <if(names)>AND name IN :names <endif>
             <if(project_id)>AND project_id = :project_id<endif>
             <if(sources)>AND source IN :sources<endif>
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String DELETE_FOR_RETENTION = """
+            DELETE FROM <table_name>
+            WHERE workspace_id IN :workspace_ids
+            AND entity_id \\< :cutoff_id
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -743,6 +762,40 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
                     .flatMap(result -> Mono.from(result.getRowsUpdated()))
                     .then(Mono.from(statement2.execute()))
                     .flatMap(result -> Mono.from(result.getRowsUpdated()));
+        });
+    }
+
+    @Override
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
+        Preconditions.checkArgument(
+                CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
+
+        log.info("Retention delete feedback_scores: workspaces={}, cutoffId={}", workspaceIds.size(), cutoffId);
+
+        return asyncTemplate.nonTransaction(connection -> {
+            var template1 = getSTWithLogComment(DELETE_FOR_RETENTION,
+                    "retention_delete_feedback_scores", null, workspaceIds.size());
+            template1.add("table_name", "feedback_scores");
+
+            var template2 = getSTWithLogComment(DELETE_FOR_RETENTION,
+                    "retention_delete_authored_feedback_scores", null, workspaceIds.size());
+            template2.add("table_name", "authored_feedback_scores");
+
+            var wsArray = workspaceIds.toArray(String[]::new);
+
+            var statement1 = connection.createStatement(template1.render())
+                    .bind("workspace_ids", wsArray)
+                    .bind("cutoff_id", cutoffId);
+
+            var statement2 = connection.createStatement(template2.render())
+                    .bind("workspace_ids", wsArray)
+                    .bind("cutoff_id", cutoffId);
+
+            return Mono.from(statement1.execute())
+                    .flatMap(result -> Mono.from(result.getRowsUpdated()))
+                    .flatMap(count1 -> Mono.from(statement2.execute())
+                            .flatMap(result -> Mono.from(result.getRowsUpdated()))
+                            .map(count2 -> count1 + count2));
         });
     }
 }

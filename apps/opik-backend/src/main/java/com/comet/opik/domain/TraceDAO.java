@@ -78,7 +78,7 @@ import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.*;
 
 @ImplementedBy(TraceDAOImpl.class)
-interface TraceDAO {
+public interface TraceDAO {
 
     Mono<UUID> insert(Trace trace, Connection connection);
 
@@ -127,6 +127,16 @@ interface TraceDAO {
     Mono<List<TraceThread>> getMinimalThreadInfoByIds(UUID projectId, Set<String> threadId);
 
     Mono<Void> bulkUpdate(@NonNull Set<UUID> ids, @NonNull TraceUpdate update, boolean mergeTags);
+
+    /**
+     * Bulk delete traces for data retention enforcement.
+     * Uses UUID v7 cutoff as an efficient time-based filter instead of created_at,
+     * since id is part of the sort key (workspace_id, project_id, id).
+     *
+     * @param workspaceIds workspaces whose traces should be purged
+     * @param cutoffId     UUID v7 representing the retention cutoff instant — all traces with id &lt; cutoffId are deleted
+     */
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
 }
 
 @Slf4j
@@ -974,12 +984,6 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
-                  <if(uuid_from_time || uuid_to_time)>
-                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
-                  <else>
-                  AND entity_id IN (SELECT id FROM target_spans)
-                  <endif>
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -998,12 +1002,6 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
-                  <if(uuid_from_time || uuid_to_time)>
-                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
-                  <else>
-                  AND entity_id IN (SELECT id FROM target_spans)
-                  <endif>
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -1723,6 +1721,14 @@ class TraceDAOImpl implements TraceDAO {
             ;
             """;
 
+    private static final String DELETE_FOR_RETENTION = """
+            DELETE FROM traces
+            WHERE workspace_id IN :workspace_ids
+            AND id \\< :cutoff_id
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
     private static final String SELECT_TRACE_ID_AND_WORKSPACE = """
             SELECT
                 DISTINCT id, workspace_id
@@ -2101,12 +2107,6 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id IN :project_ids
-                  <if(uuid_from_time || uuid_to_time)>
-                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
-                  <else>
-                  AND entity_id IN (SELECT id FROM spans_data)
-                  <endif>
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -2125,12 +2125,6 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id IN :project_ids
-                  <if(uuid_from_time || uuid_to_time)>
-                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
-                  <else>
-                  AND entity_id IN (SELECT id FROM spans_data)
-                  <endif>
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -3742,5 +3736,26 @@ class TraceDAOImpl implements TraceDAO {
         // Inject providers as first field in metadata
         return JsonUtils.prependField(
                 baseMetadata, Trace.TraceField.PROVIDERS.getValue(), providers);
+    }
+
+    @Override
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
+        Preconditions.checkArgument(
+                CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
+
+        log.info("Retention delete traces: workspaces={}, cutoffId={}", workspaceIds.size(), cutoffId);
+
+        var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_traces", null,
+                workspaceIds.size());
+
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var statement = connection.createStatement(template.render())
+                            .bind("workspace_ids", workspaceIds.toArray(String[]::new))
+                            .bind("cutoff_id", cutoffId);
+
+                    return Mono.from(statement.execute())
+                            .flatMap(result -> Mono.from(result.getRowsUpdated()));
+                });
     }
 }

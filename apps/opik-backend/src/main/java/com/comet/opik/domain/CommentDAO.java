@@ -3,6 +3,7 @@ package com.comet.opik.domain;
 import com.comet.opik.api.Comment;
 import com.comet.opik.infrastructure.db.TransactionTemplateAsync;
 import com.comet.opik.utils.template.TemplateUtils;
+import com.google.common.base.Preconditions;
 import com.google.inject.ImplementedBy;
 import io.r2dbc.spi.Result;
 import io.r2dbc.spi.Statement;
@@ -12,15 +13,18 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static com.comet.opik.domain.AsyncContextUtils.bindUserNameAndWorkspaceContext;
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToFlux;
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToMono;
+import static com.comet.opik.infrastructure.DatabaseUtils.getSTWithLogComment;
 import static com.comet.opik.utils.AsyncUtils.makeFluxContextAware;
 import static com.comet.opik.utils.AsyncUtils.makeMonoContextAware;
 
@@ -51,6 +55,16 @@ public interface CommentDAO {
     Mono<Long> deleteByEntityIds(EntityType entityType, Set<UUID> entityIds);
 
     Flux<CommentEntityRef> getEntityRefsByCommentIds(Set<UUID> commentIds);
+
+    /**
+     * Bulk delete comments for data retention enforcement.
+     * Uses UUID v7 cutoff on entity_id as an efficient time-based filter instead of created_at,
+     * since entity_id is part of the sort key (workspace_id, project_id, entity_id, id).
+     *
+     * @param workspaceIds workspaces whose comments should be purged
+     * @param cutoffId     UUID v7 representing the retention cutoff instant — all comments with entity_id &lt; cutoffId are deleted
+     */
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
 }
 
 @Singleton
@@ -129,6 +143,14 @@ class CommentDAOImpl implements CommentDAO {
             WHERE entity_id IN :entity_ids
             AND entity_type = :entity_type
             AND workspace_id = :workspace_id
+            ;
+            """;
+
+    private static final String DELETE_FOR_RETENTION = """
+            DELETE FROM comments
+            WHERE workspace_id IN :workspace_ids
+            AND entity_id \\< :cutoff_id
+            SETTINGS log_comment = '<log_comment>'
             ;
             """;
 
@@ -263,5 +285,25 @@ class CommentDAOImpl implements CommentDAO {
                 .bind("entity_type", entityType.getType())
                 .bind("project_id", projectId)
                 .bind("text", comment.text());
+    }
+
+    @Override
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
+        Preconditions.checkArgument(
+                CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
+
+        log.info("Retention delete comments: workspaces={}, cutoffId={}", workspaceIds.size(), cutoffId);
+
+        var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_comments", null,
+                workspaceIds.size());
+
+        return asyncTemplate.nonTransaction(connection -> {
+            var statement = connection.createStatement(template.render())
+                    .bind("workspace_ids", workspaceIds.toArray(String[]::new))
+                    .bind("cutoff_id", cutoffId);
+
+            return Mono.from(statement.execute())
+                    .flatMap(result -> Mono.from(result.getRowsUpdated()));
+        });
     }
 }

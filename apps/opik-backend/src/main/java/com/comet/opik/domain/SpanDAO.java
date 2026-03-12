@@ -71,7 +71,7 @@ import static java.util.function.Predicate.not;
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 @Slf4j
-class SpanDAO {
+public class SpanDAO {
 
     private static final String SPAN_SEARCH_CLAUSE = """
             (ilike(id, :search_text)
@@ -588,7 +588,7 @@ class SpanDAO {
                        created_at,
                        last_updated_at,
                        feedback_scores.last_updated_by AS author
-                FROM feedback_scores
+                FROM feedback_scores FINAL
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND entity_id IN :ids
@@ -607,7 +607,7 @@ class SpanDAO {
                        created_at,
                        last_updated_at,
                        author
-                FROM authored_feedback_scores
+                FROM authored_feedback_scores FINAL
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND entity_id IN :ids
@@ -851,7 +851,7 @@ class SpanDAO {
                        created_at,
                        last_updated_at,
                        feedback_scores.last_updated_by AS author
-                FROM feedback_scores
+                FROM feedback_scores FINAL
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
@@ -874,7 +874,7 @@ class SpanDAO {
                        created_at,
                        last_updated_at,
                        author
-                FROM authored_feedback_scores
+                FROM authored_feedback_scores FINAL
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
@@ -1052,7 +1052,6 @@ class SpanDAO {
             """;
 
     private static final String COUNT_BY_PROJECT_ID = """
-            <if(feedback_scores_filters || feedback_scores_empty_filters)>
             WITH feedback_scores_combined_raw AS (
                 SELECT workspace_id,
                        project_id,
@@ -1061,12 +1060,10 @@ class SpanDAO {
                        value,
                        last_updated_at,
                        feedback_scores.last_updated_by AS author
-                FROM feedback_scores
+                FROM feedback_scores FINAL
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
-                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -1075,12 +1072,10 @@ class SpanDAO {
                        value,
                        last_updated_at,
                        author
-                 FROM authored_feedback_scores
+                 FROM authored_feedback_scores FINAL
                  WHERE entity_type = 'span'
                    AND workspace_id = :workspace_id
                    AND project_id = :project_id
-                   <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                   <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
              ), feedback_scores_with_ranking AS (
                  SELECT workspace_id,
                         project_id,
@@ -1114,7 +1109,6 @@ class SpanDAO {
                 FROM feedback_scores_combined
                 GROUP BY workspace_id, project_id, entity_id, name
             )
-            <endif>
             <if(feedback_scores_empty_filters)>
              , fsc AS (SELECT entity_id, COUNT(entity_id) AS feedback_scores_count
                  FROM feedback_scores_final
@@ -1169,6 +1163,14 @@ class SpanDAO {
             ;
             """;
 
+    private static final String DELETE_FOR_RETENTION = """
+            DELETE FROM spans
+            WHERE workspace_id IN :workspace_ids
+            AND trace_id \\< :cutoff_id
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
     private static final String SELECT_SPAN_ID_AND_WORKSPACE = """
             SELECT
                 DISTINCT id, workspace_id
@@ -1203,12 +1205,10 @@ class SpanDAO {
                        created_at,
                        last_updated_at,
                        feedback_scores.last_updated_by AS author
-                FROM feedback_scores
+                FROM feedback_scores FINAL
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
-                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -1223,12 +1223,10 @@ class SpanDAO {
                        created_at,
                        last_updated_at,
                        author
-                FROM authored_feedback_scores
+                FROM authored_feedback_scores FINAL
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
-                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -2707,6 +2705,34 @@ class SpanDAO {
         // Inject provider as first field in metadata
         return JsonUtils.prependField(
                 baseMetadata, SpanField.PROVIDER.getValue(), provider);
+    }
+
+    /**
+     * Bulk delete spans for data retention enforcement.
+     * Uses UUID v7 cutoff on trace_id as an efficient time-based filter instead of created_at,
+     * since trace_id is part of the sort key (workspace_id, project_id, trace_id, parent_span_id, id).
+     *
+     * @param workspaceIds workspaces whose spans should be purged
+     * @param cutoffId     UUID v7 representing the retention cutoff instant — all spans with trace_id &lt; cutoffId are deleted
+     */
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
+        Preconditions.checkArgument(
+                CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
+
+        log.info("Retention delete spans: workspaces={}, cutoffId={}", workspaceIds.size(), cutoffId);
+
+        var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_spans", null,
+                workspaceIds.size());
+
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var statement = connection.createStatement(template.render())
+                            .bind("workspace_ids", workspaceIds.toArray(String[]::new))
+                            .bind("cutoff_id", cutoffId);
+
+                    return Mono.from(statement.execute())
+                            .flatMap(result -> Mono.from(result.getRowsUpdated()));
+                });
     }
 
 }
