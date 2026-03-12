@@ -30,6 +30,9 @@ const calcPercentageVsBaseline = (
     baselineValue !== 0 &&
     candidateId !== baselineCandidateId
   ) {
+    // If both values display identically at the formatter's precision,
+    // suppress the trend to avoid confusing users with a percentage
+    // change between visually identical values.
     if (formatter && formatter(value) === formatter(baselineValue)) return 0;
     return ((value - baselineValue) / Math.abs(baselineValue)) * 100;
   }

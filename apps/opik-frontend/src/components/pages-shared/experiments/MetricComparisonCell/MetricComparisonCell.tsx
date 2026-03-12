@@ -21,6 +21,9 @@ const MetricComparisonCell: React.FunctionComponent<
     return <span className="text-muted-slate">-</span>;
   }
 
+  // When both values display identically at the formatter's precision
+  // (e.g. $0.0003 vs $0.0003), suppress the trend to avoid showing a
+  // percentage change between visually identical values.
   const percentage =
     !isUndefined(baseline) && !isUndefined(current) && baseline !== 0
       ? formatter(current) === formatter(baseline)

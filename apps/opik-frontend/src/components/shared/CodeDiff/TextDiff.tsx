@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { diffTrimmedLines, diffWords, Change } from "diff";
+import { diffLines, diffWords, Change } from "diff";
 import { cn } from "@/lib/utils";
 
 type DiffMode = "lines" | "words";
@@ -208,7 +208,7 @@ const TextDiff: React.FunctionComponent<CodeDiffProps> = ({
 }) => {
   const result = useMemo(() => {
     if (mode === "words") {
-      const lineChanges = diffTrimmedLines(content1, content2);
+      const lineChanges = diffLines(content1, content2);
       const hasAnyChange = lineChanges.some((c) => c.added || c.removed);
       if (!hasAnyChange) {
         return { kind: "unchanged" as const, lineChanges };
@@ -220,7 +220,7 @@ const TextDiff: React.FunctionComponent<CodeDiffProps> = ({
     }
     return {
       kind: "lines" as const,
-      lineChanges: diffTrimmedLines(content1, content2),
+      lineChanges: diffLines(content1, content2),
     };
   }, [content1, content2, mode]);
 

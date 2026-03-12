@@ -61,7 +61,7 @@ const DEFAULT_COLUMNS_ORDER: string[] = [
 
 const DEFAULT_SORTING: ColumnSort[] = [{ id: COLUMN_NAME_ID, desc: false }];
 
-const CANDIDATE_SORT_FIELD_MAP: Record<
+export const CANDIDATE_SORT_FIELD_MAP: Record<
   string,
   keyof AggregatedCandidate | undefined
 > = {
@@ -75,7 +75,7 @@ const CANDIDATE_SORT_FIELD_MAP: Record<
   created_at: "created_at",
 };
 
-const sortCandidates = (
+export const sortCandidates = (
   candidates: AggregatedCandidate[],
   sortedColumns: ColumnSort[],
 ): AggregatedCandidate[] => {
