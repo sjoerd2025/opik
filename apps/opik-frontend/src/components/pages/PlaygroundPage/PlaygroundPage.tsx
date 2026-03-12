@@ -83,12 +83,13 @@ const PlaygroundPage = () => {
         style={
           {
             "--min-prompt-width": "720px",
+            "--max-prompt-width": "1440px",
           } as React.CSSProperties
         }
       >
         <div
           className="flex min-w-0 flex-1 flex-col"
-          style={{ maxWidth: `${promptCount * 1440}px` }}
+          style={{ maxWidth: `calc(${promptCount} * var(--max-prompt-width))` }}
         >
           <PlaygroundPrompts
             workspaceName={workspaceName}
