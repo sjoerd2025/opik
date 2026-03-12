@@ -3,13 +3,13 @@ package com.comet.opik.domain;
 import com.comet.opik.api.AssertionResult;
 import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.ExperimentItem;
-import com.comet.opik.utils.JsonUtils;
+import com.comet.opik.api.ExperimentRunSummary;
 import lombok.experimental.UtilityClass;
-import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @UtilityClass
@@ -51,52 +51,47 @@ class AssertionResultMapper {
                 .build();
     }
 
-    static List<ExperimentItem> enrichWithMultiRunStatus(List<ExperimentItem> items) {
+    static Map<String, ExperimentRunSummary> computeRunSummaries(List<ExperimentItem> items) {
         if (items == null || items.isEmpty()) {
-            return items;
+            return null;
         }
 
         var byExperiment = items.stream()
                 .collect(Collectors.groupingBy(ExperimentItem::experimentId));
 
-        return byExperiment.values().stream()
-                .flatMap(group -> {
-                    boolean hasAssertions = group.stream()
-                            .anyMatch(i -> i.assertionResults() != null);
+        Map<String, ExperimentRunSummary> summaries = new LinkedHashMap<>();
 
-                    if (!hasAssertions || group.size() <= 1) {
-                        return group.stream();
-                    }
+        for (var entry : byExperiment.entrySet()) {
+            var group = entry.getValue();
+            boolean hasAssertions = group.stream()
+                    .anyMatch(i -> i.assertionResults() != null);
 
-                    long passedRuns = group.stream()
-                            .filter(i -> "passed".equals(i.status()))
-                            .count();
-                    int totalRuns = group.size();
+            if (!hasAssertions || group.size() <= 1) {
+                continue;
+            }
 
-                    int passThreshold = group.stream()
-                            .map(ExperimentItem::executionPolicy)
-                            .filter(ep -> ep != null)
-                            .findFirst()
-                            .map(ExecutionPolicy::passThreshold)
-                            .orElse(1);
+            long passedRuns = group.stream()
+                    .filter(i -> "passed".equals(i.status()))
+                    .count();
+            int totalRuns = group.size();
 
-                    String itemStatus = passedRuns >= passThreshold ? "passed" : "failed";
+            int passThreshold = group.stream()
+                    .map(ExperimentItem::executionPolicy)
+                    .filter(ep -> ep != null)
+                    .findFirst()
+                    .map(ExecutionPolicy::passThreshold)
+                    .orElse(1);
 
-                    return group.stream()
-                            .map(i -> i.toBuilder()
-                                    .passedRuns((int) passedRuns)
-                                    .totalRuns(totalRuns)
-                                    .status(itemStatus)
-                                    .build());
-                })
-                .toList();
-    }
+            String itemStatus = passedRuns >= passThreshold ? "passed" : "failed";
 
-    static ExecutionPolicy parseExecutionPolicy(Object raw) {
-        return Optional.ofNullable(raw)
-                .map(Object::toString)
-                .filter(StringUtils::isNotBlank)
-                .map(s -> JsonUtils.readValue(s, ExecutionPolicy.class))
-                .orElse(null);
+            summaries.put(entry.getKey().toString(),
+                    ExperimentRunSummary.builder()
+                            .passedRuns((int) passedRuns)
+                            .totalRuns(totalRuns)
+                            .status(itemStatus)
+                            .build());
+        }
+
+        return summaries.isEmpty() ? null : summaries;
     }
 }

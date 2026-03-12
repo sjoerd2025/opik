@@ -3,12 +3,14 @@ package com.comet.opik.domain;
 import com.comet.opik.api.AssertionResult;
 import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.ExperimentItem;
+import com.comet.opik.api.ExperimentRunSummary;
 import com.comet.opik.api.FeedbackScore;
 import com.comet.opik.api.ScoreSource;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,21 +94,19 @@ class AssertionResultMapperTest {
     }
 
     @Test
-    void enrichWithMultiRunStatus_singleRun_noPassedRunsSet() {
+    void computeRunSummaries_singleRun_returnsNull() {
         var item = baseItem()
                 .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
                 .status("passed")
                 .build();
 
-        var result = AssertionResultMapper.enrichWithMultiRunStatus(List.of(item));
+        var result = AssertionResultMapper.computeRunSummaries(List.of(item));
 
-        assertThat(result).hasSize(1);
-        assertThat(result.getFirst().passedRuns()).isNull();
-        assertThat(result.getFirst().totalRuns()).isNull();
+        assertThat(result).isNull();
     }
 
     @Test
-    void enrichWithMultiRunStatus_multipleRuns_setsPassedAndTotal() {
+    void computeRunSummaries_multipleRuns_returnsSummary() {
         var experimentId = UUID.randomUUID();
         var items = List.of(
                 baseItem().experimentId(experimentId)
@@ -119,18 +119,17 @@ class AssertionResultMapperTest {
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
                         .status("passed").build());
 
-        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+        Map<String, ExperimentRunSummary> result = AssertionResultMapper.computeRunSummaries(items);
 
-        assertThat(result).hasSize(3);
-        assertThat(result).allSatisfy(i -> {
-            assertThat(i.passedRuns()).isEqualTo(2);
-            assertThat(i.totalRuns()).isEqualTo(3);
-            assertThat(i.status()).isEqualTo("passed");
-        });
+        assertThat(result).hasSize(1);
+        var summary = result.get(experimentId.toString());
+        assertThat(summary.passedRuns()).isEqualTo(2);
+        assertThat(summary.totalRuns()).isEqualTo(3);
+        assertThat(summary.status()).isEqualTo("passed");
     }
 
     @Test
-    void enrichWithMultiRunStatus_passThresholdNotMet_statusFailed() {
+    void computeRunSummaries_passThresholdNotMet_statusFailed() {
         var experimentId = UUID.randomUUID();
         var policy = ExecutionPolicy.builder().runsPerItem(3).passThreshold(3).build();
         var items = List.of(
@@ -144,18 +143,17 @@ class AssertionResultMapperTest {
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
                         .status("passed").build());
 
-        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+        Map<String, ExperimentRunSummary> result = AssertionResultMapper.computeRunSummaries(items);
 
-        assertThat(result).hasSize(3);
-        assertThat(result).allSatisfy(i -> {
-            assertThat(i.passedRuns()).isEqualTo(2);
-            assertThat(i.totalRuns()).isEqualTo(3);
-            assertThat(i.status()).isEqualTo("failed");
-        });
+        assertThat(result).hasSize(1);
+        var summary = result.get(experimentId.toString());
+        assertThat(summary.passedRuns()).isEqualTo(2);
+        assertThat(summary.totalRuns()).isEqualTo(3);
+        assertThat(summary.status()).isEqualTo("failed");
     }
 
     @Test
-    void enrichWithMultiRunStatus_passThresholdMet_statusPassed() {
+    void computeRunSummaries_passThresholdMet_statusPassed() {
         var experimentId = UUID.randomUUID();
         var policy = ExecutionPolicy.builder().runsPerItem(3).passThreshold(2).build();
         var items = List.of(
@@ -169,29 +167,24 @@ class AssertionResultMapperTest {
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
                         .status("passed").build());
 
-        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+        Map<String, ExperimentRunSummary> result = AssertionResultMapper.computeRunSummaries(items);
 
-        assertThat(result).hasSize(3);
-        assertThat(result).allSatisfy(i -> {
-            assertThat(i.passedRuns()).isEqualTo(2);
-            assertThat(i.totalRuns()).isEqualTo(3);
-            assertThat(i.status()).isEqualTo("passed");
-        });
+        assertThat(result).hasSize(1);
+        var summary = result.get(experimentId.toString());
+        assertThat(summary.passedRuns()).isEqualTo(2);
+        assertThat(summary.totalRuns()).isEqualTo(3);
+        assertThat(summary.status()).isEqualTo("passed");
     }
 
     @Test
-    void enrichWithMultiRunStatus_regularExperimentItems_noChange() {
+    void computeRunSummaries_regularExperimentItems_returnsNull() {
         var items = List.of(
                 baseItem().build(),
                 baseItem().build());
 
-        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+        var result = AssertionResultMapper.computeRunSummaries(items);
 
-        assertThat(result).hasSize(2);
-        assertThat(result).allSatisfy(i -> {
-            assertThat(i.passedRuns()).isNull();
-            assertThat(i.totalRuns()).isNull();
-        });
+        assertThat(result).isNull();
     }
 
     private static ExperimentItem.ExperimentItemBuilder baseItem() {

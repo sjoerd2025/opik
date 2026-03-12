@@ -63,11 +63,7 @@ public record ExperimentItem(
         @JsonView({
                 ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) List<AssertionResult> assertionResults,
         @JsonView({
-                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String status,
-        @JsonView({
-                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Integer passedRuns,
-        @JsonView({
-                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Integer totalRuns){
+                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String status){
 
     public static class View {
         public static class Write {

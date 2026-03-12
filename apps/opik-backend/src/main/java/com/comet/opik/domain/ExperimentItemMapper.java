@@ -65,7 +65,7 @@ class ExperimentItemMapper {
                             ? null
                             : VisibilityMode.fromString(row.get("trace_visibility_mode", String.class))
                                     .orElse(null))
-                    .executionPolicy(AssertionResultMapper.parseExecutionPolicy(
+                    .executionPolicy(ExecutionPolicyMapper.fromJson(
                             row.get("execution_policy", String.class)))
                     .build();
             return AssertionResultMapper.enrichWithAssertions(item);
