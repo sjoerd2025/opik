@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 import { Blocks, ChevronDown, Code2 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +10,7 @@ import {
 import AddExperimentDialog from "@/components/pages-shared/experiments/AddExperimentDialog/AddExperimentDialog";
 import ConfirmDialog from "@/components/shared/ConfirmDialog/ConfirmDialog";
 import useLoadPlayground from "@/hooks/useLoadPlayground";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 export interface UseEvaluationSuiteDropdownProps {
   datasetName?: string;
@@ -29,6 +29,10 @@ function UseEvaluationSuiteDropdown({
   const resetDialogKeyRef = useRef(0);
   const [openExperimentDialog, setOpenExperimentDialog] = useState(false);
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+
+  const {
+    permissions: { canViewExperiments },
+  } = usePermissions();
 
   const { loadPlayground, isPlaygroundEmpty, isPendingProviderKeys } =
     useLoadPlayground();
@@ -51,12 +55,14 @@ function UseEvaluationSuiteDropdown({
 
   return (
     <>
-      <AddExperimentDialog
-        key={`experiment-dialog-${resetDialogKeyRef.current}`}
-        open={openExperimentDialog}
-        setOpen={setOpenExperimentDialog}
-        datasetName={datasetName}
-      />
+      {canViewExperiments && (
+        <AddExperimentDialog
+          key={`experiment-dialog-${resetDialogKeyRef.current}`}
+          open={openExperimentDialog}
+          setOpen={setOpenExperimentDialog}
+          datasetName={datasetName}
+        />
+      )}
       <ConfirmDialog
         key={`confirm-dialog-${resetKeyRef.current}`}
         open={openConfirmDialog}
@@ -87,22 +93,24 @@ function UseEvaluationSuiteDropdown({
               </span>
             </div>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              resetDialogKeyRef.current += 1;
-              setOpenExperimentDialog(true);
-            }}
-            disabled={disabled}
-          >
-            <Code2 className="mr-2 mt-0.5 size-4 shrink-0 self-start" />
-            <div className="comet-body-s flex flex-col">
-              <span>Run an experiment</span>
-              <span className="text-light-slate">
-                Use this evaluation suite to run an experiment using the Python
-                SDK
-              </span>
-            </div>
-          </DropdownMenuItem>
+          {canViewExperiments && (
+            <DropdownMenuItem
+              onClick={() => {
+                resetDialogKeyRef.current += 1;
+                setOpenExperimentDialog(true);
+              }}
+              disabled={disabled}
+            >
+              <Code2 className="mr-2 mt-0.5 size-4 shrink-0 self-start" />
+              <div className="comet-body-s flex flex-col">
+                <span>Run an experiment</span>
+                <span className="text-light-slate">
+                  Use this evaluation suite to run an experiment using the
+                  Python SDK
+                </span>
+              </div>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>
