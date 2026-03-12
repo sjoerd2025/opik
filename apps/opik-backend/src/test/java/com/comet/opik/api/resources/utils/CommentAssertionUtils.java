@@ -42,7 +42,6 @@ public class CommentAssertionUtils {
         assertThat(actual)
                 .usingRecursiveComparison()
                 .ignoringFields(IGNORED_FIELDS_COMMENTS)
-                .ignoringCollectionOrder()
                 .isEqualTo(expected);
         if (actual != null) {
             for (var actualComment : actual) {

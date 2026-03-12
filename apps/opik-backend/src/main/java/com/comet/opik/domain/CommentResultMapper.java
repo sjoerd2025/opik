@@ -75,6 +75,11 @@ public class CommentResultMapper {
         }
 
         List<Comment> comments = JsonUtils.readValue(json, COMMENT_LIST_TYPE);
-        return CollectionUtils.isEmpty(comments) ? null : comments;
+        return CollectionUtils.isEmpty(comments)
+                ? null
+                : comments
+                        .stream()
+                        .sorted(Comparator.comparing(Comment::id))
+                        .toList();
     }
 }

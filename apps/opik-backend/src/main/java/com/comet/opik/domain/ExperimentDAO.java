@@ -727,7 +727,18 @@ class ExperimentDAO {
                 <endif>
             )
             ORDER BY <if(sort_fields)><sort_fields>,<endif> id DESC
-            <if(limit)>
+            <if(limit && (
+                feedback_scores_filters ||
+                feedback_scores_empty_filters ||
+                feedback_scores_aggregated_filters ||
+                feedback_scores_aggregated_empty_filters ||
+                experiment_scores_filters ||
+                experiment_scores_empty_filters ||
+                project_id ||
+                project_deleted ||
+                sort_fields
+                )
+            )>
             LIMIT :limit <if(offset)> OFFSET :offset <endif>
             <endif>
             SETTINGS log_comment = '<log_comment>'
@@ -1016,6 +1027,7 @@ class ExperimentDAO {
             )
             SELECT <groupSelects>, max(created_at) AS last_created_experiment_at
             FROM (
+                <if(has_aggregated)>
                 SELECT
                     ef.id,
                     ef.dataset_id,
@@ -1027,9 +1039,9 @@ class ExperimentDAO {
                     if(empty(agg.project_ids), '', agg.project_ids[1]) as project_id
                 FROM experiments_filtered ef
                 INNER JOIN experiments_from_aggregates_final agg ON ef.id = agg.experiment_id
-
-                UNION ALL
-
+                <endif>
+                <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
+                <if(has_raw)>
                 SELECT
                     ef.id,
                     ef.dataset_id,
@@ -1058,6 +1070,7 @@ class ExperimentDAO {
                     ) t ON ei.trace_id = t.id
                     GROUP BY ei.experiment_id
                 ) ep ON ef.id = ep.experiment_id
+                <endif>
             ) experiments_with_projects
             WHERE 1=1
             <if(project_id)>
@@ -1356,6 +1369,7 @@ class ExperimentDAO {
                 sum(total_count) as total_count_sum,
                 <groupSelects>
             FROM (
+                <if(has_aggregated)>
                 SELECT
                     e.id as id,
                     e.dataset_id AS dataset_id,
@@ -1381,9 +1395,9 @@ class ExperimentDAO {
                 <if(project_deleted)>
                 AND (has(project_ids, '') OR empty(project_ids))
                 <endif>
-
-                UNION ALL
-
+                <endif>
+                <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
+                <if(has_raw)>
                 SELECT
                     e.id as id,
                     e.dataset_id AS dataset_id,
@@ -1411,6 +1425,7 @@ class ExperimentDAO {
                 <endif>
                 <if(project_deleted)>
                 AND (has(project_ids, '') OR empty(project_ids))
+                <endif>
                 <endif>
             ) experiments_full
             GROUP BY <groupBy>
@@ -1942,9 +1957,6 @@ class ExperimentDAO {
     }
 
     private Mono<AggregatedExperimentCounts> getAggregationBranchCounts(ExperimentSearchCriteria criteria) {
-        if (CollectionUtils.isEmpty(criteria.experimentIds()) && criteria.datasetId() == null) {
-            return Mono.just(AggregatedExperimentCounts.BOTH_BRANCHES);
-        }
 
         return Mono.from(connectionFactory.create())
                 .flatMap(connection -> {
@@ -1985,6 +1997,23 @@ class ExperimentDAO {
 
                     var statement = connection.createStatement(template.render())
                             .bind("id", id);
+
+                    return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
+                            .flatMap(result -> result.map((row, metadata) -> new AggregatedExperimentCounts(
+                                    row.get("aggregated", Long.class),
+                                    row.get("not_aggregated", Long.class))))
+                            .next()
+                            .defaultIfEmpty(AggregatedExperimentCounts.BOTH_BRANCHES);
+                });
+    }
+
+    private Mono<AggregatedExperimentCounts> getAggregationBranchCounts() {
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var template = TemplateUtils.newST(SELECT_AGGREGATED_EXPERIMENT_IDS);
+                    template.add("log_comment", "get_aggregation_branch_counts_workspace");
+
+                    var statement = connection.createStatement(template.render());
 
                     return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
                             .flatMap(result -> result.map((row, metadata) -> new AggregatedExperimentCounts(
@@ -2279,11 +2308,18 @@ class ExperimentDAO {
         return Flux.deferContextual(ctx -> {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
-            return getTargetProjectIdsForExperiments(TargetProjectsCriteria.from(criteria))
-                    .flatMapMany(targetProjectIds -> {
+            var targetProjectIdsMono = getTargetProjectIdsForExperiments(
+                    TargetProjectsCriteria.from(criteria));
+            var branchCountsMono = getAggregationBranchCounts();
+
+            return Mono.zip(targetProjectIdsMono, branchCountsMono)
+                    .flatMapMany(preQueryResults -> {
+                        var targetProjectIds = preQueryResults.getT1();
+                        var counts = preQueryResults.getT2();
+
                         boolean hasTargetProjects = CollectionUtils.isNotEmpty(targetProjectIds);
-                        log.debug("{}: hasTargetProjects='{}', targetProjectIds='{}', criteria='{}'",
-                                queryName, hasTargetProjects, targetProjectIds, criteria);
+                        boolean hasAggregated = counts.hasAggregated();
+                        boolean hasRaw = counts.hasRaw();
 
                         return Mono.from(connectionFactory.create())
                                 .flatMapMany(connection -> {
@@ -2292,6 +2328,8 @@ class ExperimentDAO {
                                     if (hasTargetProjects) {
                                         template.add("has_target_projects", true);
                                     }
+                                    template.add("has_aggregated", hasAggregated);
+                                    template.add("has_raw", hasRaw);
 
                                     var statement = connection.createStatement(template.render());
 
