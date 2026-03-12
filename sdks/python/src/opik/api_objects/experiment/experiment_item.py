@@ -46,7 +46,9 @@ class ExperimentItemContent:
             ]
 
         raw_assertions = _extract_extra_field(value, "assertion_results")
-        assertion_results: List[AssertionResultDict] = raw_assertions if raw_assertions else []
+        assertion_results: List[AssertionResultDict] = (
+            raw_assertions if raw_assertions else []
+        )
 
         return ExperimentItemContent(
             id=value.id,

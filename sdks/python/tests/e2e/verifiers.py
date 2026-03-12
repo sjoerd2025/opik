@@ -838,9 +838,7 @@ def verify_evaluation_suite_result(
             all_score_names.update(s["name"] for s in exp_item.feedback_scores)
         if exp_item.assertion_results:
             all_scores.extend(exp_item.assertion_results)
-            all_score_names.update(
-                ar["value"] for ar in exp_item.assertion_results
-            )
+            all_score_names.update(ar["value"] for ar in exp_item.assertion_results)
 
     if total_feedback_scores is not mock.ANY:
         assert len(all_scores) == total_feedback_scores, (
