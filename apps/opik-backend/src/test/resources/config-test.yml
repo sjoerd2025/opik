@@ -7,6 +7,7 @@ logging:
   #  Default: com.comet: DEBUG
   #  Description: Individual logger configuration
   loggers:
+    com.clickhouse.client.http.ClickHouseHttpClient: DEBUG
     com.comet: DEBUG
     com.comet.opik.infrastructure.llm: INFO
 
@@ -430,7 +431,7 @@ experimentDenormalization:
   consumerBatchSize: 100
   poolingInterval: 500ms
   longPollingDuration: 5s
-  debounceDelay: 1s
+  debounceDelay: 120s
   jobLockTime: 4s
   jobLockWaitTime: 300ms
   aggregationLockTime: 120s
