@@ -697,15 +697,18 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             )
             SELECT COUNT(DISTINCT dataset_item_id) AS count
             FROM (
+                <if(has_aggregated)>
                 SELECT eia.dataset_item_id
                 FROM item_agg_count AS eia
                 <if(search)>
                 LEFT JOIN dataset_items_agg_resolved di ON di.id = eia.dataset_item_id
                 WHERE multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(eia.input), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(eia.output), :searchTerms)
                 <endif>
+                <endif>
 
-                UNION ALL
+                <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
 
+                <if(has_raw)>
                 SELECT ei.dataset_item_id
                 FROM experiment_items_final AS ei
                 LEFT JOIN dataset_items_resolved AS di ON di.id = ei.dataset_item_id
@@ -723,6 +726,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     LIMIT 1 BY id
                 ) AS tfs ON ei.trace_id = tfs.id
                 WHERE multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(tfs.input), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(tfs.output), :searchTerms)
+                <endif>
                 <endif>
             )
             """;
@@ -1183,30 +1187,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         eia.last_updated_by,
                         eia.metadata,
                         eia.feedback_scores,
-                        co.comments_array_agg
+                        eia.comments_array_agg
                     FROM experiment_item_aggregates AS eia FINAL
-                    LEFT JOIN (
-                        SELECT
-                            entity_id,
-                            groupUniqArray(tuple(c.*)) AS comments_array_agg
-                        FROM (
-                            SELECT
-                                id AS comment_id,
-                                text,
-                                created_at AS comment_created_at,
-                                last_updated_at AS comment_last_updated_at,
-                                created_by AS comment_created_by,
-                                last_updated_by AS comment_last_updated_by,
-                                entity_id
-                            FROM comments
-                            WHERE workspace_id = :workspace_id
-                            <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                            AND entity_id IN (SELECT trace_id FROM experiment_item_aggr_trace_scope)
-                            ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
-                            LIMIT 1 BY id
-                        ) AS c
-                        GROUP BY entity_id
-                    ) AS co ON eia.trace_id = co.entity_id
                     WHERE eia.workspace_id = :workspace_id
                     AND eia.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
                     <if(push_top_limit)>AND eia.dataset_item_id IN (SELECT dataset_item_id FROM top_dataset_items)<endif>
@@ -1387,7 +1369,23 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     LEFT JOIN (
                         SELECT
                             entity_id,
-                            groupUniqArray(tuple(c.*)) AS comments_array_agg
+                            toJSONString(groupUniqArray(CAST(tuple(
+                                c.comment_id,
+                                c.text,
+                                concat(replaceOne(toString(c.comment_created_at), ' ', 'T'), 'Z'),
+                                concat(replaceOne(toString(c.comment_last_updated_at), ' ', 'T'), 'Z'),
+                                c.comment_created_by,
+                                c.comment_last_updated_by,
+                                c.entity_id
+                            ), 'Tuple(
+                                id FixedString(36),
+                                text String,
+                                created_at String,
+                                last_updated_at String,
+                                created_by String,
+                                last_updated_by String,
+                                entity_id FixedString(36)
+                            )'))) AS comments_array_agg
                         FROM comments_final AS c
                         GROUP BY entity_id
                     ) AS co ON t.id = co.entity_id
@@ -1444,7 +1442,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <endif>
             )
             <if(sorting)>
-            ORDER BY <sorting>
+            ORDER BY <sorting>, id DESC
             <else>
             ORDER BY id DESC
             <endif>
@@ -2529,8 +2527,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                                     : null;
 
                             var hasDynamicKeys = criteria.sortingFields() != null
-                                    && sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields(),
-                                            fieldMapping);
+                                    && sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields());
 
                             if (criteria.sortingFields() != null && !criteria.sortingFields().isEmpty()) {
                                 String sortingQuery = sortingQueryBuilder.toOrderBySql(
@@ -2572,10 +2569,12 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                                         criteria.experimentIds().toArray(UUID[]::new));
                             }
 
-                            // Bind dynamic sorting keys if present
+                            // Bind dynamic sorting keys if present.
+                            // Pass without fieldMapping so ALL dynamic keys are bound,
+                            // including those used in the top_sorting SELECT expression.
                             if (hasDynamicKeys) {
                                 statement = sortingQueryBuilder.bindDynamicKeys(statement,
-                                        criteria.sortingFields(), fieldMapping);
+                                        criteria.sortingFields());
                             }
 
                             // Bind search and filter parameters using helper method
@@ -2589,7 +2588,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                                     .flatMap(DatasetItemResultMapper::mapItem)
                                     .collectList()
                                     .zipWith(getCountWithExperimentFilters(criteria, versionId,
-                                            targetProjectIds))
+                                            targetProjectIds, hasAggregated, hasRaw))
                                     .zipWith(getColumns(criteria.datasetId(), versionId))
                                     .map(tuple -> {
                                         var itemsAndCount = tuple.getT1();
@@ -2700,7 +2699,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
     }
 
     private Mono<Long> getCountWithExperimentFilters(@NonNull DatasetItemSearchCriteria criteria,
-            @NonNull UUID versionId, List<UUID> targetProjectIds) {
+            @NonNull UUID versionId, List<UUID> targetProjectIds,
+            boolean hasAggregated, boolean hasRaw) {
         log.debug("Getting filtered count for dataset '{}' version '{}' with experiment filters", criteria.datasetId(),
                 versionId);
 
@@ -2714,6 +2714,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             if (CollectionUtils.isNotEmpty(criteria.experimentIds())) {
                 template.add("experiment_ids", true);
             }
+
+            // Add branch flags to conditionally include/exclude UNION ALL branches
+            template.add("has_aggregated", hasAggregated);
+            template.add("has_raw", hasRaw);
 
             // Add filters and search criteria using helper method
             addFiltersToTemplate(template, criteria);
@@ -3892,13 +3896,14 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
      * and optionally dataset_items_aggr_resolved (di_t).
      */
     private String buildTopItemsSorting(List<com.comet.opik.api.sorting.SortingField> sortingFields) {
-        return sortingFields.stream()
+        String primarySort = sortingFields.stream()
                 .map(sf -> {
                     String expr = getTopSortExpression(sf);
                     String dir = sf.direction() != null ? sf.direction().name() : "ASC";
                     return expr + " " + dir;
                 })
                 .collect(Collectors.joining(", "));
+        return primarySort + ", eia_t.dataset_item_id DESC";
     }
 
     private String getTopSortExpression(com.comet.opik.api.sorting.SortingField sf) {
@@ -3932,28 +3937,22 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return "avg(eia_t.total_estimated_cost)";
         }
         if (field.startsWith("data.")) {
-            String key = field.substring("data.".length());
-            return "any(di_t.data)['%s']".formatted(key);
+            return "any(di_t.data)[:%s]".formatted(sf.bindKey());
         }
         if (field.startsWith("usage.")) {
-            String key = field.substring("usage.".length());
-            return "avgMap(eia_t.usage)['%s']".formatted(key);
+            return "avgMap(eia_t.usage)[:%s]".formatted(sf.bindKey());
         }
         if (field.startsWith("feedback_scores.")) {
-            String key = field.substring("feedback_scores.".length());
-            return "avgMap(eia_t.feedback_scores)['%s']".formatted(key);
+            return "avgMap(eia_t.feedback_scores)[:%s]".formatted(sf.bindKey());
         }
         if (field.startsWith("input.")) {
-            String key = field.substring("input.".length());
-            return "JSONExtractRaw(argMax(eia_t.input, eia_t.id), '%s')".formatted(key);
+            return "JSONExtractRaw(argMax(eia_t.input, eia_t.id), :%s)".formatted(sf.bindKey());
         }
         if (field.startsWith("output.")) {
-            String key = field.substring("output.".length());
-            return "JSONExtractRaw(argMax(eia_t.output, eia_t.id), '%s')".formatted(key);
+            return "JSONExtractRaw(argMax(eia_t.output, eia_t.id), :%s)".formatted(sf.bindKey());
         }
         if (field.startsWith("metadata.")) {
-            String key = field.substring("metadata.".length());
-            return "JSONExtractRaw(argMax(eia_t.metadata, eia_t.id), '%s')".formatted(key);
+            return "JSONExtractRaw(argMax(eia_t.metadata, eia_t.id), :%s)".formatted(sf.bindKey());
         }
 
         // Fallback — should not happen if supportsPushTopLimit is checked first

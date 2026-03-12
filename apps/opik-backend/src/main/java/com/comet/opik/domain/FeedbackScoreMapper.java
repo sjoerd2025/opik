@@ -130,7 +130,7 @@ public interface FeedbackScoreMapper {
                     .reason(getIfNotEmpty(tuple.get(1)))
                     .categoryName(getIfNotEmpty(tuple.get(2)))
                     .source(ScoreSource.fromString((String) tuple.get(3)))
-                    .lastUpdatedAt(parseFlexibleInstant(tuple.get(4).toString()));
+                    .lastUpdatedAt(parseInstant(tuple.get(4).toString()));
 
             // span_type is the 6th element (index 5), span_id is the 7th element (index 6)
             // only present for span feedback scores
@@ -185,8 +185,8 @@ public interface FeedbackScoreMapper {
                 .value(node.get("value").decimalValue())
                 .reason(getJsonTextOrNull(node.get("reason")))
                 .source(ScoreSource.fromString(node.get("source").asText()))
-                .createdAt(parseFlexibleInstant(node.get("created_at").asText()))
-                .lastUpdatedAt(parseFlexibleInstant(node.get("last_updated_at").asText()))
+                .createdAt(parseInstant(node.get("created_at").asText()))
+                .lastUpdatedAt(parseInstant(node.get("last_updated_at").asText()))
                 .createdBy(node.get("created_by").asText())
                 .lastUpdatedBy(node.get("last_updated_by").asText())
                 .valueByAuthor(parseValueByAuthorFromJson(node.get("value_by_author")))
@@ -217,7 +217,7 @@ public interface FeedbackScoreMapper {
                         .reason(getJsonTextOrNull(tuple.get(1)))
                         .categoryName(getJsonTextOrNull(tuple.get(2)))
                         .source(ScoreSource.fromString(tuple.get(3).asText()))
-                        .lastUpdatedAt(parseFlexibleInstant(tuple.get(4).asText()));
+                        .lastUpdatedAt(parseInstant(tuple.get(4).asText()));
 
                 if (tuple.size() > 5 && tuple.get(5) != null && !tuple.get(5).isNull()) {
                     builder.spanType(tuple.get(5).asText());
@@ -233,7 +233,7 @@ public interface FeedbackScoreMapper {
                         .reason(getJsonTextOrNull(tuple.get("reason")))
                         .categoryName(getJsonTextOrNull(tuple.get("category_name")))
                         .source(ScoreSource.fromString(tuple.get("source").asText()))
-                        .lastUpdatedAt(parseFlexibleInstant(tuple.get("last_updated_at").asText()));
+                        .lastUpdatedAt(parseInstant(tuple.get("last_updated_at").asText()));
 
                 if (tuple.has("span_type") && !tuple.get("span_type").isNull()) {
                     builder.spanType(tuple.get("span_type").asText());
@@ -261,8 +261,8 @@ public interface FeedbackScoreMapper {
                         .reason(Optional.ofNullable(feedbackScore.get(4)).map(Object::toString)
                                 .filter(StringUtils::isNotEmpty).orElse(null))
                         .source(ScoreSource.fromString(feedbackScore.get(5).toString()))
-                        .createdAt(parseFlexibleInstant(feedbackScore.get(6).toString()))
-                        .lastUpdatedAt(parseFlexibleInstant(feedbackScore.get(7).toString()))
+                        .createdAt(parseInstant(feedbackScore.get(6).toString()))
+                        .lastUpdatedAt(parseInstant(feedbackScore.get(7).toString()))
                         .createdBy(feedbackScore.get(8).toString())
                         .lastUpdatedBy(feedbackScore.get(9).toString())
                         .valueByAuthor(parseValueByAuthor(feedbackScore.get(10)))
@@ -271,7 +271,7 @@ public interface FeedbackScoreMapper {
         return feedbackScores.isEmpty() ? null : feedbackScores;
     }
 
-    private static Instant parseFlexibleInstant(String date) {
+    private static Instant parseInstant(String date) {
         return Instant.parse(date);
     }
 }

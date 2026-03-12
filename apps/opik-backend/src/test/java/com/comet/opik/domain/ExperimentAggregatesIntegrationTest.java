@@ -1298,6 +1298,54 @@ class ExperimentAggregatesIntegrationTest {
         }
     }
 
+    private <T> void assertPageNotEmpty(com.comet.opik.api.Page<T> page) {
+        assertThat(page).isNotNull();
+        assertThat(page.content()).isNotEmpty();
+    }
+
+    private void assertPageNotEmpty(ExperimentGroupResponse response) {
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isNotEmpty();
+    }
+
+    private void assertPageNotEmpty(ExperimentGroupAggregationsResponse response) {
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isNotEmpty();
+    }
+
+    private <T> void assertPagesMatchForFind(com.comet.opik.api.Page<T> expected, com.comet.opik.api.Page<T> actual,
+            String description) {
+        assertThat(actual).isNotNull();
+        assertThat(actual)
+                .as(description)
+                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
+                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                        .build())
+                .ignoringCollectionOrderInFields("content.feedbackScores", "content.experimentScores")
+                .isEqualTo(expected);
+    }
+
+    private void assertPagesMatchForFindGroups(ExperimentGroupResponse expected,
+            ExperimentGroupResponse actual, String description) {
+        assertThat(actual).isNotNull();
+        assertThat(actual)
+                .as(description)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+    }
+
+    private void assertPagesMatchForFindGroupsAggregations(ExperimentGroupAggregationsResponse expected,
+            ExperimentGroupAggregationsResponse actual, String description) {
+        assertThat(actual).isNotNull();
+        assertThat(actual)
+                .as(description)
+                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
+                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                        .build())
+                .ignoringCollectionOrderInFields("feedbackScores", "experimentScores")
+                .isEqualTo(expected);
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("datasetItemCountFilterScenarios")
     @DisplayName("getExperimentItemsStats: aggregates should match original calculation with filters")
@@ -1378,8 +1426,7 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(beforeAggregation).isNotNull();
-        assertThat(beforeAggregation.content()).isNotEmpty();
+        assertPageNotEmpty(beforeAggregation);
 
         // Populate experiment_aggregates
         experimentAggregatesService.populateAggregations(experiment.id())
@@ -1395,16 +1442,8 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(afterAggregation).isNotNull();
-        assertThat(afterAggregation.content()).isNotEmpty();
-
-        assertThat(afterAggregation)
-                .as("FIND must return identical results before and after populating experiment_aggregates")
-                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
-                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
-                        .build())
-                .ignoringCollectionOrderInFields("content.feedbackScores", "content.experimentScores")
-                .isEqualTo(beforeAggregation);
+        assertPagesMatchForFind(beforeAggregation, afterAggregation,
+                "FIND must return identical results before and after populating experiment_aggregates");
     }
 
     @Test
@@ -1435,8 +1474,7 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(beforeAggregation).isNotNull();
-        assertThat(beforeAggregation.content()).isNotEmpty();
+        assertPageNotEmpty(beforeAggregation);
 
         // Populate experiment_aggregates
         experimentAggregatesService.populateAggregations(experiment.id())
@@ -1452,13 +1490,8 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(afterAggregation).isNotNull();
-        assertThat(afterAggregation.content()).isNotEmpty();
-
-        assertThat(afterAggregation)
-                .as("FIND_GROUPS must return identical results before and after populating experiment_aggregates")
-                .usingRecursiveComparison()
-                .isEqualTo(beforeAggregation);
+        assertPagesMatchForFindGroups(beforeAggregation, afterAggregation,
+                "FIND_GROUPS must return identical results before and after populating experiment_aggregates");
     }
 
     @Test
@@ -1489,8 +1522,7 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(beforeAggregation).isNotNull();
-        assertThat(beforeAggregation.content()).isNotEmpty();
+        assertPageNotEmpty(beforeAggregation);
 
         // Populate experiment_aggregates
         experimentAggregatesService.populateAggregations(experiment.id())
@@ -1506,16 +1538,8 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(afterAggregation).isNotNull();
-        assertThat(afterAggregation.content()).isNotEmpty();
-
-        assertThat(afterAggregation)
-                .as("FIND_GROUPS_AGGREGATIONS must return identical results before and after populating experiment_aggregates")
-                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
-                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
-                        .build())
-                .ignoringCollectionOrderInFields("feedbackScores", "experimentScores")
-                .isEqualTo(beforeAggregation);
+        assertPagesMatchForFindGroupsAggregations(beforeAggregation, afterAggregation,
+                "FIND_GROUPS_AGGREGATIONS must return identical results before and after populating experiment_aggregates");
     }
 
     @Test
@@ -1544,8 +1568,7 @@ class ExperimentAggregatesIntegrationTest {
         var beforeAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
                 dataset.id(), experimentIds, null, null, apiKey, workspaceName);
 
-        assertThat(beforeAggregation).isNotNull();
-        assertThat(beforeAggregation.content()).isNotEmpty();
+        assertPageNotEmpty(beforeAggregation);
 
         // Populate experiment_item_aggregates
         experimentIds.forEach(id -> experimentAggregatesService.populateAggregations(id)
@@ -1558,10 +1581,54 @@ class ExperimentAggregatesIntegrationTest {
         var afterAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
                 dataset.id(), experimentIds, null, null, apiKey, workspaceName);
 
-        assertThat(afterAggregation).isNotNull();
-        assertThat(afterAggregation.content()).isNotEmpty();
-
+        assertPageNotEmpty(afterAggregation);
         assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
+    }
+
+    @Test
+    @DisplayName("ExperimentItemDAO.STREAM returns consistent results in mixed state (some experiments aggregated, some not)")
+    void streamExperimentItemsIsConsistentInMixedAggregationState() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment1 = createExperiment(dataset, apiKey, workspaceName);
+        var experiment2 = createExperiment(dataset, apiKey, workspaceName);
+        var experiment3 = createExperiment(dataset, apiKey, workspaceName);
+
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(experiment1.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+        createExperimentItemWithData(experiment2.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+        createExperimentItemWithData(experiment3.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var experimentIds = List.of(experiment1.id(), experiment2.id(), experiment3.id());
+
+        // Query BEFORE any aggregation — all raw
+        var beforeAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertPageNotEmpty(beforeAggregation);
+
+        // Aggregate only experiment1 — mixed state: has_aggregated=true AND has_raw=true
+        experimentAggregatesService.populateAggregations(experiment1.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        // Query in mixed state — UNION ALL hybrid with both branches active
+        var mixedState = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertPageNotEmpty(mixedState);
+        assertDatasetItemsWithExperimentItems(beforeAggregation.content(), mixedState.content());
     }
 
     @Test
@@ -1588,10 +1655,7 @@ class ExperimentAggregatesIntegrationTest {
         var beforeAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
                 dataset.id(), experimentIds, null, null, apiKey, workspaceName);
 
-        assertThat(beforeAggregation).isNotNull();
-        assertThat(beforeAggregation.content())
-                .as("Branch 2 (on-the-fly JOINs) must return items even when there are no feedback scores")
-                .isNotEmpty();
+        assertPageNotEmpty(beforeAggregation);
 
         // Populate experiment_item_aggregates
         experimentIds.forEach(id -> experimentAggregatesService.populateAggregations(id)
@@ -1604,11 +1668,7 @@ class ExperimentAggregatesIntegrationTest {
         var afterAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
                 dataset.id(), experimentIds, null, null, apiKey, workspaceName);
 
-        assertThat(afterAggregation).isNotNull();
-        assertThat(afterAggregation.content())
-                .as("Branch 1 (pre-computed aggregates) must return items even when there are no feedback scores")
-                .isNotEmpty();
-
+        assertPageNotEmpty(afterAggregation);
         assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
     }
 
@@ -1687,16 +1747,9 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(afterAggregation).isNotNull();
-
-        assertThat(afterAggregation)
-                .as("FIND must return identical results before and after populating experiment_aggregates for scenario: %s",
-                        scenarioName)
-                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
-                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
-                        .build())
-                .ignoringCollectionOrderInFields("content.feedbackScores", "content.experimentScores")
-                .isEqualTo(beforeAggregation);
+        assertPagesMatchForFind(beforeAggregation, afterAggregation,
+                "FIND must return identical results before and after populating experiment_aggregates for scenario: %s"
+                        .formatted(scenarioName));
     }
 
     @ParameterizedTest(name = "Criteria filter: {0}")
@@ -1760,13 +1813,9 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(afterAggregation).isNotNull();
-
-        assertThat(afterAggregation)
-                .as("FIND_GROUPS must return identical results before and after populating experiment_aggregates for scenario: %s",
-                        scenarioName)
-                .usingRecursiveComparison()
-                .isEqualTo(beforeAggregation);
+        assertPagesMatchForFindGroups(beforeAggregation, afterAggregation,
+                "FIND_GROUPS must return identical results before and after populating experiment_aggregates for scenario: %s"
+                        .formatted(scenarioName));
     }
 
     @ParameterizedTest(name = "Criteria filter: {0}")
@@ -1830,16 +1879,9 @@ class ExperimentAggregatesIntegrationTest {
                         .put(RequestContext.WORKSPACE_ID, workspaceId))
                 .block();
 
-        assertThat(afterAggregation).isNotNull();
-
-        assertThat(afterAggregation)
-                .as("FIND_GROUPS_AGGREGATIONS must return identical results before and after populating experiment_aggregates for scenario: %s",
-                        scenarioName)
-                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
-                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
-                        .build())
-                .ignoringCollectionOrderInFields("feedbackScores", "experimentScores")
-                .isEqualTo(beforeAggregation);
+        assertPagesMatchForFindGroupsAggregations(beforeAggregation, afterAggregation,
+                "FIND_GROUPS_AGGREGATIONS must return identical results before and after populating experiment_aggregates for scenario: %s"
+                        .formatted(scenarioName));
     }
 
     @ParameterizedTest(name = "{0}")
