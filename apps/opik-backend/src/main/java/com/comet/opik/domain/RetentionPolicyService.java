@@ -1,5 +1,6 @@
 package com.comet.opik.domain;
 
+import com.comet.opik.api.InstantToUUIDMapper;
 import com.comet.opik.api.retention.RetentionLevel;
 import com.comet.opik.api.retention.RetentionRule;
 import com.comet.opik.infrastructure.RetentionConfig;
@@ -36,6 +37,7 @@ public class RetentionPolicyService {
     private final @NonNull SpanDAO spanDAO;
     private final @NonNull FeedbackScoreDAO feedbackScoreDAO;
     private final @NonNull CommentDAO commentDAO;
+    private final @NonNull InstantToUUIDMapper uuidMapper;
     private final @NonNull @Config("retention") RetentionConfig config;
 
     /**
@@ -88,10 +90,10 @@ public class RetentionPolicyService {
                 .filter(rule -> rule.retention() != null && rule.retention().getDays() > 0)
                 .map(rule -> {
                     var cutoff = now.minus(rule.retention().getDays(), ChronoUnit.DAYS);
-                    var cutoffId = IdGenerator.generateMinId(cutoff);
+                    var cutoffId = uuidMapper.toLowerBound(cutoff);
                     UUID minId = null;
                     if (!Boolean.TRUE.equals(rule.applyToPast()) && rule.createdAt() != null) {
-                        minId = IdGenerator.generateMinId(rule.createdAt());
+                        minId = uuidMapper.toLowerBound(rule.createdAt());
                     }
                     return new WorkspaceRetention(rule.workspaceId(), cutoffId, minId);
                 })

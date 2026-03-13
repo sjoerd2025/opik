@@ -19,20 +19,6 @@ public interface IdGenerator {
     }
 
     /**
-     * Returns the smallest possible UUID v7 for the given timestamp.
-     * Sets the 48-bit timestamp, version nibble (0x7), variant bits (0b10),
-     * and zeroes all random/entropy bits.
-     */
-    static UUID generateMinId(Instant timestamp) {
-        long ms = timestamp.toEpochMilli();
-        // Upper 48 bits = timestamp, next 4 bits = version 7, remaining 12 bits = 0
-        long msb = (ms << 16) | 0x7000L;
-        // Variant 10xx (RFC 9562) in the top 2 bits, rest zeroed
-        long lsb = 0x8000_0000_0000_0000L;
-        return new UUID(msb, lsb);
-    }
-
-    /**
      * Extracts the Unix epoch timestamp in milliseconds from a UUIDv7.
      *
      * @param uuid the UUIDv7 instance
