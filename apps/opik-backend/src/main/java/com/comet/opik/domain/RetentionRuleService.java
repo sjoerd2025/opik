@@ -58,7 +58,7 @@ class RetentionRuleServiceImpl implements RetentionRuleService {
                 .id(id)
                 .workspaceId(workspaceId)
                 .level(level)
-                .applyToPast(Optional.ofNullable(rule.applyToPast()).orElse(false))
+                .applyToPast(Optional.ofNullable(rule.applyToPast()).orElse(true))
                 .enabled(true)
                 .createdBy(userName)
                 .lastUpdatedBy(userName)

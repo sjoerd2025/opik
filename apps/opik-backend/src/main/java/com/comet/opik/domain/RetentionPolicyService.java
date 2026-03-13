@@ -90,7 +90,8 @@ public class RetentionPolicyService {
                 .filter(rule -> rule.retention() != null && rule.retention().getDays() != null
                         && rule.retention().getDays() > 0)
                 .map(rule -> {
-                    var cutoff = now.minus(rule.retention().getDays(), ChronoUnit.DAYS);
+                    var cutoff = now.truncatedTo(ChronoUnit.DAYS)
+                            .minus(rule.retention().getDays(), ChronoUnit.DAYS);
                     var cutoffId = uuidMapper.toLowerBound(cutoff);
                     UUID minId = null;
                     if (!Boolean.TRUE.equals(rule.applyToPast()) && rule.createdAt() != null) {
