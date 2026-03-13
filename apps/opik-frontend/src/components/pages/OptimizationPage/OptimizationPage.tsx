@@ -111,6 +111,7 @@ const OptimizationPage: React.FC = () => {
     sortableBy,
     bestCandidateId: bestCandidate?.candidateId,
     isEvaluationSuite,
+    objectiveName: optimization?.objective_name,
   });
 
   if (isOptimizationPending || isExperimentsPending) {

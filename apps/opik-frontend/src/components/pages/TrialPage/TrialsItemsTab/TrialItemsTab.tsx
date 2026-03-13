@@ -29,6 +29,7 @@ import DataTableRowHeightSelector from "@/components/shared/DataTableRowHeightSe
 import IdCell from "@/components/shared/DataTableCells/IdCell";
 import AutodetectCell from "@/components/shared/DataTableCells/AutodetectCell";
 import TrialPassedCell from "./TrialPassedCell";
+import TrialScoreCell from "./TrialScoreCell";
 import TraceDetailsPanel from "@/components/pages-shared/traces/TraceDetailsPanel/TraceDetailsPanel";
 import ColumnsButton from "@/components/shared/ColumnsButton/ColumnsButton";
 import FiltersButton from "@/components/shared/FiltersButton/FiltersButton";
@@ -439,11 +440,11 @@ const TrialItemsTab: React.FC<TrialItemsTabProps> = ({
       label: scoreName,
       type: COLUMN_TYPE.number,
       header: FeedbackScoreHeader as never,
+      cell: TrialScoreCell as never,
       accessorFn: (row: FlattenedTrialItem) => {
-        const score = row.experimentItem.feedback_scores?.find(
+        return row.experimentItem.feedback_scores?.find(
           (s) => s.name === scoreName,
         );
-        return score?.value;
       },
       customMeta: {
         scoreName,

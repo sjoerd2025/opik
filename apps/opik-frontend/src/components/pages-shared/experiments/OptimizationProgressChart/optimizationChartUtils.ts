@@ -56,11 +56,12 @@ export type InProgressInfo = {
  * Compute status for each candidate:
  * - Step 0 = "baseline"
  * - score == null (still being evaluated) = "running"
- * - scored higher than best parent = "passed"
- * - scored equal or lower than best parent = "pruned"
+ * - When isEvaluationSuite (default): scored higher than best parent = "passed", otherwise "pruned"
+ * - When !isEvaluationSuite: all scored non-baseline candidates = "passed" (no pruning)
  */
 export const computeCandidateStatuses = (
   candidates: AggregatedCandidate[],
+  isEvaluationSuite = true,
 ): Map<string, TrialStatus> => {
   const statusMap = new Map<string, TrialStatus>();
   if (!candidates.length) return statusMap;
@@ -73,6 +74,12 @@ export const computeCandidateStatuses = (
   for (const c of candidates) {
     if (c.stepIndex === 0) {
       statusMap.set(c.candidateId, "baseline");
+    } else if (!isEvaluationSuite) {
+      if (c.score == null) {
+        statusMap.set(c.candidateId, "running");
+      } else {
+        statusMap.set(c.candidateId, "passed");
+      }
     } else if (c.score == null) {
       statusMap.set(c.candidateId, "running");
     } else {
@@ -102,8 +109,9 @@ export const computeCandidateStatuses = (
  */
 export const buildCandidateChartData = (
   candidates: AggregatedCandidate[],
+  isEvaluationSuite = true,
 ): CandidateDataPoint[] => {
-  const statusMap = computeCandidateStatuses(candidates);
+  const statusMap = computeCandidateStatuses(candidates, isEvaluationSuite);
 
   return candidates
     .slice()

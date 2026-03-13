@@ -163,7 +163,9 @@ const OptimizationProgressChartContent: React.FC<
       const { cx: rawCx, cy, payload } = props;
       const pxOffset = overlapOffsets.get(payload.candidateId) ?? 0;
       const cx = rawCx + pxOffset;
-      const color = TRIAL_STATUS_COLORS[payload.status];
+      const color = !isEvaluationSuite
+        ? TRIAL_STATUS_COLORS.passed
+        : TRIAL_STATUS_COLORS[payload.status];
       const isBest = payload.candidateId === bestCandidateId;
       const isSelected = payload.candidateId === selectedTrialId;
       const radius = isBest ? 8 : 6;
@@ -259,6 +261,7 @@ const OptimizationProgressChartContent: React.FC<
       overlapOffsets,
       isInProgress,
       inProgressInfo,
+      isEvaluationSuite,
     ],
   );
 
@@ -547,19 +550,31 @@ const OptimizationProgressChartContent: React.FC<
         })()}
 
       <div className="mt-1 flex items-center justify-center gap-4">
-        {TRIAL_STATUS_ORDER.filter((s) =>
-          chartData.some((d) => d.status === s),
-        ).map((s) => (
-          <div key={s} className="flex items-center gap-1.5">
+        {isEvaluationSuite ? (
+          TRIAL_STATUS_ORDER.filter((s) =>
+            chartData.some((d) => d.status === s),
+          ).map((s) => (
+            <div key={s} className="flex items-center gap-1.5">
+              <span
+                className="size-2.5 rounded-full"
+                style={{ backgroundColor: TRIAL_STATUS_COLORS[s] }}
+              />
+              <span className="comet-body-xs text-muted-slate">
+                {TRIAL_STATUS_LABELS[s]}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div className="flex items-center gap-1.5">
             <span
               className="size-2.5 rounded-full"
-              style={{ backgroundColor: TRIAL_STATUS_COLORS[s] }}
+              style={{ backgroundColor: TRIAL_STATUS_COLORS.passed }}
             />
             <span className="comet-body-xs text-muted-slate">
-              {TRIAL_STATUS_LABELS[s]}
+              {objectiveName}
             </span>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

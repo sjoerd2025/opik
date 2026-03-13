@@ -25,6 +25,7 @@ type UseOptimizationColumnsParams = {
   sortableBy: string[];
   bestCandidateId?: string;
   isEvaluationSuite?: boolean;
+  objectiveName?: string;
 };
 
 export const useOptimizationColumns = ({
@@ -34,6 +35,7 @@ export const useOptimizationColumns = ({
   sortableBy,
   bestCandidateId,
   isEvaluationSuite,
+  objectiveName,
 }: UseOptimizationColumnsParams) => {
   const columnsDef: ColumnData<AggregatedCandidate>[] = useMemo(() => {
     return [
@@ -59,7 +61,11 @@ export const useOptimizationColumns = ({
       },
       {
         id: "objective_name",
-        label: isEvaluationSuite ? "Pass rate" : "Accuracy",
+        label: isEvaluationSuite
+          ? "Pass rate"
+          : objectiveName
+            ? `Accuracy (${objectiveName})`
+            : "Accuracy",
         type: COLUMN_TYPE.numberDictionary,
         size: 160,
         accessorFn: (row) => row.score,
@@ -108,6 +114,7 @@ export const useOptimizationColumns = ({
         customMeta: {
           candidates,
           bestCandidateId,
+          isEvaluationSuite,
         },
       },
       {
@@ -120,7 +127,7 @@ export const useOptimizationColumns = ({
         },
       },
     ];
-  }, [candidates, bestCandidateId, isEvaluationSuite]);
+  }, [candidates, bestCandidateId, isEvaluationSuite, objectiveName]);
 
   const columns = useMemo(() => {
     return [

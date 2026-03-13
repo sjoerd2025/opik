@@ -51,8 +51,8 @@ const OptimizationProgressChartContainer: React.FC<
     : INITIALIZING_MESSAGE;
 
   const chartData = useMemo(
-    () => buildCandidateChartData(candidates),
-    [candidates],
+    () => buildCandidateChartData(candidates, isEvaluationSuite),
+    [candidates, isEvaluationSuite],
   );
 
   const noData = useMemo(
