@@ -1919,6 +1919,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 feedbackScores,
                 null, // comments - not in DB
                 traceCount,
+                null, // datasetItemCount - not in aggregates table
                 createdAt,
                 duration,
                 totalEstimatedCost, // total_estimated_cost_sum

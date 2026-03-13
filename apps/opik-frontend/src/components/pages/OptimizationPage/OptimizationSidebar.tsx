@@ -9,7 +9,7 @@ type ScoreData = {
   percentage?: number;
 };
 
-type CompareOptimizationsSidebarProps = {
+type OptimizationSidebarProps = {
   optimization: Optimization | undefined;
   bestExperiment: Experiment | undefined;
   baselineExperiment: Experiment | undefined;
@@ -17,9 +17,7 @@ type CompareOptimizationsSidebarProps = {
   status?: OPTIMIZATION_STATUS;
 };
 
-const CompareOptimizationsSidebar: React.FC<
-  CompareOptimizationsSidebarProps
-> = ({
+const OptimizationSidebar: React.FC<OptimizationSidebarProps> = ({
   optimization,
   bestExperiment,
   baselineExperiment,
@@ -48,4 +46,4 @@ const CompareOptimizationsSidebar: React.FC<
   );
 };
 
-export default CompareOptimizationsSidebar;
+export default OptimizationSidebar;

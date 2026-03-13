@@ -94,7 +94,9 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 class OptimizationsResourceTest {
 
     public static final String[] OPTIMIZATION_IGNORED_FIELDS = {"datasetId", "createdAt",
-            "lastUpdatedAt", "createdBy", "lastUpdatedBy", "studioConfig"};
+            "lastUpdatedAt", "createdBy", "lastUpdatedBy", "studioConfig", "datasetName",
+            "baselineObjectiveScore", "bestObjectiveScore", "baselineDuration", "bestDuration",
+            "baselineCost", "bestCost", "totalOptimizationCost", "experimentScores"};
 
     private static final String API_KEY = UUID.randomUUID().toString();
     private static final String WORKSPACE_ID = UUID.randomUUID().toString();
@@ -776,7 +778,6 @@ class OptimizationsResourceTest {
                     .studioConfig(studioConfig)
                     .build();
 
-            // Get initial queue size
             String queueKey = "rq:queue:" + Queue.OPTIMIZER_CLOUD.toString();
             RQueueReactive<String> queue = redisClient.getQueue(queueKey, StringCodec.INSTANCE);
             Integer initialSize = queue.size().block();

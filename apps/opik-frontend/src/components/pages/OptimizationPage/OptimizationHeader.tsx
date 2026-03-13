@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Play, RotateCw, X } from "lucide-react";
+import { Play, Rocket, RotateCw, X } from "lucide-react";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@tanstack/react-router";
-import { OPTIMIZATION_STATUS } from "@/types/optimizations";
+import { OPTIMIZATION_STATUS, Optimization } from "@/types/optimizations";
 import { STATUS_TO_VARIANT_MAP } from "@/constants/experiments";
 import { IN_PROGRESS_OPTIMIZATION_STATUSES } from "@/lib/optimizations";
 import useOptimizationStopMutation from "@/api/optimizations/useOptimizationStopMutation";
@@ -17,9 +17,12 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog/ConfirmDialog";
 import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import { convertMessages } from "@/components/pages-shared/shared/useSaveToPromptLibrary";
+import NavigationTag from "@/components/shared/NavigationTag/NavigationTag";
+import { RESOURCE_TYPE } from "@/components/shared/ResourceLink/ResourceLink";
+import { formatDate } from "@/lib/date";
 
-type CompareOptimizationsHeaderProps = {
-  title: string;
+type OptimizationHeaderProps = {
+  optimization?: Optimization;
   status?: OPTIMIZATION_STATUS;
   optimizationId?: string;
   isStudioOptimization?: boolean;
@@ -27,8 +30,8 @@ type CompareOptimizationsHeaderProps = {
   bestExperiment?: Experiment | null;
 };
 
-const CompareOptimizationsHeader: React.FC<CompareOptimizationsHeaderProps> = ({
-  title,
+const OptimizationHeader: React.FC<OptimizationHeaderProps> = ({
+  optimization,
   status,
   optimizationId,
   isStudioOptimization,
@@ -111,52 +114,79 @@ const CompareOptimizationsHeader: React.FC<CompareOptimizationsHeaderProps> = ({
   return (
     <>
       <div className="mb-4 flex min-h-8 flex-nowrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="comet-title-l truncate break-words">{title}</h1>
-          {status && (
-            <Tag
-              variant={STATUS_TO_VARIANT_MAP[status]}
-              size="md"
-              className="capitalize"
-            >
-              {status}
-            </Tag>
-          )}
-        </div>
-        {(canStop || canRerun || canDeploy) && (
+        <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            {canDeploy && (
-              <TooltipWrapper content="Deploy best prompt to Playground">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDeployClick}
-                  disabled={isPendingProviderKeys}
-                >
-                  <Play className="mr-2 size-4" />
-                  Run in Playground
-                </Button>
-              </TooltipWrapper>
+            <h1 className="comet-title-l truncate break-words">
+              {optimization?.dataset_name || optimizationId}
+            </h1>
+            {optimization?.created_at && (
+              <span className="comet-body-s text-muted-slate">
+                {formatDate(optimization.created_at)}
+              </span>
             )}
-            {canRerun && (
-              <Button variant="outline" size="sm" onClick={handleRerun}>
-                <RotateCw className="mr-2 size-4" />
-                Rerun
-              </Button>
-            )}
-            {canStop && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleStop}
-                disabled={isStoppingOptimization}
+            {status && (
+              <Tag
+                variant={STATUS_TO_VARIANT_MAP[status]}
+                size="md"
+                className="capitalize"
               >
-                <X className="mr-2 size-4" />
-                Stop Execution
-              </Button>
+                {status}
+              </Tag>
             )}
           </div>
-        )}
+          {optimization?.dataset_id && optimization?.dataset_name && (
+            <NavigationTag
+              id={optimization.dataset_id}
+              name={`Go to ${optimization.dataset_name}`}
+              resource={RESOURCE_TYPE.dataset}
+              className="w-fit"
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {canDeploy && (
+            <TooltipWrapper content="Deploy best prompt to Playground">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeployClick}
+                disabled={isPendingProviderKeys}
+              >
+                <Play className="mr-2 size-4" />
+                Run in Playground
+              </Button>
+            </TooltipWrapper>
+          )}
+          {!isInProgress && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.alert("Promote to prod — coming soon")}
+              >
+                <Rocket className="mr-2 size-4" />
+                Promote to prod
+              </Button>
+            </>
+          )}
+          {canRerun && (
+            <Button variant="outline" size="sm" onClick={handleRerun}>
+              <RotateCw className="mr-2 size-4" />
+              Rerun
+            </Button>
+          )}
+          {canStop && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleStop}
+              disabled={isStoppingOptimization}
+            >
+              <X className="mr-2 size-4" />
+              Stop Execution
+            </Button>
+          )}
+        </div>
       </div>
       <ConfirmDialog
         key={resetKeyRef.current}
@@ -171,4 +201,4 @@ const CompareOptimizationsHeader: React.FC<CompareOptimizationsHeaderProps> = ({
   );
 };
 
-export default CompareOptimizationsHeader;
+export default OptimizationHeader;
