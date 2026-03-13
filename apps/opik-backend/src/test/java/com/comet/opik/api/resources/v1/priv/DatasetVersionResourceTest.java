@@ -41,6 +41,8 @@ import com.comet.opik.api.resources.utils.resources.DatasetResourceClient;
 import com.comet.opik.api.resources.utils.resources.ExperimentResourceClient;
 import com.comet.opik.api.resources.utils.resources.SpanResourceClient;
 import com.comet.opik.api.resources.utils.resources.TraceResourceClient;
+import com.comet.opik.api.sorting.Direction;
+import com.comet.opik.api.sorting.SortingField;
 import com.comet.opik.domain.DatasetVersionService;
 import com.comet.opik.domain.SpanEnrichmentOptions;
 import com.comet.opik.domain.TraceEnrichmentOptions;
@@ -2790,6 +2792,186 @@ class DatasetVersionResourceTest {
         }
 
         @Test
+        @DisplayName("should sort versioned experiment items by avg(total_estimated_cost) across trials in descending order: OPIK-4611")
+        void sortByTotalEstimatedCost__whenDescendingOrder__thenReturnSortedByAverage() {
+            var datasetName = UUID.randomUUID().toString();
+            var datasetId = createDataset(datasetName);
+            createDatasetItems(datasetId, 3);
+
+            var version = getLatestVersion(datasetId);
+            var datasetItems = datasetResourceClient.getDatasetItems(
+                    datasetId, 1, 10, DatasetVersionService.LATEST_TAG, API_KEY, TEST_WORKSPACE).content();
+
+            var projectName = UUID.randomUUID().toString();
+
+            // 6 traces (2 trials per dataset item)
+            var traceIds = IntStream.range(0, 6)
+                    .mapToObj(i -> {
+                        var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                                .projectName(projectName).build();
+                        traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+                        return trace.id();
+                    })
+                    .toList();
+
+            var experiment = experimentResourceClient.createPartialExperiment()
+                    .datasetName(datasetName)
+                    .datasetVersionId(version.id())
+                    .build();
+            var experimentId = experimentResourceClient.create(experiment, API_KEY, TEST_WORKSPACE);
+
+            // Batch 1 (earlier trials): A=40, B=10, C=30
+            var batch1Costs = List.of(
+                    java.math.BigDecimal.valueOf(40),
+                    java.math.BigDecimal.valueOf(10),
+                    java.math.BigDecimal.valueOf(30));
+            var batch1Spans = IntStream.range(0, 3)
+                    .mapToObj(i -> factory.manufacturePojo(Span.class).toBuilder()
+                            .projectName(projectName)
+                            .traceId(traceIds.get(i))
+                            .totalEstimatedCost(batch1Costs.get(i))
+                            .build())
+                    .toList();
+            spanResourceClient.batchCreateSpans(batch1Spans, API_KEY, TEST_WORKSPACE);
+
+            IntStream.range(0, 3).forEach(i -> {
+                var item = factory.manufacturePojo(ExperimentItem.class).toBuilder()
+                        .experimentId(experimentId)
+                        .datasetItemId(datasetItems.get(i).id())
+                        .traceId(traceIds.get(i))
+                        .build();
+                experimentResourceClient.createExperimentItem(Set.of(item), API_KEY, TEST_WORKSPACE);
+            });
+
+            // Batch 2 (later trials): A=5, B=30, C=2
+            // avg: A=(40+5)/2=22.5, B=(10+30)/2=20, C=(30+2)/2=16
+            // DESC by avg: A(22.5), B(20), C(16)
+            var batch2Costs = List.of(
+                    java.math.BigDecimal.valueOf(5),
+                    java.math.BigDecimal.valueOf(30),
+                    java.math.BigDecimal.valueOf(2));
+            var batch2Spans = IntStream.range(0, 3)
+                    .mapToObj(i -> factory.manufacturePojo(Span.class).toBuilder()
+                            .projectName(projectName)
+                            .traceId(traceIds.get(i + 3))
+                            .totalEstimatedCost(batch2Costs.get(i))
+                            .build())
+                    .toList();
+            spanResourceClient.batchCreateSpans(batch2Spans, API_KEY, TEST_WORKSPACE);
+
+            IntStream.range(0, 3).forEach(i -> {
+                var item = factory.manufacturePojo(ExperimentItem.class).toBuilder()
+                        .experimentId(experimentId)
+                        .datasetItemId(datasetItems.get(i).id())
+                        .traceId(traceIds.get(i + 3))
+                        .build();
+                experimentResourceClient.createExperimentItem(Set.of(item), API_KEY, TEST_WORKSPACE);
+            });
+
+            var sorting = List.of(new SortingField("total_estimated_cost", Direction.DESC));
+            var result = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                    datasetId, List.of(experimentId), null, null, sorting, API_KEY, TEST_WORKSPACE);
+
+            // Verify sorted by avg cost DESC: A(22.5), B(20), C(16)
+            assertThat(result.content())
+                    .extracting(DatasetItem::id)
+                    .containsExactly(
+                            datasetItems.get(0).id(),
+                            datasetItems.get(1).id(),
+                            datasetItems.get(2).id());
+        }
+
+        @Test
+        @DisplayName("should sort versioned experiment items by avgMap(usage.total_tokens) across trials in ascending order: OPIK-4611")
+        void sortByUsageTotalTokens__whenAscendingOrder__thenReturnSortedByAverage() {
+            var datasetName = UUID.randomUUID().toString();
+            var datasetId = createDataset(datasetName);
+            createDatasetItems(datasetId, 3);
+
+            var version = getLatestVersion(datasetId);
+            var datasetItems = datasetResourceClient.getDatasetItems(
+                    datasetId, 1, 10, DatasetVersionService.LATEST_TAG, API_KEY, TEST_WORKSPACE).content();
+
+            var projectName = UUID.randomUUID().toString();
+
+            // 6 traces (2 trials per dataset item)
+            var traceIds = IntStream.range(0, 6)
+                    .mapToObj(i -> {
+                        var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                                .projectName(projectName).build();
+                        traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+                        return trace.id();
+                    })
+                    .toList();
+
+            var experiment = experimentResourceClient.createPartialExperiment()
+                    .datasetName(datasetName)
+                    .datasetVersionId(version.id())
+                    .build();
+            var experimentId = experimentResourceClient.create(experiment, API_KEY, TEST_WORKSPACE);
+
+            // Batch 1 (earlier trials): A=200, B=40, C=120
+            var batch1Usage = List.of(
+                    Map.of("total_tokens", 200, "prompt_tokens", 100, "completion_tokens", 100),
+                    Map.of("total_tokens", 40, "prompt_tokens", 20, "completion_tokens", 20),
+                    Map.of("total_tokens", 120, "prompt_tokens", 60, "completion_tokens", 60));
+            var batch1Spans = IntStream.range(0, 3)
+                    .mapToObj(i -> factory.manufacturePojo(Span.class).toBuilder()
+                            .projectName(projectName)
+                            .traceId(traceIds.get(i))
+                            .usage(batch1Usage.get(i))
+                            .build())
+                    .toList();
+            spanResourceClient.batchCreateSpans(batch1Spans, API_KEY, TEST_WORKSPACE);
+
+            IntStream.range(0, 3).forEach(i -> {
+                var item = factory.manufacturePojo(ExperimentItem.class).toBuilder()
+                        .experimentId(experimentId)
+                        .datasetItemId(datasetItems.get(i).id())
+                        .traceId(traceIds.get(i))
+                        .build();
+                experimentResourceClient.createExperimentItem(Set.of(item), API_KEY, TEST_WORKSPACE);
+            });
+
+            // Batch 2 (later trials): A=20, B=160, C=10
+            // avgMap: A=(200+20)/2=110, B=(40+160)/2=100, C=(120+10)/2=65
+            // ASC by avgMap: C(65), B(100), A(110)
+            var batch2Usage = List.of(
+                    Map.of("total_tokens", 20, "prompt_tokens", 10, "completion_tokens", 10),
+                    Map.of("total_tokens", 160, "prompt_tokens", 80, "completion_tokens", 80),
+                    Map.of("total_tokens", 10, "prompt_tokens", 5, "completion_tokens", 5));
+            var batch2Spans = IntStream.range(0, 3)
+                    .mapToObj(i -> factory.manufacturePojo(Span.class).toBuilder()
+                            .projectName(projectName)
+                            .traceId(traceIds.get(i + 3))
+                            .usage(batch2Usage.get(i))
+                            .build())
+                    .toList();
+            spanResourceClient.batchCreateSpans(batch2Spans, API_KEY, TEST_WORKSPACE);
+
+            IntStream.range(0, 3).forEach(i -> {
+                var item = factory.manufacturePojo(ExperimentItem.class).toBuilder()
+                        .experimentId(experimentId)
+                        .datasetItemId(datasetItems.get(i).id())
+                        .traceId(traceIds.get(i + 3))
+                        .build();
+                experimentResourceClient.createExperimentItem(Set.of(item), API_KEY, TEST_WORKSPACE);
+            });
+
+            var sorting = List.of(new SortingField("usage.total_tokens", Direction.ASC));
+            var result = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                    datasetId, List.of(experimentId), null, null, sorting, API_KEY, TEST_WORKSPACE);
+
+            // Verify sorted by avg usage ASC: C(65), B(100), A(110)
+            assertThat(result.content())
+                    .extracting(DatasetItem::id)
+                    .containsExactly(
+                            datasetItems.get(2).id(),
+                            datasetItems.get(1).id(),
+                            datasetItems.get(0).id());
+        }
+
+        @Test
         @DisplayName("Success: PUT /items without query param returns 204 (backward compatibility)")
         void putItems_whenRespondWithLatestVersionNotSet_thenReturnsNoContent() {
             // given
@@ -4439,6 +4621,95 @@ class DatasetVersionResourceTest {
 
             var updatedItem = latestItems.getFirst();
             assertThat(updatedItem.description()).isEqualTo(newDescription);
+        }
+
+        @Test
+        @DisplayName("Success: empty string description clears item description via applyChanges")
+        void applyChanges__whenEmptyDescription__thenDescriptionIsCleared() {
+            var datasetId = createDataset(UUID.randomUUID().toString());
+
+            var originalDescription = "Description to clear " + UUID.randomUUID();
+
+            var items = List.of(DatasetItem.builder()
+                    .source(DatasetItemSource.SDK)
+                    .data(Map.of("input", JsonUtils.getJsonNodeFromString("\"" + UUID.randomUUID() + "\"")))
+                    .description(originalDescription)
+                    .build());
+
+            var batch = DatasetItemBatch.builder()
+                    .datasetId(datasetId)
+                    .items(items)
+                    .batchGroupId(UUID.randomUUID())
+                    .build();
+            datasetResourceClient.createDatasetItems(batch, TEST_WORKSPACE, API_KEY);
+
+            var version1 = getLatestVersion(datasetId);
+            datasetResourceClient.createVersionTag(datasetId, version1.versionHash(),
+                    DatasetVersionTag.builder().tag("v1").build(), API_KEY, TEST_WORKSPACE);
+
+            var v1Items = datasetResourceClient.getDatasetItems(
+                    datasetId, 1, 10, "v1", API_KEY, TEST_WORKSPACE).content();
+            assertThat(v1Items).hasSize(1);
+            assertThat(v1Items.getFirst().description()).isEqualTo(originalDescription);
+
+            var editedItem = DatasetItemEdit.builder()
+                    .id(v1Items.getFirst().id())
+                    .description("")
+                    .build();
+
+            var changes = DatasetItemChanges.builder()
+                    .baseVersion(version1.id())
+                    .editedItems(List.of(editedItem))
+                    .tags(List.of("v2"))
+                    .build();
+
+            datasetResourceClient.applyDatasetItemChanges(
+                    datasetId, changes, false, API_KEY, TEST_WORKSPACE);
+
+            var v2Items = datasetResourceClient.getDatasetItems(
+                    datasetId, 1, 10, "v2", API_KEY, TEST_WORKSPACE).content();
+            assertThat(v2Items).hasSize(1);
+            assertThat(v2Items.getFirst().description()).isNull();
+        }
+
+        @Test
+        @DisplayName("Success: empty string description clears item description via batch update")
+        void batchUpdate__whenEmptyDescription__thenDescriptionIsCleared() {
+            var datasetId = createDataset(UUID.randomUUID().toString());
+
+            var originalDescription = "Batch description to clear " + UUID.randomUUID();
+
+            var items = List.of(DatasetItem.builder()
+                    .source(DatasetItemSource.SDK)
+                    .data(Map.of("input", JsonUtils.getJsonNodeFromString("\"" + UUID.randomUUID() + "\"")))
+                    .description(originalDescription)
+                    .build());
+
+            var batch = DatasetItemBatch.builder()
+                    .datasetId(datasetId)
+                    .items(items)
+                    .batchGroupId(UUID.randomUUID())
+                    .build();
+            datasetResourceClient.createDatasetItems(batch, TEST_WORKSPACE, API_KEY);
+
+            var version1 = getLatestVersion(datasetId);
+            var v1Items = datasetResourceClient.getDatasetItems(
+                    datasetId, 1, 10, version1.versionHash(), API_KEY, TEST_WORKSPACE).content();
+            assertThat(v1Items).hasSize(1);
+            assertThat(v1Items.getFirst().description()).isEqualTo(originalDescription);
+
+            var batchUpdate = DatasetItemBatchUpdate.builder()
+                    .ids(Set.of(v1Items.getFirst().id()))
+                    .update(DatasetItemUpdate.builder()
+                            .description("")
+                            .build())
+                    .build();
+            datasetResourceClient.batchUpdateDatasetItems(batchUpdate, API_KEY, TEST_WORKSPACE);
+
+            var latestItems = datasetResourceClient.getDatasetItems(
+                    datasetId, 1, 10, DatasetVersionService.LATEST_TAG, API_KEY, TEST_WORKSPACE).content();
+            assertThat(latestItems).hasSize(1);
+            assertThat(latestItems.getFirst().description()).isNull();
         }
     }
 }

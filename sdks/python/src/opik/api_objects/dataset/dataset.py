@@ -471,6 +471,18 @@ class Dataset(DatasetExportOperations):
 
         return execution_policy.DEFAULT_EXECUTION_POLICY.copy()
 
+    def get_tags(self) -> List[str]:
+        """
+        Get the tags for this dataset.
+
+        Returns:
+            List of tag strings.
+        """
+        dataset_fern = self._rest_client.datasets.get_dataset_by_identifier(
+            dataset_name=self._name
+        )
+        return dataset_fern.tags or []
+
     def _convert_to_rest_item(
         self, item: dataset_item.DatasetItem
     ) -> rest_dataset_item.DatasetItemWrite:
@@ -506,6 +518,7 @@ class Dataset(DatasetExportOperations):
             span_id=item.span_id,  # type: ignore
             source=item.source,  # type: ignore
             data=item.get_content(),
+            description=item.description,
             evaluators=evaluators,
             execution_policy=execution_policy,
         )

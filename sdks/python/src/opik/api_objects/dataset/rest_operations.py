@@ -122,6 +122,7 @@ def stream_dataset_items(
                 trace_id=item.trace_id,
                 span_id=item.span_id,
                 source=item.source,
+                description=item.description,
                 evaluators=evaluators,
                 execution_policy=execution_policy,
                 **item.data,
@@ -265,6 +266,7 @@ def create_evaluation_suite_dataset(
     description: Optional[str],
     evaluators: Optional[List[llm_judge.LLMJudge]],
     exec_policy: Optional[execution_policy.ExecutionPolicy],
+    tags: Optional[List[str]] = None,
 ) -> str:
     """
     Create a dataset of type 'evaluation_suite' and its initial version
@@ -281,7 +283,7 @@ def create_evaluation_suite_dataset(
         The dataset ID.
     """
     rest_client.datasets.create_dataset(
-        name=dataset_name, description=description, type="evaluation_suite"
+        name=dataset_name, description=description, type="evaluation_suite", tags=tags
     )
 
     dataset_fern = rest_client.datasets.get_dataset_by_identifier(

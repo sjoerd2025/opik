@@ -10,6 +10,7 @@ from ..types.error_info import ErrorInfo
 from ..types.error_info_write import ErrorInfoWrite
 from ..types.feedback_score_batch_item import FeedbackScoreBatchItem
 from ..types.feedback_score_batch_item_thread import FeedbackScoreBatchItemThread
+from ..types.feedback_score_names_public import FeedbackScoreNamesPublic
 from ..types.feedback_score_source import FeedbackScoreSource
 from ..types.json_list_string import JsonListString
 from ..types.json_list_string_write import JsonListStringWrite
@@ -393,6 +394,7 @@ class TracesClient:
         strip_attachments: typing.Optional[bool] = None,
         sorting: typing.Optional[str] = None,
         exclude: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -419,6 +421,8 @@ class TracesClient:
         sorting : typing.Optional[str]
 
         exclude : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -448,6 +452,7 @@ class TracesClient:
             strip_attachments=strip_attachments,
             sorting=sorting,
             exclude=exclude,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -880,8 +885,12 @@ class TracesClient:
         return _response.data
 
     def find_feedback_score_names2(
-        self, *, project_id: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
-    ) -> typing.List[str]:
+        self,
+        *,
+        project_id: typing.Optional[str] = None,
+        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> FeedbackScoreNamesPublic:
         """
         Find Feedback Score names
 
@@ -889,12 +898,14 @@ class TracesClient:
         ----------
         project_id : typing.Optional[str]
 
+        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        typing.List[str]
+        FeedbackScoreNamesPublic
             Feedback Scores resource
 
         Examples
@@ -903,12 +914,14 @@ class TracesClient:
         client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
         client.traces.find_feedback_score_names2()
         """
-        _response = self._raw_client.find_feedback_score_names2(project_id=project_id, request_options=request_options)
+        _response = self._raw_client.find_feedback_score_names2(
+            project_id=project_id, exclude_category_names=exclude_category_names, request_options=request_options
+        )
         return _response.data
 
     def find_trace_threads_feedback_score_names(
         self, *, project_id: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
-    ) -> typing.List[str]:
+    ) -> FeedbackScoreNamesPublic:
         """
         Find Trace Threads Feedback Score names
 
@@ -921,7 +934,7 @@ class TracesClient:
 
         Returns
         -------
-        typing.List[str]
+        FeedbackScoreNamesPublic
             Find Trace Threads Feedback Score names
 
         Examples
@@ -941,6 +954,7 @@ class TracesClient:
         project_id: typing.Optional[str] = None,
         project_name: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -955,6 +969,8 @@ class TracesClient:
         project_name : typing.Optional[str]
 
         filters : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -978,6 +994,7 @@ class TracesClient:
             project_id=project_id,
             project_name=project_name,
             filters=filters,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -1019,6 +1036,7 @@ class TracesClient:
         project_id: typing.Optional[str] = None,
         project_name: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1033,6 +1051,8 @@ class TracesClient:
         project_name : typing.Optional[str]
 
         filters : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -1056,6 +1076,7 @@ class TracesClient:
             project_id=project_id,
             project_name=project_name,
             filters=filters,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -1147,6 +1168,7 @@ class TracesClient:
         strip_attachments: typing.Optional[bool] = None,
         filters: typing.Optional[str] = None,
         sorting: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1171,6 +1193,8 @@ class TracesClient:
         filters : typing.Optional[str]
 
         sorting : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -1199,6 +1223,7 @@ class TracesClient:
             strip_attachments=strip_attachments,
             filters=filters,
             sorting=sorting,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -1990,6 +2015,7 @@ class AsyncTracesClient:
         strip_attachments: typing.Optional[bool] = None,
         sorting: typing.Optional[str] = None,
         exclude: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -2016,6 +2042,8 @@ class AsyncTracesClient:
         sorting : typing.Optional[str]
 
         exclude : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -2048,6 +2076,7 @@ class AsyncTracesClient:
             strip_attachments=strip_attachments,
             sorting=sorting,
             exclude=exclude,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -2510,8 +2539,12 @@ class AsyncTracesClient:
         return _response.data
 
     async def find_feedback_score_names2(
-        self, *, project_id: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
-    ) -> typing.List[str]:
+        self,
+        *,
+        project_id: typing.Optional[str] = None,
+        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> FeedbackScoreNamesPublic:
         """
         Find Feedback Score names
 
@@ -2519,12 +2552,14 @@ class AsyncTracesClient:
         ----------
         project_id : typing.Optional[str]
 
+        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        typing.List[str]
+        FeedbackScoreNamesPublic
             Feedback Scores resource
 
         Examples
@@ -2537,13 +2572,13 @@ class AsyncTracesClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.find_feedback_score_names2(
-            project_id=project_id, request_options=request_options
+            project_id=project_id, exclude_category_names=exclude_category_names, request_options=request_options
         )
         return _response.data
 
     async def find_trace_threads_feedback_score_names(
         self, *, project_id: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
-    ) -> typing.List[str]:
+    ) -> FeedbackScoreNamesPublic:
         """
         Find Trace Threads Feedback Score names
 
@@ -2556,7 +2591,7 @@ class AsyncTracesClient:
 
         Returns
         -------
-        typing.List[str]
+        FeedbackScoreNamesPublic
             Find Trace Threads Feedback Score names
 
         Examples
@@ -2579,6 +2614,7 @@ class AsyncTracesClient:
         project_id: typing.Optional[str] = None,
         project_name: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -2593,6 +2629,8 @@ class AsyncTracesClient:
         project_name : typing.Optional[str]
 
         filters : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -2619,6 +2657,7 @@ class AsyncTracesClient:
             project_id=project_id,
             project_name=project_name,
             filters=filters,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -2663,6 +2702,7 @@ class AsyncTracesClient:
         project_id: typing.Optional[str] = None,
         project_name: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -2677,6 +2717,8 @@ class AsyncTracesClient:
         project_name : typing.Optional[str]
 
         filters : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -2703,6 +2745,7 @@ class AsyncTracesClient:
             project_id=project_id,
             project_name=project_name,
             filters=filters,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -2800,6 +2843,7 @@ class AsyncTracesClient:
         strip_attachments: typing.Optional[bool] = None,
         filters: typing.Optional[str] = None,
         sorting: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -2824,6 +2868,8 @@ class AsyncTracesClient:
         filters : typing.Optional[str]
 
         sorting : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -2855,6 +2901,7 @@ class AsyncTracesClient:
             strip_attachments=strip_attachments,
             filters=filters,
             sorting=sorting,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,

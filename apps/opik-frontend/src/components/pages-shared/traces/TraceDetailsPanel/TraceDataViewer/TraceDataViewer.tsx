@@ -26,9 +26,14 @@ import MessagesTab from "./MessagesTab";
 import DetailsTab from "./DetailsTab";
 import AgentGraphTab from "./AgentGraphTab";
 import PromptsTab from "./PromptsTab";
+import AgentConfigurationTab, {
+  isAgentConfigurationMetadata,
+} from "./AgentConfigurationTab";
+import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 import { formatDuration, formatDate } from "@/lib/date";
 import isUndefined from "lodash/isUndefined";
 import { formatCost } from "@/lib/money";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import TraceDataViewerActionsPanel from "@/components/pages-shared/traces/TraceDetailsPanel/TraceDataViewer/TraceDataViewerActionsPanel";
 import UserCommentHoverList from "@/components/pages-shared/traces/UserComment/UserCommentHoverList";
 import {
@@ -68,6 +73,10 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
   isSpansLazyLoading,
   search,
 }) => {
+  const {
+    permissions: { canAnnotateTraceSpanThread },
+  } = usePermissions();
+
   const rootScrollRef = useRef<HTMLDivElement>(null);
   const type = get(data, "type", TRACE_TYPE_FOR_TREE);
   const tokens = data.usage?.total_tokens;
@@ -82,12 +91,23 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
   const showOptimizerPrompts = useIsFeatureEnabled(
     FeatureToggleKeys.OPTIMIZATION_STUDIO_ENABLED,
   );
+  const isAgentConfigurationEnabled = useIsFeatureEnabled(
+    FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED,
+  );
 
   const hasPrompts = useMemo(() => {
     if (!showOptimizerPrompts) return false;
     const prompts = (data.metadata as Record<string, unknown>)?.opik_prompts;
     return Array.isArray(prompts) && prompts.length > 0;
   }, [data.metadata, showOptimizerPrompts]);
+
+  const hasAgentConfiguration = useMemo(() => {
+    if (!isAgentConfigurationEnabled) return false;
+    const config = (data.metadata as Record<string, unknown>)?.[
+      AGENT_CONFIGURATION_METADATA_KEY
+    ];
+    return isAgentConfigurationMetadata(config);
+  }, [data.metadata, isAgentConfigurationEnabled]);
 
   const { media, transformedInput, transformedOutput } = useUnifiedMedia(data);
 
@@ -126,16 +146,25 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
     if (normalizedTab === "messages" && !canShowMessagesTab) return "details";
     if (normalizedTab === "graph" && !hasSpanAgentGraph) return defaultTab;
     if (normalizedTab === "prompts" && !hasPrompts) return defaultTab;
+    if (normalizedTab === "configuration" && !hasAgentConfiguration)
+      return defaultTab;
 
     return normalizedTab;
-  }, [tab, defaultTab, canShowMessagesTab, hasSpanAgentGraph, hasPrompts]);
+  }, [
+    tab,
+    defaultTab,
+    canShowMessagesTab,
+    hasSpanAgentGraph,
+    hasPrompts,
+    hasAgentConfiguration,
+  ]);
 
   const isSpanInputOutputLoading =
     type !== TRACE_TYPE_FOR_TREE && isSpansLazyLoading;
   const entityType = type === TRACE_TYPE_FOR_TREE ? "trace" : "span";
   const isTrace = type === TRACE_TYPE_FOR_TREE;
 
-  const isTraceType = (data: Trace | Span): data is Trace =>
+  const isTraceType = (_data: Trace | Span): _data is Trace =>
     type === TRACE_TYPE_FOR_TREE;
 
   const traceData = isTraceType(data) ? data : undefined;
@@ -349,6 +378,11 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
                 Agent graph
               </TabsTrigger>
             )}
+            {hasAgentConfiguration && (
+              <TabsTrigger variant="underline" value="configuration">
+                Configuration
+              </TabsTrigger>
+            )}
           </TabsList>
           {canShowMessagesTab && (
             <TabsContent value="messages">
@@ -374,7 +408,11 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
                 <ConfigurableFeedbackScoreTable
                   title={isTrace ? "Trace scores" : "Span scores"}
                   feedbackScores={data.feedback_scores}
-                  onDeleteFeedbackScore={onDeleteFeedbackScore}
+                  onDeleteFeedbackScore={
+                    canAnnotateTraceSpanThread
+                      ? onDeleteFeedbackScore
+                      : undefined
+                  }
                   onAddHumanReview={() =>
                     setActiveSection(DetailsActionSection.Annotations)
                   }
@@ -387,7 +425,11 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
                   <ConfigurableFeedbackScoreTable
                     title="Span scores"
                     feedbackScores={traceData.span_feedback_scores}
-                    onDeleteFeedbackScore={onDeleteFeedbackScore}
+                    onDeleteFeedbackScore={
+                      canAnnotateTraceSpanThread
+                        ? onDeleteFeedbackScore
+                        : undefined
+                    }
                     onAddHumanReview={() =>
                       setActiveSection(DetailsActionSection.Annotations)
                     }
@@ -406,6 +448,11 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
           {hasSpanAgentGraph && (
             <TabsContent value="graph">
               <AgentGraphTab data={agentGraphData} />
+            </TabsContent>
+          )}
+          {hasAgentConfiguration && (
+            <TabsContent value="configuration">
+              <AgentConfigurationTab data={data} projectId={projectId} />
             </TabsContent>
           )}
         </Tabs>
