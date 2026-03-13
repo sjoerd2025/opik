@@ -78,7 +78,7 @@ import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.*;
 
 @ImplementedBy(TraceDAOImpl.class)
-public interface TraceDAO {
+interface TraceDAO {
 
     Mono<UUID> insert(Trace trace, Connection connection);
 
@@ -984,6 +984,12 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
+                  <if(uuid_from_time || uuid_to_time)>
+                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
+                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  <else>
+                  AND entity_id IN (SELECT id FROM target_spans)
+                  <endif>
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -1002,6 +1008,12 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
+                  <if(uuid_from_time || uuid_to_time)>
+                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
+                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  <else>
+                  AND entity_id IN (SELECT id FROM target_spans)
+                  <endif>
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -1712,19 +1724,19 @@ class TraceDAOImpl implements TraceDAO {
             ;
             """;
 
+    private static final String DELETE_FOR_RETENTION = """
+            DELETE FROM traces
+            WHERE workspace_id IN :workspace_ids
+            AND id \\< :cutoff_id
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
     private static final String DELETE_BY_ID = """
             DELETE FROM traces
             WHERE id IN :ids
             AND workspace_id = :workspace_id
             <if(project_id)>AND project_id = :project_id<endif>
-            SETTINGS log_comment = '<log_comment>'
-            ;
-            """;
-
-    private static final String DELETE_FOR_RETENTION = """
-            DELETE FROM traces
-            WHERE workspace_id IN :workspace_ids
-            AND id \\< :cutoff_id
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -2107,6 +2119,12 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id IN :project_ids
+                  <if(uuid_from_time || uuid_to_time)>
+                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
+                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  <else>
+                  AND entity_id IN (SELECT id FROM spans_data)
+                  <endif>
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -2125,6 +2143,12 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'span'
                   AND workspace_id = :workspace_id
                   AND project_id IN :project_ids
+                  <if(uuid_from_time || uuid_to_time)>
+                  <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
+                  <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  <else>
+                  AND entity_id IN (SELECT id FROM spans_data)
+                  <endif>
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
