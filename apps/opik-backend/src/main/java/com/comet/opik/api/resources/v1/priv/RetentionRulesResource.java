@@ -114,9 +114,8 @@ public class RetentionRulesResource {
 
     @DELETE
     @Path("/{ruleId}")
-    @Operation(operationId = "deactivateRetentionRule", summary = "Deactivate retention rule", description = "Soft-deactivate a retention rule (sets enabled=false). Rules are never hard-deleted for audit trail.", responses = {
-            @ApiResponse(responseCode = "204", description = "No content"),
-            @ApiResponse(responseCode = "404", description = "Retention rule not found")
+    @Operation(operationId = "deactivateRetentionRule", summary = "Deactivate retention rule", description = "Soft-deactivate a retention rule (sets enabled=false). Idempotent — returns 204 even if the rule does not exist or is already inactive. Rules are never hard-deleted for audit trail.", responses = {
+            @ApiResponse(responseCode = "204", description = "No content")
     })
     public Response deactivateRule(@PathParam("ruleId") UUID id) {
 
