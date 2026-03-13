@@ -107,6 +107,9 @@ public class RetentionPolicyService {
         Map<CutoffKey, List<WorkspaceRetention>> grouped = resolved.stream()
                 .collect(Collectors.groupingBy(wr -> new CutoffKey(wr.cutoffId(), wr.minId())));
 
+        // Sequential execution (concatMap) to avoid overloading ClickHouse — retention
+        // deletes can be very large and we don't want to saturate connections or cause
+        // excessive merge pressure from parallel mutations.
         return Flux.fromIterable(grouped.entrySet())
                 .concatMap(entry -> {
                     var key = entry.getKey();
