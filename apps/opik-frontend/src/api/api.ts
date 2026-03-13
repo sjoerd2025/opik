@@ -38,6 +38,7 @@ export const PLAYGROUND_EVALUATION_REST_ENDPOINT =
   "/v1/private/playground/evaluations/";
 export const DASHBOARDS_REST_ENDPOINT = "/v1/private/dashboards/";
 export const AGENT_CONFIGS_REST_ENDPOINT = "/v1/private/agent-configs/";
+export const OLLIE_REST_ENDPOINT = "/v1/private/ollie/";
 
 export const COMPARE_EXPERIMENTS_KEY = "compare-experiments";
 export const SPANS_KEY = "spans";
@@ -59,6 +60,7 @@ export const TRACE_AI_ASSISTANT_KEY = "trace-analyzer-history";
 export const DASHBOARDS_KEY = "dashboards";
 export const DASHBOARD_KEY = "dashboard";
 export const AGENT_CONFIGS_KEY = "agent-configs";
+export const OLLIE_COMPUTE_KEY = "ollie-compute";
 
 // stats for feedback
 export const STATS_COMET_ENDPOINT = "https://stats.comet.com/notify/event/";

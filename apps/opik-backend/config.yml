@@ -773,6 +773,20 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Agent Configuration feature is enabled
   agentConfigurationEnabled: ${TOGGLE_AGENT_CONFIGURATION_ENABLED:-"false"}
+  # Default: false
+  # Description: Whether or not Ollie compute engine is enabled
+  ollieEnabled: ${TOGGLE_OLLIE_ENABLED:-"false"}
+
+# Ollie compute engine configuration
+ollie:
+  orchestratorUrl: ${OLLIE_ORCHESTRATOR_URL:-http://python-panels-orchestrator:4100}
+  redisLabelTtlSeconds: ${OLLIE_REDIS_LABEL_TTL:-86400}
+  cookiePath: ${OLLIE_COOKIE_PATH:-/}
+  cookieDomain: ${OLLIE_COOKIE_DOMAIN:-}
+  cookieMaxAge: ${OLLIE_COOKIE_MAX_AGE:-86400}
+  cookieSecure: ${OLLIE_COOKIE_SECURE:-true}
+  cookieHttpOnly: ${OLLIE_COOKIE_HTTP_ONLY:-true}
+  cookieSameSite: ${OLLIE_COOKIE_SAME_SITE:-None}
 
 # Local Runner configuration
 localRunner:

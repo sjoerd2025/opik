@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { FeatureToggleKeys, FeatureToggles } from "@/types/feature-toggles";
 import { OnChangeFn } from "@/types/shared";
 import useFeatureToggle from "@/api/feature-toggle/useFeatureToggle";
+import useOllieWarm from "@/api/ollie/useOllieWarm";
 import useAppStore from "@/store/AppStore";
 
 type FeatureTogglesProps = {
@@ -38,6 +39,7 @@ const DEFAULT_STATE: FeatureToggles = {
   [FeatureToggleKeys.OLLAMA_PROVIDER_ENABLED]: false,
   [FeatureToggleKeys.COLLABORATORS_TAB_ENABLED]: false,
   [FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED]: false,
+  [FeatureToggleKeys.OLLIE_ENABLED]: false,
 };
 
 const initialState: FeatureTogglesState = {
@@ -61,6 +63,8 @@ export function FeatureTogglesProvider({ children }: FeatureTogglesProps) {
       setFeatures(data);
     }
   }, [data]);
+
+  useOllieWarm(features[FeatureToggleKeys.OLLIE_ENABLED]);
 
   const value = useMemo(() => {
     return {
