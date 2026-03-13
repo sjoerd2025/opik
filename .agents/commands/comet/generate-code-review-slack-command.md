@@ -47,7 +47,7 @@ This workflow will:
 ### 1. Preflight & Environment Check
 
 - **Check GitHub MCP**: Test GitHub MCP availability by attempting to fetch repository info using `get_file_contents` for `comet-ml/opik`
-  > If unavailable, respond with: "This command needs the GitHub MCP server. Please enable it, then run: `npm run install-mcp`."  
+  > If unavailable, respond with: "This command needs GitHub MCP configured. Set MCP config/env, run `make cursor` (Cursor) or `make claude` (Claude CLI), then retry."  
   > Stop here.
 - **Check Git repository**: Verify we're in a Git repository
 - **Check current branch**: Get current branch name
@@ -73,7 +73,7 @@ This workflow will:
 
 - **Extract Jira ticket from PR title**:
   - Parse PR title for pattern `[OPIK-\d+]` or `[issue-\d+]` or `[NA]`
-  - Extract ticket number (e.g., `OPIK-1234` from `[OPIK-1234] [BE] Add endpoint`)
+  - Extract ticket number (e.g., `OPIK-1234` from `[OPIK-1234] [BE] feat(api): add trace request validation endpoint`)
   - If not found in title, check PR description "## Issues" section for `OPIK-\d+` pattern
   - If still not found, prompt: "Jira ticket not found in PR. Enter Jira ticket number (e.g., OPIK-1234):"
   - Validate format and store
@@ -87,6 +87,15 @@ This workflow will:
 
 - **Extract test environment link from PR description and comments**:
   - First, search PR comments for test environment deployment messages (look for "Test environment is now available!" or similar)
+  - When fetching PR comments via `gh api`, **always** use `--paginate` to ensure all results are fetched:
+    ```bash
+    # Issue comments (general PR comments, including deployment bot messages)
+    gh api repos/comet-ml/opik/issues/{pr_number}/comments --paginate
+
+    # Review comments (inline code comments)
+    gh api repos/comet-ml/opik/pulls/{pr_number}/comments --paginate
+    ```
+    > **Why pagination is required**: GitHub API returns 30 items per page by default. Opik PRs regularly exceed this — 17 CI test group comments + deployment bot comments + reviewer comments can push past 30 total. Without `--paginate`, the deployment bot comment with the test environment link may end up on page 2 and get silently missed.
   - Extract URL from comment body (typically in format `https://pr-XXXX.dev.comet.com` or `https://test.opik.com`)
   - If not found in comments, search PR description for URLs in "## Testing" section
   - Look for common test environment patterns: `https://pr-*.dev.comet.com`, `https://test.opik.com`, `https://*.opik.com`, or any `https://` URL
@@ -270,7 +279,7 @@ cursor generate-code-review-slack-command
 
 # Command execution flow:
 # 1. Find PR for current branch: https://github.com/comet-ml/opik/pull/1234
-# 2. Extract Jira ticket from PR title: [OPIK-1234] [BE] [FE] Add metrics dashboard
+# 2. Extract Jira ticket from PR title: [OPIK-1234] [FE] feat(api): add metrics dashboard
 # 3. Extract test env from PR comments or description: https://pr-1234.dev.comet.com (from PR comments or Testing section)
 # 4. Extract summaries from PR description:
 #    - FE: Added new metrics dashboard UI (from Details section)

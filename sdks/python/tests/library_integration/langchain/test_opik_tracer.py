@@ -1,9 +1,53 @@
 from typing import Optional
+from uuid import uuid4
 
 import pytest
 from opik import exceptions
+from opik.api_objects import span as span_module, trace as trace_module
 from opik.integrations import langchain
-from opik.integrations.langchain.run_parse_helpers import parse_graph_interrupt_value
+from opik.integrations.langchain.opik_tracer import OpikTracer
+from opik.integrations.langchain.run_parse_helpers import (
+    parse_graph_interrupt_value,
+    is_langgraph_parent_command,
+)
+
+
+def test_opik_tracer__attach_span_to_parent_span__stream_restart_root(fake_backend):
+    """When a parent run is a stream-restart root (in _span_data_map but NOT in
+    _created_traces_data_map), trace data should be propagated to the child via
+    a trace_id fallback lookup rather than raising a KeyError."""
+    tracer = OpikTracer(opik_context_read_only_mode=True)
+
+    # Simulate an original root run that created a trace
+    trace_data = trace_module.TraceData(name="test-trace")
+    trace_id = trace_data.id
+    root_run_id = uuid4()
+    tracer._created_traces_data_map[root_run_id] = trace_data
+
+    # Simulate a stream-restart root: has a span with the same trace_id but is
+    # NOT in _created_traces_data_map (the scenario that previously caused a KeyError)
+    stream_restart_run_id = uuid4()
+    parent_span = span_module.SpanData(trace_id=trace_id, name="stream-restart-span")
+    tracer._span_data_map[stream_restart_run_id] = parent_span
+
+    child_run_id = uuid4()
+    run_dict = {
+        "inputs": {"input": "hello"},
+        "name": "child-span",
+        "run_type": "general",
+        "extra": {},
+    }
+
+    # Should not raise KeyError
+    tracer._attach_span_to_parent_span(
+        run_id=child_run_id,
+        parent_run_id=stream_restart_run_id,
+        run_dict=run_dict,
+    )
+
+    # Child should inherit the trace data via trace_id fallback lookup
+    assert child_run_id in tracer._created_traces_data_map
+    assert tracer._created_traces_data_map[child_run_id] is trace_data
 
 
 def test_opik_tracer__init_validation():
@@ -174,6 +218,19 @@ def test_opik_tracer__init_validation():
             "GraphInterrupt(Interrupt(value=  test_value  ))",
             "test_value",
         ),
+        # NodeInterrupt (deprecated subclass of GraphInterrupt) - repr uses a list, not tuple
+        (
+            "NodeInterrupt([Interrupt(value='hello')])",
+            "hello",
+        ),
+        (
+            'NodeInterrupt([Interrupt(value="review this PR", id="abc123")])',
+            "review this PR",
+        ),
+        (
+            "NodeInterrupt([Interrupt(value=42)])",
+            "42",
+        ),
         # Edge cases: no match
         (
             "Some random error message",
@@ -282,4 +339,57 @@ def test_parse_graph_interrupt_value(error_traceback: str, expected: Optional[st
     result = parse_graph_interrupt_value(error_traceback)
     assert result == expected, (
         f"Expected {expected!r}, got {result!r} for input: {error_traceback[:100]}"
+    )
+
+
+@pytest.mark.parametrize(
+    "error_traceback,expected",
+    [
+        # Detection via repr prefix (from LangChain run.error = repr(exception))
+        (
+            "ParentCommand(Command(graph='__parent__', goto=[Send(node='some_agent', arg={})]))",
+            True,
+        ),
+        # Detection via a fully qualified class name in traceback
+        (
+            "Traceback (most recent call last):\n  File 'test.py', line 1\nlanggraph.errors.ParentCommand: Command(graph='__parent__', goto=[])",
+            True,
+        ),
+        # Full error string matching the pattern reported by users
+        (
+            "ParentCommand(Command(graph='__parent__', goto=[Send(node='jira_agent', arg={'messages': [], 'remaining_steps': 9999})]))Traceback (most recent call last):\n\n  File \"langgraph/_internal/_runnable.py\", line 711, in ainvoke\n    input = await step.ainvoke(input, config)\n\nlanggraph.errors.ParentCommand: Command(graph='__parent__', goto=[])",
+            True,
+        ),
+        # Not a ParentCommand - regular error
+        (
+            "ValueError: something went wrong",
+            False,
+        ),
+        # Not a ParentCommand - GraphInterrupt
+        (
+            "GraphInterrupt(Interrupt(value='test'))",
+            False,
+        ),
+        # Not a ParentCommand - empty string
+        (
+            "",
+            False,
+        ),
+        # Not a ParentCommand - partial match (must start with ParentCommand or contain FQCN)
+        (
+            "SomeOtherParentCommand(foo)",
+            False,
+        ),
+        # Not a ParentCommand - similar but different class
+        (
+            "Command(graph='__parent__', goto=[])",
+            False,
+        ),
+    ],
+)
+def test_is_langgraph_parent_command(error_traceback: str, expected: bool):
+    """Test is_langgraph_parent_command with various input formats."""
+    result = is_langgraph_parent_command(error_traceback)
+    assert result == expected, (
+        f"Expected {expected!r}, got {result!r} for input: {error_traceback[:120]}"
     )

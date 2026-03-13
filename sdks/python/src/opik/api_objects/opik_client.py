@@ -11,11 +11,7 @@ from typing import (
     Union,
     Literal,
     cast,
-    TYPE_CHECKING,
 )
-
-if TYPE_CHECKING:
-    from opik.evaluation.suite_evaluators import llm_judge
 
 import httpx
 
@@ -47,10 +43,11 @@ from .experiment import helpers as experiment_helpers
 from .experiment import rest_operations as experiment_rest_operations
 from . import prompt as prompt_module
 from .prompt import client as prompt_client
+from .agent_config.config import AgentConfig
 from .threads import threads_client
 from .trace import migration as trace_migration, trace_client
+from .. import config as opik_config
 from .. import (
-    config,
     datetime_helpers,
     exceptions,
     httpx_client,
@@ -59,13 +56,16 @@ from .. import (
     rest_client_configurator,
     url_helpers,
 )
+from ..healthcheck import connection_monitor, connection_probe
 from ..message_processing import (
     messages,
     streamer_constructors,
     message_queue,
+    permissions,
 )
 from ..message_processing.batching import sequence_splitter
 from ..message_processing.processors import message_processors_chain
+from ..message_processing.replay import replay_manager
 from ..rest_api import client as rest_api_client
 from ..rest_api.core.api_error import ApiError
 from ..rest_api.types import (
@@ -83,6 +83,7 @@ from ..types import (
     LLMProvider,
     SpanType,
 )
+from ..file_upload import upload_manager
 
 LOGGER = logging.getLogger(__name__)
 
@@ -116,7 +117,7 @@ class Opik:
             None
         """
 
-        config_ = config.get_from_user_inputs(
+        config_ = opik_config.get_from_user_inputs(
             project_name=project_name,
             workspace=workspace,
             url_override=host,
@@ -140,10 +141,10 @@ class Opik:
         atexit.register(self.end, timeout=self._flush_timeout)
 
     @property
-    def config(self) -> config.OpikConfig:
+    def config(self) -> opik_config.OpikConfig:
         """
         Returns:
-            config.OpikConfig: Read-only copy of the configuration of the Opik client.
+            OpikConfig: Read-only copy of the configuration of the Opik client.
         """
         return self._config.model_copy()
 
@@ -196,23 +197,53 @@ class Opik:
             batch_factor=self._config.maximal_queue_size_batch_factor,
         )
 
-        self.__internal_api__message_processor__ = (
-            message_processors_chain.create_message_processors_chain(
-                rest_client=self._rest_client
-            )
-        )
-        self._streamer = streamer_constructors.construct_online_streamer(
-            n_consumers=self._config.background_workers,
+        file_uploader = upload_manager.FileUploadManager(
             rest_client=self._rest_client,
             httpx_client=self._httpx_client,
+            worker_count=self._config.file_upload_background_workers,
+        )
+
+        fallback_replay = self._create_replay_manager()
+
+        self.__internal_api__message_processor__ = message_processors_chain.create_message_processors_chain(
+            rest_client=self._rest_client,
+            file_upload_manager=file_uploader,
+            fallback_replay_manager=fallback_replay,
+            unauthorized_message_types_registry=permissions.UnauthorizedMessageTypeRegistry(
+                retry_interval_seconds=self._config.unauthorized_message_type_retry_interval,
+                max_retry_count=self._config.unauthorized_message_type_max_retry_count,
+            ),
+        )
+        self._streamer = streamer_constructors.construct_online_streamer(
+            file_uploader=file_uploader,
+            n_consumers=self._config.background_workers,
             use_batching=use_batching,
             use_attachment_extraction=self._config.is_attachment_extraction_active,
             min_base64_embedded_attachment_size=self._config.min_base64_embedded_attachment_size,
-            file_upload_worker_count=self._config.file_upload_background_workers,
             max_queue_size=max_queue_size,
             message_processor=self.__internal_api__message_processor__,
             url_override=self._config.url_override,
+            fallback_replay_manager=fallback_replay,
         )
+
+    def _create_replay_manager(self) -> replay_manager.ReplayManager:
+        probe = connection_probe.ConnectionProbe(
+            base_url=self._config.url_override,
+            client=self._httpx_client,
+        )
+        monitor = connection_monitor.OpikConnectionMonitor(
+            ping_interval=self._config.connection_monitor_ping_interval,
+            check_timeout=self._config.connection_monitor_check_timeout,
+            probe=probe,
+        )
+
+        fallback_replay = replay_manager.ReplayManager(
+            monitor=monitor,
+            batch_size=self._config.replay_batch_size,
+            batch_replay_delay=self._config.replay_batch_replay_delay,
+            tick_interval_seconds=self._config.replay_tick_interval,
+        )
+        return fallback_replay
 
     def _display_trace_url(self, trace_id: str, project_name: str) -> None:
         project_url = url_helpers.get_project_url_by_trace_id(
@@ -700,7 +731,7 @@ class Opik:
 
         for batch in sequence_splitter.split_into_batches(
             score_messages,
-            max_payload_size_MB=config.MAX_BATCH_SIZE_MB,
+            max_payload_size_MB=opik_config.MAX_BATCH_SIZE_MB,
             max_length=constants.FEEDBACK_SCORES_MAX_BATCH_SIZE,
         ):
             add_span_feedback_scores_batch_message = (
@@ -750,7 +781,7 @@ class Opik:
 
         for batch in sequence_splitter.split_into_batches(
             score_messages,
-            max_payload_size_MB=config.MAX_BATCH_SIZE_MB,
+            max_payload_size_MB=opik_config.MAX_BATCH_SIZE_MB,
             max_length=constants.FEEDBACK_SCORES_MAX_BATCH_SIZE,
         ):
             add_trace_feedback_scores_batch_message = (
@@ -960,8 +991,9 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        evaluators: Optional[List["llm_judge.LLMJudge"]] = None,
+        assertions: Optional[List[str]] = None,
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        tags: Optional[List[str]] = None,
     ) -> evaluation_suite.EvaluationSuite:
         """
         Create a new evaluation suite for regression testing.
@@ -973,25 +1005,23 @@ class Opik:
         Args:
             name: The name of the evaluation suite.
             description: Optional description of what this suite tests.
-            evaluators: Suite-level evaluators (e.g., LLMJudge instances)
-                applied to all test items.
-            execution_policy: Dataset-level execution policy.
+            assertions: Suite-level assertions. Each string describes an
+                expected behavior that will be checked by an LLM.
+            execution_policy: Suite-level execution policy.
                 Example: {"runs_per_item": 3, "pass_threshold": 2}
+            tags: Optional list of tags for the suite.
 
         Returns:
             EvaluationSuite: The created evaluation suite object.
 
         Example:
-            >>> from opik.evaluation.suite_evaluators import LLMJudge
-            >>>
             >>> suite = client.create_evaluation_suite(
             ...     name="Refund Policy Tests",
             ...     description="Regression tests for refund scenarios",
-            ...     evaluators=[
-            ...         LLMJudge(assertions=[
-            ...             {"name": "no_hallucination", "expected_behavior": "No hallucinated information"},
-            ...         ]),
-            ...     ]
+            ...     assertions=[
+            ...         "No hallucinated information",
+            ...         "Response is helpful",
+            ...     ],
             ... )
             >>>
             >>> suite.add_item(
@@ -1002,8 +1032,12 @@ class Opik:
         """
         from .dataset import validators, rest_operations
 
-        if evaluators:
-            validators.validate_evaluators(evaluators, "suite-level evaluators")
+        if execution_policy is not None:
+            validators.validate_execution_policy(execution_policy)
+
+        evaluators = validators.resolve_evaluators(
+            assertions, None, "suite-level assertions"
+        )
 
         rest_operations.create_evaluation_suite_dataset(
             rest_client=self._rest_client,
@@ -1011,6 +1045,7 @@ class Opik:
             description=description,
             evaluators=evaluators,
             exec_policy=execution_policy,
+            tags=tags,
         )
         suite_dataset = dataset.Dataset(
             name=name,
@@ -1028,8 +1063,8 @@ class Opik:
         """
         Get an existing evaluation suite by name.
 
-        Retrieves the dataset and its version-level evaluators/execution_policy
-        from the backend, returning a fully configured EvaluationSuite.
+        Retrieves the dataset and its version-level assertions and execution
+        policy from the backend, returning a fully configured EvaluationSuite.
 
         Args:
             name: The name of the evaluation suite.
@@ -1062,32 +1097,57 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        evaluators: Optional[List["llm_judge.LLMJudge"]] = None,
+        assertions: Optional[List[str]] = None,
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        tags: Optional[List[str]] = None,
     ) -> evaluation_suite.EvaluationSuite:
         """
         Get an existing evaluation suite by name or create a new one if it does not exist.
 
+        If the suite already exists and ``assertions``, ``execution_policy``,
+        or ``tags`` are provided, the suite is updated accordingly
+        (unspecified parameters retain their current values).
+
         Args:
             name: The name of the evaluation suite.
             description: Optional description (used only when creating).
-            evaluators: Suite-level evaluators (used only when creating).
-            execution_policy: Execution policy (used only when creating).
+            assertions: Suite-level assertions. Each string describes an
+                expected behavior that will be checked by an LLM.
+            execution_policy: Execution policy for the suite.
+            tags: Optional list of tags for the suite.
 
         Returns:
             EvaluationSuite: The evaluation suite object.
         """
+        from .dataset import validators
+
+        if execution_policy is not None:
+            validators.validate_execution_policy(execution_policy)
+
         try:
-            return self.get_evaluation_suite(name)
+            suite = self.get_evaluation_suite(name)
         except ApiError as e:
             if e.status_code == 404:
                 return self.create_evaluation_suite(
                     name=name,
                     description=description,
-                    evaluators=evaluators,
                     execution_policy=execution_policy,
+                    assertions=assertions,
+                    tags=tags,
                 )
             raise
+
+        has_updates = (
+            assertions is not None or execution_policy is not None or tags is not None
+        )
+        if has_updates:
+            suite.update(
+                assertions=assertions,
+                execution_policy=execution_policy,
+                tags=tags,
+            )
+
+        return suite
 
     def create_experiment(
         self,
@@ -1097,6 +1157,7 @@ class Opik:
         prompt: Optional[prompt_module.base_prompt.BasePrompt] = None,
         prompts: Optional[List[prompt_module.base_prompt.BasePrompt]] = None,
         type: Literal["regular", "trial", "mini-batch"] = "regular",
+        evaluation_method: Literal["dataset", "evaluation_suite"] = "dataset",
         optimization_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         dataset_version_id: Optional[str] = None,
@@ -1138,6 +1199,7 @@ class Opik:
             metadata=metadata,
             prompt_versions=prompt_versions,
             type=type,
+            evaluation_method=evaluation_method,
             optimization_id=optimization_id,
             tags=tags,
             dataset_version_id=dataset_version_id,
@@ -1305,6 +1367,10 @@ class Opik:
         """
         timeout = timeout if timeout is not None else self._flush_timeout
         return self._streamer.flush(timeout)
+
+    def __internal_api__failed_uploads__(self, timeout: Optional[float] = None) -> int:
+        """Returns the number of failed file uploads after flush. Blocking - waits for all uploads to complete."""
+        return self._streamer.__internal_api__failed_uploads__(timeout=timeout)
 
     def search_traces(
         self,
@@ -1544,7 +1610,7 @@ class Opik:
         """
 
         dereferenced_workspace = self._workspace
-        if dereferenced_workspace == config.OPIK_WORKSPACE_DEFAULT_NAME:
+        if dereferenced_workspace == opik_config.OPIK_WORKSPACE_DEFAULT_NAME:
             dereferenced_workspace = (
                 self._rest_client.check.get_workspace_name().workspace_name
             )
@@ -2238,6 +2304,16 @@ class Opik:
         """
         self._rest_client.annotation_queues.delete_annotation_queue_batch(
             ids=[queue_id]
+        )
+
+    def get_agent_config(
+        self,
+        project_name: Optional[str] = None,
+    ) -> AgentConfig:
+        project_name = project_name or self._project_name
+        return AgentConfig(
+            project_name=project_name,
+            rest_client_=self._rest_client,
         )
 
 

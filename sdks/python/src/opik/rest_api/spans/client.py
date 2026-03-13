@@ -9,6 +9,7 @@ from ..types.comment import Comment
 from ..types.error_info import ErrorInfo
 from ..types.error_info_write import ErrorInfoWrite
 from ..types.feedback_score_batch_item import FeedbackScoreBatchItem
+from ..types.feedback_score_names_public import FeedbackScoreNamesPublic
 from ..types.feedback_score_source import FeedbackScoreSource
 from ..types.json_list_string import JsonListString
 from ..types.json_list_string_write import JsonListStringWrite
@@ -256,6 +257,7 @@ class SpansClient:
         strip_attachments: typing.Optional[bool] = None,
         sorting: typing.Optional[str] = None,
         exclude: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -287,6 +289,8 @@ class SpansClient:
 
         exclude : typing.Optional[str]
 
+        search : typing.Optional[str]
+
         from_time : typing.Optional[dt.datetime]
 
         to_time : typing.Optional[dt.datetime]
@@ -317,6 +321,7 @@ class SpansClient:
             strip_attachments=strip_attachments,
             sorting=sorting,
             exclude=exclude,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -510,6 +515,8 @@ class SpansClient:
         model: typing.Optional[str] = OMIT,
         provider: typing.Optional[str] = OMIT,
         tags: typing.Optional[typing.Sequence[str]] = OMIT,
+        tags_to_add: typing.Optional[typing.Sequence[str]] = OMIT,
+        tags_to_remove: typing.Optional[typing.Sequence[str]] = OMIT,
         usage: typing.Optional[typing.Dict[str, int]] = OMIT,
         total_estimated_cost: typing.Optional[float] = OMIT,
         error_info: typing.Optional[ErrorInfo] = OMIT,
@@ -550,6 +557,13 @@ class SpansClient:
         provider : typing.Optional[str]
 
         tags : typing.Optional[typing.Sequence[str]]
+            Tags
+
+        tags_to_add : typing.Optional[typing.Sequence[str]]
+            Tags to add
+
+        tags_to_remove : typing.Optional[typing.Sequence[str]]
+            Tags to remove
 
         usage : typing.Optional[typing.Dict[str, int]]
 
@@ -587,6 +601,8 @@ class SpansClient:
             model=model,
             provider=provider,
             tags=tags,
+            tags_to_add=tags_to_add,
+            tags_to_remove=tags_to_remove,
             usage=usage,
             total_estimated_cost=total_estimated_cost,
             error_info=error_info,
@@ -663,8 +679,9 @@ class SpansClient:
         *,
         project_id: typing.Optional[str] = None,
         type: typing.Optional[FindFeedbackScoreNames1RequestType] = None,
+        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> typing.List[str]:
+    ) -> FeedbackScoreNamesPublic:
         """
         Find Feedback Score names
 
@@ -674,12 +691,14 @@ class SpansClient:
 
         type : typing.Optional[FindFeedbackScoreNames1RequestType]
 
+        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        typing.List[str]
+        FeedbackScoreNamesPublic
             Feedback Scores resource
 
         Examples
@@ -689,7 +708,10 @@ class SpansClient:
         client.spans.find_feedback_score_names1()
         """
         _response = self._raw_client.find_feedback_score_names1(
-            project_id=project_id, type=type, request_options=request_options
+            project_id=project_id,
+            type=type,
+            exclude_category_names=exclude_category_names,
+            request_options=request_options,
         )
         return _response.data
 
@@ -730,6 +752,7 @@ class SpansClient:
         trace_id: typing.Optional[str] = None,
         type: typing.Optional[GetSpanStatsRequestType] = None,
         filters: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -748,6 +771,8 @@ class SpansClient:
         type : typing.Optional[GetSpanStatsRequestType]
 
         filters : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -773,6 +798,7 @@ class SpansClient:
             trace_id=trace_id,
             type=type,
             filters=filters,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -1176,6 +1202,7 @@ class AsyncSpansClient:
         strip_attachments: typing.Optional[bool] = None,
         sorting: typing.Optional[str] = None,
         exclude: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1206,6 +1233,8 @@ class AsyncSpansClient:
         sorting : typing.Optional[str]
 
         exclude : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -1240,6 +1269,7 @@ class AsyncSpansClient:
             strip_attachments=strip_attachments,
             sorting=sorting,
             exclude=exclude,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,
@@ -1442,6 +1472,8 @@ class AsyncSpansClient:
         model: typing.Optional[str] = OMIT,
         provider: typing.Optional[str] = OMIT,
         tags: typing.Optional[typing.Sequence[str]] = OMIT,
+        tags_to_add: typing.Optional[typing.Sequence[str]] = OMIT,
+        tags_to_remove: typing.Optional[typing.Sequence[str]] = OMIT,
         usage: typing.Optional[typing.Dict[str, int]] = OMIT,
         total_estimated_cost: typing.Optional[float] = OMIT,
         error_info: typing.Optional[ErrorInfo] = OMIT,
@@ -1482,6 +1514,13 @@ class AsyncSpansClient:
         provider : typing.Optional[str]
 
         tags : typing.Optional[typing.Sequence[str]]
+            Tags
+
+        tags_to_add : typing.Optional[typing.Sequence[str]]
+            Tags to add
+
+        tags_to_remove : typing.Optional[typing.Sequence[str]]
+            Tags to remove
 
         usage : typing.Optional[typing.Dict[str, int]]
 
@@ -1522,6 +1561,8 @@ class AsyncSpansClient:
             model=model,
             provider=provider,
             tags=tags,
+            tags_to_add=tags_to_add,
+            tags_to_remove=tags_to_remove,
             usage=usage,
             total_estimated_cost=total_estimated_cost,
             error_info=error_info,
@@ -1604,8 +1645,9 @@ class AsyncSpansClient:
         *,
         project_id: typing.Optional[str] = None,
         type: typing.Optional[FindFeedbackScoreNames1RequestType] = None,
+        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> typing.List[str]:
+    ) -> FeedbackScoreNamesPublic:
         """
         Find Feedback Score names
 
@@ -1615,12 +1657,14 @@ class AsyncSpansClient:
 
         type : typing.Optional[FindFeedbackScoreNames1RequestType]
 
+        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        typing.List[str]
+        FeedbackScoreNamesPublic
             Feedback Scores resource
 
         Examples
@@ -1633,7 +1677,10 @@ class AsyncSpansClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.find_feedback_score_names1(
-            project_id=project_id, type=type, request_options=request_options
+            project_id=project_id,
+            type=type,
+            exclude_category_names=exclude_category_names,
+            request_options=request_options,
         )
         return _response.data
 
@@ -1677,6 +1724,7 @@ class AsyncSpansClient:
         trace_id: typing.Optional[str] = None,
         type: typing.Optional[GetSpanStatsRequestType] = None,
         filters: typing.Optional[str] = None,
+        search: typing.Optional[str] = None,
         from_time: typing.Optional[dt.datetime] = None,
         to_time: typing.Optional[dt.datetime] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1695,6 +1743,8 @@ class AsyncSpansClient:
         type : typing.Optional[GetSpanStatsRequestType]
 
         filters : typing.Optional[str]
+
+        search : typing.Optional[str]
 
         from_time : typing.Optional[dt.datetime]
 
@@ -1723,6 +1773,7 @@ class AsyncSpansClient:
             trace_id=trace_id,
             type=type,
             filters=filters,
+            search=search,
             from_time=from_time,
             to_time=to_time,
             request_options=request_options,

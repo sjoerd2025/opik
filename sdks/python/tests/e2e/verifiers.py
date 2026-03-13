@@ -566,7 +566,7 @@ def verify_thread(
                 )
             )
             == 1
-        )
+        ),
     ):
         raise AssertionError(f"Failed to get thread with id '{thread_id}'.")
     threads = threads_client.search_threads(
@@ -620,7 +620,7 @@ def _assert_feedback_scores(
             category_name=score.category_name,
             id=item_id,
             name=score.name,
-            reason=score.reason.strip(),
+            reason=score.reason.strip() if score.reason is not None else None,
             value=score.value,
         )
         for score in feedback_scores

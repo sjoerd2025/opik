@@ -55,6 +55,9 @@ LANGGRAPH_INTERRUPT_OUTPUT_KEY = "__interrupt__"
 LANGGRAPH_RESUME_INPUT_KEY = "__resume__"
 LANGGRAPH_INTERRUPT_METADATA_KEY = "_langgraph_interrupt"
 
+# Constant for LangGraph ParentCommand (multi-agent control flow routing)
+LANGGRAPH_PARENT_COMMAND_METADATA_KEY = "_langgraph_parent_command"
+
 
 class TrackRootRunResult(NamedTuple):
     new_trace_data: Optional[trace.TraceData]
@@ -194,6 +197,10 @@ class OpikTracer(BaseTracer):
             ):
                 outputs = {LANGGRAPH_INTERRUPT_OUTPUT_KEY: interrupt_value}
                 trace_additional_metadata[LANGGRAPH_INTERRUPT_METADATA_KEY] = True
+                # Don't set error_info - this is not an error
+            # ParentCommand is not an error - it's multi-agent routing in LangGraph
+            elif run_parse_helpers.is_langgraph_parent_command(error_str):
+                trace_additional_metadata[LANGGRAPH_PARENT_COMMAND_METADATA_KEY] = True
                 # Don't set error_info - this is not an error
             elif not self._should_skip_error(error_str):
                 error_info = ErrorInfoDict(
@@ -477,9 +484,17 @@ class OpikTracer(BaseTracer):
         )
 
         if new_span_data.trace_id not in self._externally_created_traces_ids:
-            self._created_traces_data_map[run_id] = self._created_traces_data_map[
-                parent_run_id
-            ]
+            if parent_run_id in self._created_traces_data_map:
+                self._created_traces_data_map[run_id] = self._created_traces_data_map[
+                    parent_run_id
+                ]
+            else:
+                # Parent may be a stream-restart root run that was created as a regular
+                # span (not a skipped LangGraph root). Find the trace data by trace_id.
+                for td in self._created_traces_data_map.values():
+                    if td.id == new_span_data.trace_id:
+                        self._created_traces_data_map[run_id] = td
+                        break
 
         if not self._opik_context_read_only_mode:
             self._opik_context_storage.add_span_data(new_span_data)
@@ -667,7 +682,11 @@ class OpikTracer(BaseTracer):
                     metadata={LANGGRAPH_INTERRUPT_METADATA_KEY: True},
                     output={LANGGRAPH_INTERRUPT_OUTPUT_KEY: interrupt_value},
                 )
-            # Don't set error_info - this is not an error
+            # ParentCommand is not an error - it's multi-agent routing in LangGraph
+            elif run_parse_helpers.is_langgraph_parent_command(error_str):
+                span_data.init_end_time().update(
+                    metadata={LANGGRAPH_PARENT_COMMAND_METADATA_KEY: True},
+                )
             elif self._should_skip_error(error_str):
                 span_data.init_end_time().update(output=ERROR_SKIPPED_OUTPUTS)
             else:

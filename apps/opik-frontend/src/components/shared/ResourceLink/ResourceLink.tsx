@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  ArrowUpRight,
   ChartLine,
   Database,
   FileTerminal,
@@ -139,7 +138,7 @@ export const RESOURCE_MAP = {
   },
 };
 
-type ResourceLinkProps = {
+export type ResourceLinkProps = {
   name?: string;
   id: string;
   resource: RESOURCE_TYPE;
@@ -147,7 +146,7 @@ type ResourceLinkProps = {
   params?: Record<string, string | number | string[]>;
   variant?: TagProps["variant"];
   size?: TagProps["size"];
-  iconsSize?: number;
+  iconSize?: 3 | 3.5 | 4 | 5;
   gapSize?: number;
   tooltipContent?: string;
   asTag?: boolean;
@@ -164,7 +163,7 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
   params,
   variant = "gray",
   size = "md",
-  iconsSize = 4,
+  iconSize = 4,
   gapSize = 2,
   tooltipContent = "",
   asTag = false,
@@ -204,6 +203,8 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
               gapSize === 3 && "gap-3",
               gapSize === 4 && "gap-4",
               deleted && "opacity-50 cursor-default",
+              !deleted &&
+                "hover:bg-primary-foreground hover:text-foreground active:bg-primary-100 active:text-foreground",
               isSmall && "size-8 justify-center",
               className,
             )}
@@ -211,36 +212,25 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
             <props.icon
               className={cn(
                 "shrink-0",
-                iconsSize === 3 && "size-3",
-                iconsSize === 4 && "size-4",
-                iconsSize === 5 && "size-5",
+                iconSize === 3 && "size-3",
+                iconSize === 3.5 && "size-3.5",
+                iconSize === 4 && "size-4",
+                iconSize === 5 && "size-5",
               )}
               style={{ color: props.color }}
             />
             {!isSmall && (
-              <>
-                <div
-                  className={cn(
-                    "truncate",
-                    variant === "transparent" && [
-                      "text-muted-slate",
-                      "comet-body-s-accented",
-                    ],
-                  )}
-                >
-                  {text}
-                </div>
-                {!deleted && (
-                  <ArrowUpRight
-                    className={cn(
-                      "shrink-0 text-muted-slate",
-                      iconsSize === 3 && "size-3",
-                      iconsSize === 4 && "size-4",
-                      iconsSize === 5 && "size-5",
-                    )}
-                  />
+              <div
+                className={cn(
+                  "truncate",
+                  variant === "transparent" && [
+                    "text-muted-slate",
+                    "comet-body-s-accented",
+                  ],
                 )}
-              </>
+              >
+                {text}
+              </div>
             )}
           </Tag>
         </TooltipWrapper>
