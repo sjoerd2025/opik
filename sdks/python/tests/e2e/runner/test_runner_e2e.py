@@ -17,6 +17,9 @@ import pytest
 
 from opik import Opik, synchronization
 import opik.rest_api.client as rest_api_client
+from opik.api_objects import rest_helpers
+from opik.rest_api import core as rest_api_core
+from ..conftest import OPIK_E2E_TESTS_PROJECT_NAME
 
 
 ECHO_APP = os.path.join(os.path.dirname(__file__), "echo_app.py")
@@ -165,12 +168,22 @@ def subprocess_env():
 
 
 @pytest.fixture()
-def runner_process(api_client, subprocess_env):
-    """Start ``opik connect --pair <code>`` and yield the runner_id."""
-    pair = api_client.runners.generate_pairing_code()
+def runner_process(api_client, subprocess_env, request):
+    """Start ``opik connect --pair <code> <python> <app>`` and yield the runner_id."""
+    app_path = getattr(request, "param", ECHO_APP)
+
+    try:
+        api_client.projects.create_project(name=OPIK_E2E_TESTS_PROJECT_NAME)
+    except rest_api_core.ApiError:
+        pass
+    project_id = rest_helpers.resolve_project_id_by_name(
+        api_client, OPIK_E2E_TESTS_PROJECT_NAME
+    )
+
+    pair = api_client.runners.generate_pairing_code(project_id=project_id)
 
     proc = subprocess.Popen(
-        [OPIK_CLI, "connect", "--pair", pair.pairing_code],
+        [OPIK_CLI, "connect", "--pair", pair.pairing_code, sys.executable, app_path],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -231,10 +244,11 @@ def test_runner_happy_path(api_client, runner_process):
     assert job.result is not None, "Completed job should have a result"
     assert f"echo: {message}" in str(job.result)
 
-    trace = find_trace_by_input(api_client, "Default Project", message)
+    trace = find_trace_by_input(api_client, OPIK_E2E_TESTS_PROJECT_NAME, message)
     assert f"echo: {message}" in str(trace.output)
 
 
+@pytest.mark.parametrize("runner_process", [ECHO_CONFIG_APP], indirect=True)
 def test_runner_with_mask(api_client, runner_process):
     """Mask: register echo_config agent, create mask, verify mask value in job result and trace."""
     register_agent(ECHO_CONFIG_APP)
@@ -259,7 +273,7 @@ def test_runner_with_mask(api_client, runner_process):
     assert job.result is not None, "Completed job should have a result"
     assert custom_greeting in str(job.result)
 
-    trace = find_trace_by_input(api_client, "Default Project", message)
+    trace = find_trace_by_input(api_client, OPIK_E2E_TESTS_PROJECT_NAME, message)
     assert custom_greeting in str(trace.output), (
         f"Expected '{custom_greeting}' in trace output, got: {trace.output}"
     )
