@@ -248,7 +248,8 @@ class ExperimentItemDAO {
                 ei.last_updated_at,
                 ei.created_by,
                 ei.last_updated_by,
-                tfs.visibility_mode AS trace_visibility_mode
+                tfs.visibility_mode AS trace_visibility_mode,
+                ei.execution_policy
             FROM experiment_items_scope AS ei
             LEFT JOIN (
                 SELECT

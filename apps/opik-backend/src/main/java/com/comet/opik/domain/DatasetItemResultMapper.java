@@ -78,7 +78,14 @@ public class DatasetItemResultMapper {
                                 .map(Object::toString)
                                 .filter(StringUtils::isNotBlank)
                                 .orElse(null))
+                        .executionPolicy(experimentItem.size() > 18
+                                ? ExecutionPolicyMapper.fromJson(
+                                        Optional.ofNullable(experimentItem.get(18))
+                                                .map(Object::toString)
+                                                .orElse(null))
+                                : null)
                         .build())
+                .map(AssertionResultMapper::enrichWithAssertions)
                 .toList();
 
         return experimentItems.isEmpty() ? null : experimentItems;
@@ -154,6 +161,8 @@ public class DatasetItemResultMapper {
                     .orElse(null);
         }
 
+        var experimentItems = getExperimentItems(row.get("experiment_items_array", List[].class));
+
         return DatasetItem.builder()
                 .id(row.get("id", UUID.class))
                 .data(data)
@@ -180,7 +189,8 @@ public class DatasetItemResultMapper {
                 .evaluators(getEvaluators(row, rowMetadata))
                 .executionPolicy(getExecutionPolicy(row, rowMetadata))
                 .datasetItemId(datasetItemId)
-                .experimentItems(getExperimentItems(row.get("experiment_items_array", List[].class)))
+                .experimentItems(experimentItems)
+                .runSummariesByExperiment(AssertionResultMapper.computeRunSummaries(experimentItems))
                 .lastUpdatedAt(row.get("last_updated_at", Instant.class))
                 .createdAt(row.get("created_at", Instant.class))
                 .createdBy(row.get("created_by", String.class))

@@ -1020,7 +1020,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     tfs.usage,
                     tfs.visibility_mode,
                     tfs.metadata,
-                    di.description
+                    di.description,
+                    ei.execution_policy
                 )) AS experiment_items_array
             FROM experiment_items_final AS ei
             LEFT JOIN dataset_items_resolved AS di ON di.id = ei.dataset_item_id
