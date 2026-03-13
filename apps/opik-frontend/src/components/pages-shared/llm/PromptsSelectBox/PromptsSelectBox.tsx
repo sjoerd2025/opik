@@ -152,7 +152,7 @@ const PromptsSelectBox: React.FC<PromptsSelectBoxProps> = ({
             content={hasUnsavedChanges ? "Unsaved changes" : displayName}
           >
             <div className="flex min-w-0 items-center gap-1">
-              <FileTerminal className="size-3.5 shrink-0 text-lime-400" />
+              <FileTerminal className="size-3.5 shrink-0 text-[#b8e54a]" />
               <span className="comet-body-xs-accented truncate">
                 {displayName}
               </span>
