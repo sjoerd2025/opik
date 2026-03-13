@@ -236,24 +236,47 @@ class RetentionPolicyServiceTest {
 
             Instant now = Instant.now();
 
-            // Insert identical 30-day-old trace in BOTH workspaces (expired by 14d rule)
+            // Insert identical 30-day-old data in BOTH workspaces (expired by 14d rule)
             UUID traceA = idGenerator.generateId(now.minus(30, ChronoUnit.DAYS));
+            UUID spanA = idGenerator.generateId(now.minus(30, ChronoUnit.DAYS));
             UUID traceB = idGenerator.generateId(now.minus(30, ChronoUnit.DAYS));
+            UUID spanB = idGenerator.generateId(now.minus(30, ChronoUnit.DAYS));
+
             createTestTrace(traceA, apiKeyA, wsNameA);
+            createTestSpan(spanA, traceA, apiKeyA, wsNameA);
+            createTestFeedbackScore(traceA, apiKeyA, wsNameA);
+            createTestComment(traceA, apiKeyA, wsNameA);
+
             createTestTrace(traceB, apiKeyB, wsNameB);
+            createTestSpan(spanB, traceB, apiKeyB, wsNameB);
+            createTestFeedbackScore(traceB, apiKeyB, wsNameB);
+            createTestComment(traceB, apiKeyB, wsNameB);
 
             awaitData("traces", wsA, 1);
+            awaitData("spans", wsA, 1);
+            awaitData("authored_feedback_scores", wsA, 1);
+            awaitData("comments", wsA, 1);
             awaitData("traces", wsB, 1);
+            awaitData("spans", wsB, 1);
+            awaitData("authored_feedback_scores", wsB, 1);
+            awaitData("comments", wsB, 1);
 
             retentionPolicyService.executeRetentionCycle(0, now).block();
 
-            // Workspace A (applyToPast=true): old trace DELETED — standard retention behavior
+            // Workspace A (applyToPast=true): all old data DELETED — standard retention behavior
             assertThat(countRows("traces", wsA)).isZero();
+            assertThat(countRows("spans", wsA)).isZero();
+            assertThat(countRows("authored_feedback_scores", wsA)).isZero();
+            assertThat(countRows("comments", wsA)).isZero();
 
-            // Workspace B (applyToPast=false): old trace PRESERVED — data predates the rule
+            // Workspace B (applyToPast=false): all old data PRESERVED — data predates the rule
             // (rule.createdAt ≈ now → minId ≈ now → no data matches id >= minId AND id < cutoff)
             assertThat(countRows("traces", wsB)).isEqualTo(1);
+            assertThat(countRows("spans", wsB)).isEqualTo(1);
+            assertThat(countRows("authored_feedback_scores", wsB)).isEqualTo(1);
+            assertThat(countRows("comments", wsB)).isEqualTo(1);
             assertThat(countRowsById("traces", traceB)).isEqualTo(1);
+            assertThat(countRowsById("spans", spanB)).isEqualTo(1);
         }
 
         @Test
