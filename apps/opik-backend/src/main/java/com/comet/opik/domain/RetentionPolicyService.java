@@ -1,7 +1,6 @@
 package com.comet.opik.domain;
 
 import com.comet.opik.api.retention.RetentionLevel;
-import com.comet.opik.api.retention.RetentionPeriod;
 import com.comet.opik.api.retention.RetentionRule;
 import com.comet.opik.infrastructure.RetentionConfig;
 import com.comet.opik.utils.RetentionUtils;
@@ -37,8 +36,15 @@ public class RetentionPolicyService {
     private final @NonNull SpanDAO spanDAO;
     private final @NonNull FeedbackScoreDAO feedbackScoreDAO;
     private final @NonNull CommentDAO commentDAO;
-    private final @NonNull IdGenerator idGenerator;
     private final @NonNull @Config("retention") RetentionConfig config;
+
+    /**
+     * Resolved retention parameters for a single workspace.
+     * cutoffId: everything with id < cutoffId is eligible for deletion.
+     * minId: if non-null, only data with id >= minId is eligible (applyToPast=false).
+     */
+    private record WorkspaceRetention(String workspaceId, UUID cutoffId, UUID minId) {
+    }
 
     /**
      * Execute one retention cycle for the given fraction.
@@ -59,64 +65,19 @@ public class RetentionPolicyService {
                         return Mono.empty();
                     }
 
-                    Map<RetentionPeriod, List<String>> grouped = groupByRetention(rules);
-                    log.info("Retention cycle: '{}' rules across '{}' retention levels",
-                            rules.size(), grouped.size());
+                    List<WorkspaceRetention> resolved = resolveRetentionParams(rules, now);
+                    log.info("Retention cycle: '{}' workspaces to process", resolved.size());
 
-                    return executeDeletes(grouped, now);
+                    return executeDeletes(resolved);
                 })
                 .doOnSuccess(__ -> log.info("Retention cycle completed: fraction='{}'", fraction));
     }
 
-    private Mono<Void> executeDeletes(Map<RetentionPeriod, List<String>> grouped, Instant now) {
-        return Flux.fromIterable(grouped.entrySet())
-                .concatMap(entry -> {
-                    var period = entry.getKey();
-                    var workspaceIds = entry.getValue();
-                    var cutoff = now.minus(period.getDays(), ChronoUnit.DAYS);
-                    var cutoffId = idGenerator.generateId(cutoff);
-
-                    return deleteForRetentionLevel(workspaceIds, cutoffId);
-                })
-                .then();
-    }
-
     /**
-     * Delete expired data across all tables for a single retention level.
-     * Workspace batching is done here so each DAO receives a pre-split batch.
-     * Order: feedback_scores → comments → spans → traces (children first).
+     * Resolve priority per workspace (WORKSPACE > ORGANIZATION), compute cutoffId and
+     * optional minId (for applyToPast=false rules), and filter out unlimited rules.
      */
-    private Flux<Long> deleteForRetentionLevel(List<String> workspaceIds, UUID cutoffId) {
-        var batches = Lists.partition(workspaceIds, config.getWorkspaceBatchSize());
-
-        return Flux.fromIterable(batches)
-                .concatMap(batch -> deleteBatchAcrossTables(batch, cutoffId));
-    }
-
-    private Flux<Long> deleteBatchAcrossTables(List<String> batch, UUID cutoffId) {
-        return Flux.concat(
-                feedbackScoreDAO.deleteForRetention(batch, cutoffId)
-                        .onErrorResume(e -> logAndSkip("feedback_scores", batch.size(), e)),
-                commentDAO.deleteForRetention(batch, cutoffId)
-                        .onErrorResume(e -> logAndSkip("comments", batch.size(), e)),
-                spanDAO.deleteForRetention(batch, cutoffId)
-                        .onErrorResume(e -> logAndSkip("spans", batch.size(), e)),
-                traceDAO.deleteForRetention(batch, cutoffId)
-                        .onErrorResume(e -> logAndSkip("traces", batch.size(), e)));
-    }
-
-    private Mono<Long> logAndSkip(String table, int batchSize, Throwable error) {
-        log.error("Retention delete failed: table='{}', batchSize='{}'", table, batchSize, error);
-        return Mono.just(0L);
-    }
-
-    /**
-     * Resolve priority per workspace (WORKSPACE > ORGANIZATION), then group by retention period.
-     * If a workspace has both a WORKSPACE-level and an ORGANIZATION-level rule,
-     * only the WORKSPACE-level rule is used.
-     */
-    private Map<RetentionPeriod, List<String>> groupByRetention(List<RetentionRule> rules) {
-        // Priority: WORKSPACE (ordinal 1) < ORGANIZATION (ordinal 0), so higher ordinal wins
+    private List<WorkspaceRetention> resolveRetentionParams(List<RetentionRule> rules, Instant now) {
         var priorityOrder = Comparator.comparing(
                 (RetentionRule r) -> r.level() == RetentionLevel.WORKSPACE ? 0 : 1);
 
@@ -124,10 +85,65 @@ public class RetentionPolicyService {
                 .collect(Collectors.groupingBy(RetentionRule::workspaceId))
                 .values().stream()
                 .map(rulesForWs -> rulesForWs.stream().min(priorityOrder).orElseThrow())
-                .filter(rule -> Boolean.TRUE.equals(rule.applyToPast()))
-                .collect(Collectors.groupingBy(
-                        RetentionRule::retention,
-                        Collectors.mapping(RetentionRule::workspaceId, Collectors.toList())));
+                .filter(rule -> rule.retention() != null && rule.retention().getDays() > 0)
+                .map(rule -> {
+                    var cutoff = now.minus(rule.retention().getDays(), ChronoUnit.DAYS);
+                    var cutoffId = IdGenerator.generateMinId(cutoff);
+                    UUID minId = null;
+                    if (!Boolean.TRUE.equals(rule.applyToPast()) && rule.createdAt() != null) {
+                        minId = IdGenerator.generateMinId(rule.createdAt());
+                    }
+                    return new WorkspaceRetention(rule.workspaceId(), cutoffId, minId);
+                })
+                .toList();
+    }
+
+    private Mono<Void> executeDeletes(List<WorkspaceRetention> resolved) {
+        // Group workspaces that share the same (cutoffId, minId) for batching
+        Map<CutoffKey, List<WorkspaceRetention>> grouped = resolved.stream()
+                .collect(Collectors.groupingBy(wr -> new CutoffKey(wr.cutoffId(), wr.minId())));
+
+        return Flux.fromIterable(grouped.entrySet())
+                .concatMap(entry -> {
+                    var key = entry.getKey();
+                    var workspaceIds = entry.getValue().stream()
+                            .map(WorkspaceRetention::workspaceId)
+                            .toList();
+                    return deleteForRetentionLevel(workspaceIds, key.cutoffId(), key.minId());
+                })
+                .then();
+    }
+
+    private record CutoffKey(UUID cutoffId, UUID minId) {
+    }
+
+    /**
+     * Delete expired data across all tables for a single retention level.
+     * Workspace batching is done here so each DAO receives a pre-split batch.
+     * Order: feedback_scores → comments → spans → traces (children first).
+     */
+    private Flux<Long> deleteForRetentionLevel(List<String> workspaceIds, UUID cutoffId, UUID minId) {
+        var batches = Lists.partition(workspaceIds, config.getWorkspaceBatchSize());
+
+        return Flux.fromIterable(batches)
+                .concatMap(batch -> deleteBatchAcrossTables(batch, cutoffId, minId));
+    }
+
+    private Flux<Long> deleteBatchAcrossTables(List<String> batch, UUID cutoffId, UUID minId) {
+        return Flux.concat(
+                feedbackScoreDAO.deleteForRetention(batch, cutoffId, minId)
+                        .onErrorResume(e -> logAndSkip("feedback_scores", batch.size(), e)),
+                commentDAO.deleteForRetention(batch, cutoffId, minId)
+                        .onErrorResume(e -> logAndSkip("comments", batch.size(), e)),
+                spanDAO.deleteForRetention(batch, cutoffId, minId)
+                        .onErrorResume(e -> logAndSkip("spans", batch.size(), e)),
+                traceDAO.deleteForRetention(batch, cutoffId, minId)
+                        .onErrorResume(e -> logAndSkip("traces", batch.size(), e)));
+    }
+
+    private Mono<Long> logAndSkip(String table, int batchSize, Throwable error) {
+        log.error("Retention delete failed: table='{}', batchSize='{}'", table, batchSize, error);
+        return Mono.just(0L);
     }
 
 }

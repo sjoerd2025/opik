@@ -1173,6 +1173,7 @@ class SpanDAO {
             DELETE FROM spans
             WHERE workspace_id IN :workspace_ids
             AND id \\< :cutoff_id
+            <if(min_id)>AND id >= :min_id<endif>
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -2717,20 +2718,28 @@ class SpanDAO {
                 baseMetadata, SpanField.PROVIDER.getValue(), provider);
     }
 
-    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
+            UUID minId) {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete spans: workspaces='{}', cutoffId='{}'", workspaceIds.size(), cutoffId);
+        log.info("Retention delete spans: workspaces='{}', cutoffId='{}', minId='{}'",
+                workspaceIds.size(), cutoffId, minId);
 
         var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_spans", null,
                 workspaceIds.size());
+        if (minId != null) {
+            template.add("min_id", true);
+        }
 
         return Mono.from(connectionFactory.create())
                 .flatMap(connection -> {
                     var statement = connection.createStatement(template.render())
                             .bind("workspace_ids", workspaceIds.toArray(String[]::new))
                             .bind("cutoff_id", cutoffId);
+                    if (minId != null) {
+                        statement.bind("min_id", minId);
+                    }
 
                     return Mono.from(statement.execute())
                             .flatMap(result -> Mono.from(result.getRowsUpdated()));

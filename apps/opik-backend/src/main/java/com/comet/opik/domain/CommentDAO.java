@@ -63,8 +63,9 @@ public interface CommentDAO {
      *
      * @param workspaceIds workspaces whose comments should be purged
      * @param cutoffId     UUID v7 representing the retention cutoff instant — all comments with entity_id &lt; cutoffId are deleted
+     * @param minId        if non-null, only deletes comments with entity_id &gt;= minId (for applyToPast=false rules)
      */
-    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId, UUID minId);
 }
 
 @Singleton
@@ -150,6 +151,7 @@ class CommentDAOImpl implements CommentDAO {
             DELETE FROM comments
             WHERE workspace_id IN :workspace_ids
             AND entity_id \\< :cutoff_id
+            <if(min_id)>AND entity_id >= :min_id<endif>
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -288,19 +290,27 @@ class CommentDAOImpl implements CommentDAO {
     }
 
     @Override
-    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
+            UUID minId) {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete comments: workspaces='{}', cutoffId='{}'", workspaceIds.size(), cutoffId);
+        log.info("Retention delete comments: workspaces='{}', cutoffId='{}', minId='{}'",
+                workspaceIds.size(), cutoffId, minId);
 
         var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_comments", null,
                 workspaceIds.size());
+        if (minId != null) {
+            template.add("min_id", true);
+        }
 
         return asyncTemplate.nonTransaction(connection -> {
             var statement = connection.createStatement(template.render())
                     .bind("workspace_ids", workspaceIds.toArray(String[]::new))
                     .bind("cutoff_id", cutoffId);
+            if (minId != null) {
+                statement.bind("min_id", minId);
+            }
 
             return Mono.from(statement.execute())
                     .flatMap(result -> Mono.from(result.getRowsUpdated()));

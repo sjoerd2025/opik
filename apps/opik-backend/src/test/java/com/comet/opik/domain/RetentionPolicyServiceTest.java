@@ -203,6 +203,60 @@ class RetentionPolicyServiceTest {
         }
 
         @Test
+        @DisplayName("applyToPast=false preserves pre-existing data that applyToPast=true would delete")
+        void applyToPastFalsePreservesPreExistingData() {
+            // Two workspaces with the SAME retention (14d) and the SAME old data (30d),
+            // differing ONLY in applyToPast. This directly proves the flag works.
+
+            // --- Workspace A: applyToPast=true (default) ---
+            String wsA = randomFraction0WorkspaceId();
+            String apiKeyA = UUID.randomUUID().toString();
+            String wsNameA = "workspace" + RandomStringUtils.secure().nextAlphanumeric(36);
+            String userA = "user-" + RandomStringUtils.secure().nextAlphanumeric(36);
+            AuthTestUtils.mockTargetWorkspace(wireMock.server(), apiKeyA, wsNameA, wsA, userA);
+
+            retentionClient.createAndGet(
+                    retentionClient.buildWorkspaceRule(RetentionPeriod.SHORT_14D)
+                            .applyToPast(true)
+                            .build(),
+                    apiKeyA, wsNameA);
+
+            // --- Workspace B: applyToPast=false ---
+            String wsB = randomFraction0WorkspaceId();
+            String apiKeyB = UUID.randomUUID().toString();
+            String wsNameB = "workspace" + RandomStringUtils.secure().nextAlphanumeric(36);
+            String userB = "user-" + RandomStringUtils.secure().nextAlphanumeric(36);
+            AuthTestUtils.mockTargetWorkspace(wireMock.server(), apiKeyB, wsNameB, wsB, userB);
+
+            retentionClient.createAndGet(
+                    retentionClient.buildWorkspaceRule(RetentionPeriod.SHORT_14D)
+                            .applyToPast(false)
+                            .build(),
+                    apiKeyB, wsNameB);
+
+            Instant now = Instant.now();
+
+            // Insert identical 30-day-old trace in BOTH workspaces (expired by 14d rule)
+            UUID traceA = idGenerator.generateId(now.minus(30, ChronoUnit.DAYS));
+            UUID traceB = idGenerator.generateId(now.minus(30, ChronoUnit.DAYS));
+            createTestTrace(traceA, apiKeyA, wsNameA);
+            createTestTrace(traceB, apiKeyB, wsNameB);
+
+            awaitData("traces", wsA, 1);
+            awaitData("traces", wsB, 1);
+
+            retentionPolicyService.executeRetentionCycle(0, now).block();
+
+            // Workspace A (applyToPast=true): old trace DELETED — standard retention behavior
+            assertThat(countRows("traces", wsA)).isZero();
+
+            // Workspace B (applyToPast=false): old trace PRESERVED — data predates the rule
+            // (rule.createdAt ≈ now → minId ≈ now → no data matches id >= minId AND id < cutoff)
+            assertThat(countRows("traces", wsB)).isEqualTo(1);
+            assertThat(countRowsById("traces", traceB)).isEqualTo(1);
+        }
+
+        @Test
         @DisplayName("Unlimited retention rules are ignored")
         void unlimitedRetentionRulesAreIgnored() {
             String unlimitedWsId = randomFraction0WorkspaceId();

@@ -73,8 +73,9 @@ public interface FeedbackScoreDAO {
      *
      * @param workspaceIds workspaces whose feedback scores should be purged
      * @param cutoffId     UUID v7 representing the retention cutoff instant — all scores with entity_id &lt; cutoffId are deleted
+     * @param minId        if non-null, only deletes scores with entity_id &gt;= minId (for applyToPast=false rules)
      */
-    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId, UUID minId);
 }
 
 @Singleton
@@ -165,6 +166,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             DELETE FROM <table_name>
             WHERE workspace_id IN :workspace_ids
             AND entity_id \\< :cutoff_id
+            <if(min_id)>AND entity_id >= :min_id<endif>
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -766,11 +768,13 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
     }
 
     @Override
-    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
+            UUID minId) {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete feedback_scores: workspaces='{}', cutoffId='{}'", workspaceIds.size(), cutoffId);
+        log.info("Retention delete feedback_scores: workspaces='{}', cutoffId='{}', minId='{}'",
+                workspaceIds.size(), cutoffId, minId);
 
         return asyncTemplate.nonTransaction(connection -> {
             var template1 = getSTWithLogComment(DELETE_FOR_RETENTION,
@@ -781,6 +785,11 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
                     "retention_delete_authored_feedback_scores", null, workspaceIds.size());
             template2.add("table_name", "authored_feedback_scores");
 
+            if (minId != null) {
+                template1.add("min_id", true);
+                template2.add("min_id", true);
+            }
+
             var wsArray = workspaceIds.toArray(String[]::new);
 
             var statement1 = connection.createStatement(template1.render())
@@ -790,6 +799,11 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             var statement2 = connection.createStatement(template2.render())
                     .bind("workspace_ids", wsArray)
                     .bind("cutoff_id", cutoffId);
+
+            if (minId != null) {
+                statement1.bind("min_id", minId);
+                statement2.bind("min_id", minId);
+            }
 
             return Mono.from(statement1.execute())
                     .flatMap(result -> Mono.from(result.getRowsUpdated()))
