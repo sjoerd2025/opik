@@ -277,17 +277,21 @@ class OpikTracer:
             is_partial = False
 
         span_id: Optional[str] = None
+        current_span: Optional[span.SpanData] = None
+        inv_id: Optional[str] = None
         exception_occurred = False
         try:
             model = None
             usage = None
             output = None
 
+            inv_id = callback_context.invocation_id
+
             if adk_helpers.has_empty_text_part_content(llm_response):
                 # Clean up TTFT tracking if it exists before early return
-                current_span = context_storage.top_span_data()
-                if current_span is not None and current_span.id is not None:
-                    self._safe_ttft_tracking(current_span.id, pop=True)
+                context_span = context_storage.top_span_data()
+                if context_span is not None and context_span.id is not None:
+                    self._safe_ttft_tracking(context_span.id, pop=True)
                 return
 
             current_span = context_storage.top_span_data()
@@ -295,7 +299,6 @@ class OpikTracer:
                 # ContextVar may be inaccessible across async context boundaries
                 # (e.g. SSE streaming combined with OTel context managers in ADK context
                 # caching). Fall back to the per-invocation pending spans stack.
-                inv_id = callback_context.invocation_id
                 with self._pending_llm_spans_lock:
                     stack = self._pending_llm_spans.get(inv_id, [])
                     current_span = stack[-1] if stack else None
@@ -383,13 +386,6 @@ class OpikTracer:
             )
 
             context_storage.pop_span_data(ensure_id=current_span.id)
-            inv_id = callback_context.invocation_id
-            with self._pending_llm_spans_lock:
-                stack = self._pending_llm_spans.get(inv_id, [])
-                if stack and stack[-1].id == current_span.id:
-                    stack.pop()
-                    if not stack:
-                        self._pending_llm_spans.pop(inv_id, None)
             current_span.init_end_time()
             # We close this span manually because otherwise ADK will close it too late,
             # and it will also add tool spans inside of it, which we want to avoid.
@@ -407,6 +403,15 @@ class OpikTracer:
             # For errors (exception_occurred=True) or early returns, this ensures cleanup happens
             if span_id is not None and (exception_occurred or not is_partial):
                 self._ttft_tracking.pop(span_id, None)
+            # Clean up pending LLM spans on all exit paths (including errors) to prevent
+            # stale entries that would be seen by future callbacks.
+            if current_span is not None and not is_partial and inv_id is not None:
+                with self._pending_llm_spans_lock:
+                    stack = self._pending_llm_spans.get(inv_id, [])
+                    if stack and stack[-1].id == current_span.id:
+                        stack.pop()
+                        if not stack:
+                            self._pending_llm_spans.pop(inv_id, None)
 
     def before_tool_callback(
         self,
