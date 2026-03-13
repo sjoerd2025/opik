@@ -135,13 +135,8 @@ class RetentionRuleServiceImpl implements RetentionRuleService {
             int result = dao.deactivate(id, workspaceId, userName);
 
             if (result == 0) {
-                // Could be not found or already deactivated — check existence
-                dao.findById(id, workspaceId)
-                        .orElseThrow(() -> {
-                            log.warn("Retention rule '{}' not found in workspace '{}'", id, workspaceId);
-                            return new NotFoundException(RULE_NOT_FOUND);
-                        });
-                log.info("Retention rule '{}' was already deactivated in workspace '{}'", id, workspaceId);
+                // DELETE is idempotent — return 204 whether not found or already deactivated
+                log.info("Retention rule '{}' not found or already deactivated in workspace '{}'", id, workspaceId);
             } else {
                 log.info("Deactivated retention rule '{}' in workspace '{}'", id, workspaceId);
             }

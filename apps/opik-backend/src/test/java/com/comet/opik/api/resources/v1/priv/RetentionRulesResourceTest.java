@@ -414,18 +414,18 @@ class RetentionRulesResourceTest {
         }
 
         @Test
-        @DisplayName("Deactivate non-existent rule returns 404")
+        @DisplayName("Deactivate non-existent rule returns 204 (idempotent)")
         void deactivateNonExistent() {
-            retentionClient.deactivate(UUID.randomUUID(), API_KEY, TEST_WORKSPACE_NAME, HttpStatus.SC_NOT_FOUND);
+            retentionClient.deactivate(UUID.randomUUID(), API_KEY, TEST_WORKSPACE_NAME, HttpStatus.SC_NO_CONTENT);
         }
 
         @Test
-        @DisplayName("Deactivate rule from another workspace returns 404")
+        @DisplayName("Deactivate rule from another workspace returns 204 (idempotent)")
         void deactivateFromAnotherWorkspace() {
             var rule = retentionClient.buildWorkspaceRule(RetentionPeriod.BASE_60D).build();
             var created = retentionClient.createAndGet(rule, API_KEY, TEST_WORKSPACE_NAME);
 
-            retentionClient.deactivate(created.id(), OTHER_API_KEY, OTHER_WORKSPACE_NAME, HttpStatus.SC_NOT_FOUND);
+            retentionClient.deactivate(created.id(), OTHER_API_KEY, OTHER_WORKSPACE_NAME, HttpStatus.SC_NO_CONTENT);
 
             // Original rule should still be active
             var fetched = retentionClient.get(created.id(), API_KEY, TEST_WORKSPACE_NAME, HttpStatus.SC_OK);

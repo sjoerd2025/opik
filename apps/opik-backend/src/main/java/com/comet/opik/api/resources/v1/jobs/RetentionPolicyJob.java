@@ -92,7 +92,11 @@ public class RetentionPolicyJob implements Managed {
                     }
 
                     return retentionPolicyService.executeRetentionCycle(fraction, Instant.now())
-                            .doFinally(__ -> lockService.unlockUsingToken(RUN_LOCK).subscribe());
+                            .then(lockService.unlockUsingToken(RUN_LOCK))
+                            .onErrorResume(e -> lockService.unlockUsingToken(RUN_LOCK)
+                                    .doOnError(unlockErr -> log.error("Failed to release retention lock", unlockErr))
+                                    .onErrorComplete()
+                                    .then(Mono.error(e)));
                 });
     }
 
