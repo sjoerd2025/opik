@@ -6,7 +6,7 @@ const warmOllie = async () => {
   return null;
 };
 
-export default function useOllieWarm(enabled: boolean) {
+export default function useOllieWarm({ enabled }: { enabled: boolean }) {
   useQuery({
     queryKey: ["ollie-warm"],
     queryFn: warmOllie,

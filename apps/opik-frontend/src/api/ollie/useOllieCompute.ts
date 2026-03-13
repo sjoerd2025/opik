@@ -13,7 +13,7 @@ const getOllieCompute = async () => {
   return data;
 };
 
-export default function useOllieCompute(enabled: boolean = false) {
+export default function useOllieCompute({ enabled }: { enabled: boolean }) {
   return useQuery({
     queryKey: [OLLIE_COMPUTE_KEY],
     queryFn: getOllieCompute,

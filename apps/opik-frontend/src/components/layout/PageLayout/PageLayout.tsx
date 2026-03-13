@@ -10,6 +10,7 @@ import useWelcomeWizardStatus from "@/api/welcome-wizard/useWelcomeWizardStatus"
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import QuickstartDialog from "@/components/pages-shared/onboarding/QuickstartDialog/QuickstartDialog";
+import useOllieWarm from "@/api/ollie/useOllieWarm";
 
 const MOBILE_BREAKPOINT = 1024; // lg breakpoint in Tailwind
 
@@ -22,6 +23,9 @@ const PageLayout = () => {
   const welcomeWizardEnabled = useIsFeatureEnabled(
     FeatureToggleKeys.WELCOME_WIZARD_ENABLED,
   );
+
+  const ollieEnabled = useIsFeatureEnabled(FeatureToggleKeys.OLLIE_ENABLED);
+  useOllieWarm({ enabled: ollieEnabled });
 
   const { data: wizardStatus } = useWelcomeWizardStatus({
     enabled: welcomeWizardEnabled,
