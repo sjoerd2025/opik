@@ -13,6 +13,9 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.Cookie;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.NewCookie;
@@ -41,7 +44,7 @@ public class OllieComputeResource {
             @ApiResponse(responseCode = "200", description = "Compute URL response"),
             @ApiResponse(responseCode = "503", description = "Ollie not enabled")
     })
-    public Response getCompute() {
+    public Response getCompute(@Context HttpHeaders incomingHeaders) {
         if (!config.getServiceToggles().isOllieEnabled()) {
             return Response.ok()
                     .entity(new DisabledResponse("", false))
@@ -50,14 +53,21 @@ public class OllieComputeResource {
 
         AuthenticationConfig.UrlConfig reactService = config.getAuthentication().getReactService();
         String apiKey = requestContext.get().getApiKey();
+        String workspaceName = requestContext.get().getWorkspaceName();
 
-        try (Response upstreamResponse = httpClient.target(URI.create(reactService.url()))
+        Invocation.Builder upstream = httpClient.target(URI.create(reactService.url()))
                 .path("opik")
                 .path("ollie")
                 .path("compute")
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, apiKey)
-                .get()) {
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName);
+
+        for (Cookie cookie : incomingHeaders.getCookies().values()) {
+            upstream = upstream.cookie(cookie);
+        }
+
+        try (Response upstreamResponse = upstream.get()) {
 
             String body = upstreamResponse.readEntity(String.class);
             Response.ResponseBuilder builder = Response.status(upstreamResponse.getStatus())
