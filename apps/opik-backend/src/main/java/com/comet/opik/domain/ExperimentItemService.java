@@ -325,14 +325,6 @@ public class ExperimentItemService {
         return experimentItemDAO.getExperimentRefsByTraceIds(traceIds, statuses);
     }
 
-    public Flux<ExperimentTraceRef> getExperimentRefsByItemIds(@NonNull Set<UUID> itemIds,
-            @NonNull Set<ExperimentStatus> statuses) {
-        if (itemIds.isEmpty()) {
-            return Flux.empty();
-        }
-        return experimentItemDAO.getExperimentRefsByItemIds(itemIds, statuses);
-    }
-
     public Flux<ExperimentTraceRef> getExperimentRefsBySpanIds(@NonNull Set<UUID> spanIds,
             @NonNull Set<ExperimentStatus> statuses) {
         if (spanIds.isEmpty()) {
