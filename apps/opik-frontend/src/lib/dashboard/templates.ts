@@ -12,7 +12,7 @@ import { LayoutDashboard, FlaskConical } from "lucide-react";
 
 import { BREAKDOWN_FIELD } from "@/types/dashboard";
 
-const EXPERIMENT_COMPARISON_TEMPLATE: DashboardTemplate = {
+export const EXPERIMENT_COMPARISON_TEMPLATE: DashboardTemplate = {
   id: createTemplateId(TEMPLATE_TYPE.EXPERIMENT_COMPARISON),
   type: TEMPLATE_TYPE.EXPERIMENT_COMPARISON,
   scope: TEMPLATE_SCOPE.EXPERIMENTS,
@@ -378,11 +378,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
   },
 };
 
-export const DASHBOARD_TEMPLATES: Record<TEMPLATE_TYPE, DashboardTemplate> = {
-  [TEMPLATE_TYPE.PROJECT_OVERVIEW]: PROJECT_OVERVIEW_TEMPLATE,
-  [TEMPLATE_TYPE.EXPERIMENT_COMPARISON]: EXPERIMENT_COMPARISON_TEMPLATE,
-};
-
 export const TEMPLATE_LIST: DashboardTemplate[] = [
   PROJECT_OVERVIEW_TEMPLATE,
   EXPERIMENT_COMPARISON_TEMPLATE,
@@ -390,10 +385,6 @@ export const TEMPLATE_LIST: DashboardTemplate[] = [
 
 export const PROJECT_TEMPLATE_LIST: DashboardTemplate[] = [
   PROJECT_OVERVIEW_TEMPLATE,
-];
-
-export const EXPERIMENTS_TEMPLATE_LIST: DashboardTemplate[] = [
-  EXPERIMENT_COMPARISON_TEMPLATE,
 ];
 
 // Old project templates replaced by PROJECT_OVERVIEW — users may still have these in localStorage

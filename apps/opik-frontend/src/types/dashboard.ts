@@ -39,11 +39,6 @@ export enum DASHBOARD_SCOPE {
   INSIGHTS = "insights",
 }
 
-export enum VIEW_TYPE {
-  DETAILS = "details",
-  DASHBOARDS = "dashboards",
-}
-
 export enum WIDGET_TYPE {
   PROJECT_METRICS = "project_metrics",
   PROJECT_STATS_CARD = "project_stats_card",
