@@ -306,14 +306,6 @@ const PlaygroundOutputActions = ({
       isDatasetRemoved ||
       isDatasetEmpty ||
       hasMediaCompatibilityIssues;
-
-    const shouldTooltipAppear =
-      !canUsePlayground ||
-      !allPromptsHaveModels ||
-      !allMessagesNotEmpty ||
-      isDatasetEmpty ||
-      isDatasetRemoved ||
-      hasMediaCompatibilityIssues;
     const style: React.CSSProperties = isDisabledButton
       ? { pointerEvents: "auto" }
       : {};
@@ -352,10 +344,6 @@ const PlaygroundOutputActions = ({
       return "Action is disabled";
     };
 
-    const tooltipKey = shouldTooltipAppear
-      ? "action-tooltip-open-tooltip"
-      : "action-tooltip";
-
     const hasActiveFilters = filters.length > 0;
     const isPaginationActive = page > 1 || size < total;
     const isSubsetSelected = hasActiveFilters || isPaginationActive;
@@ -369,8 +357,6 @@ const PlaygroundOutputActions = ({
     return (
       <TooltipWrapper
         content={getTooltipMessage()}
-        key={tooltipKey}
-        defaultOpen={shouldTooltipAppear}
         hotkeys={isDisabledButton ? undefined : RUN_HOT_KEYS}
       >
         <Button
@@ -431,7 +417,7 @@ const PlaygroundOutputActions = ({
           <PlaygroundProgressIndicator />
         </div>
       )}
-      <div className="sticky flex items-center justify-between gap-2">
+      <div className="sticky flex items-center justify-between gap-2 pr-4">
         {createdExperiments.length > 0 && plainDatasetId && (
           <div className="flex gap-2">
             {canViewExperiments && (
