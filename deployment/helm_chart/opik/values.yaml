@@ -726,6 +726,19 @@ clickhouse:
       enabled: false
     username: opik
     password: opik
+  additionalUsers:
+    - username: ollie_readonly
+      password: ollie_readonly
+      profile: ollie_readonly
+  additionalProfiles:
+    - name: ollie_readonly
+      settings:
+        readonly: 2
+        max_memory_usage: 536870912
+        max_execution_time: 30
+        max_result_rows: 1000
+        max_result_bytes: 5242880
+        max_rows_to_read: 10000000
   serviceAccount:
     annotations: {}
     create: false
