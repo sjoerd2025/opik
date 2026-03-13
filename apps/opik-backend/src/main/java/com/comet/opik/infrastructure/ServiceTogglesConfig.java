@@ -54,4 +54,6 @@ public class ServiceTogglesConfig {
     @NotNull boolean collaboratorsTabEnabled;
     @JsonProperty
     @NotNull boolean agentConfigurationEnabled;
+    @JsonProperty
+    @NotNull boolean ollieEnabled;
 }

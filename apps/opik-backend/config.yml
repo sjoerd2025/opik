@@ -773,6 +773,9 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Agent Configuration feature is enabled
   agentConfigurationEnabled: ${TOGGLE_AGENT_CONFIGURATION_ENABLED:-"false"}
+  # Default: false
+  # Description: Whether or not Ollie compute engine is enabled
+  ollieEnabled: ${TOGGLE_OLLIE_ENABLED:-"false"}
 
 # Local Runner configuration
 localRunner:

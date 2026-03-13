@@ -530,6 +530,7 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Collaborators tab feature is enabled
   collaboratorsTabEnabled: "false"
+  ollieEnabled: "false"
 
 # Local Runner configuration
 localRunner:
