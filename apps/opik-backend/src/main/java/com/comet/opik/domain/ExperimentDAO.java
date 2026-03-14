@@ -283,6 +283,7 @@ class ExperimentDAO {
                         map()
                     ) AS duration_values,
                     ea.trace_count AS trace_count,
+                    ea.experiment_items_count AS dataset_item_count,
                     ea.usage_avg AS usage,
                     if(isFinite(ea.total_estimated_cost_sum), toDecimal128(ea.total_estimated_cost_sum, 12), toDecimal128(0, 12)) AS total_estimated_cost_sum,
                     if(isFinite(ea.total_estimated_cost_avg), toDecimal128(ea.total_estimated_cost_avg, 12), toDecimal128(0, 12)) AS total_estimated_cost_avg,
@@ -1122,6 +1123,7 @@ class ExperimentDAO {
                         map()
                     ) AS duration_values,
                     ea.trace_count AS trace_count,
+                    ea.experiment_items_count AS dataset_item_count,
                     if(isFinite(ea.total_estimated_cost_sum), toDecimal128(ea.total_estimated_cost_sum, 12), toDecimal128(0, 12)) AS total_estimated_cost_sum,
                     if(isFinite(ea.total_estimated_cost_avg), toDecimal128(ea.total_estimated_cost_avg, 12), toDecimal128(0, 12)) AS total_estimated_cost_avg,
                     mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.feedback_scores_avg) AS feedback_scores,
@@ -1355,6 +1357,7 @@ class ExperimentDAO {
                     agg.feedback_scores as feedback_scores,
                     agg.experiment_scores as experiment_scores,
                     agg.trace_count as trace_count,
+                    agg.dataset_item_count as dataset_item_count,
                     agg.duration_values AS duration,
                     agg.total_estimated_cost_sum as total_estimated_cost,
                     agg.total_estimated_cost_avg as total_estimated_cost_avg,
