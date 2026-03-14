@@ -33,8 +33,10 @@ public class OllieComputeService {
     public record ProxyResult(int status, String body, Map<String, NewCookie> cookies) {
     }
 
+    private static final OllieComputeResponse DISABLED_RESPONSE = new OllieComputeResponse("", false);
+
     public OllieComputeResponse getDisabledResponse() {
-        return new OllieComputeResponse("", false);
+        return DISABLED_RESPONSE;
     }
 
     public boolean isEnabled() {
