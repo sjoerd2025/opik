@@ -26,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -66,16 +67,17 @@ public interface FeedbackScoreDAO {
             Set<String> excludeCategoryNames);
 
     /**
-     * Bulk delete feedback scores for data retention enforcement.
-     * Uses UUID v7 cutoff on entity_id as an efficient time-based filter instead of created_at,
-     * since entity_id is part of the sort key (workspace_id, project_id, entity_type, entity_id, name).
+     * Bulk delete feedback scores for data retention enforcement (applyToPast=true).
      * Deletes from both feedback_scores and authored_feedback_scores tables.
-     *
-     * @param workspaceIds workspaces whose feedback scores should be purged
-     * @param cutoffId     UUID v7 representing the retention cutoff instant — all scores with entity_id &lt; cutoffId are deleted
-     * @param minId        if non-null, only deletes scores with entity_id &gt;= minId (for applyToPast=false rules)
      */
-    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId, UUID minId);
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
+
+    /**
+     * Bulk delete feedback scores for data retention enforcement (applyToPast=false).
+     * Per-workspace bounded delete with OR conditions.
+     * Deletes from both feedback_scores and authored_feedback_scores tables.
+     */
+    Mono<Long> deleteForRetentionBounded(Map<String, UUID> workspaceMinIds, UUID cutoffId);
 }
 
 @Singleton
@@ -166,7 +168,14 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             DELETE FROM <table_name>
             WHERE workspace_id IN :workspace_ids
             AND entity_id \\< :cutoff_id
-            <if(min_id)>AND entity_id >= :min_id<endif>
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String DELETE_FOR_RETENTION_BOUNDED = """
+            DELETE FROM <table_name>
+            WHERE entity_id \\< :cutoff_id
+            AND (<workspace_bounds:{wb | (workspace_id = :ws_<i0> AND entity_id >= :min_<i0>)};separator=" OR ">)
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -768,13 +777,12 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
     }
 
     @Override
-    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
-            UUID minId) {
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete feedback_scores: workspaces='{}', cutoffId='{}', minId='{}'",
-                workspaceIds.size(), cutoffId, minId);
+        log.info("Retention delete feedback_scores: workspaces='{}', cutoffId='{}'",
+                workspaceIds.size(), cutoffId);
 
         return asyncTemplate.nonTransaction(connection -> {
             var template1 = getSTWithLogComment(DELETE_FOR_RETENTION,
@@ -784,11 +792,6 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             var template2 = getSTWithLogComment(DELETE_FOR_RETENTION,
                     "retention_delete_authored_feedback_scores", null, workspaceIds.size());
             template2.add("table_name", "authored_feedback_scores");
-
-            if (minId != null) {
-                template1.add("min_id", true);
-                template2.add("min_id", true);
-            }
 
             var wsArray = workspaceIds.toArray(String[]::new);
 
@@ -800,9 +803,47 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
                     .bind("workspace_ids", wsArray)
                     .bind("cutoff_id", cutoffId);
 
-            if (minId != null) {
-                statement1.bind("min_id", minId);
-                statement2.bind("min_id", minId);
+            return Mono.from(statement1.execute())
+                    .flatMap(result -> Mono.from(result.getRowsUpdated()))
+                    .flatMap(count1 -> Mono.from(statement2.execute())
+                            .flatMap(result -> Mono.from(result.getRowsUpdated()))
+                            .map(count2 -> count1 + count2));
+        });
+    }
+
+    @Override
+    public Mono<Long> deleteForRetentionBounded(@NonNull Map<String, UUID> workspaceMinIds,
+            @NonNull UUID cutoffId) {
+        Preconditions.checkArgument(
+                !workspaceMinIds.isEmpty(), "Argument 'workspaceMinIds' must not be empty");
+
+        log.info("Retention delete feedback_scores (bounded): workspaces='{}', cutoffId='{}'",
+                workspaceMinIds.size(), cutoffId);
+
+        return asyncTemplate.nonTransaction(connection -> {
+            var template1 = getSTWithLogComment(DELETE_FOR_RETENTION_BOUNDED,
+                    "retention_delete_feedback_scores_bounded", null, workspaceMinIds.size());
+            template1.add("table_name", "feedback_scores");
+            template1.add("workspace_bounds", workspaceMinIds.keySet().toArray());
+
+            var template2 = getSTWithLogComment(DELETE_FOR_RETENTION_BOUNDED,
+                    "retention_delete_authored_feedback_scores_bounded", null, workspaceMinIds.size());
+            template2.add("table_name", "authored_feedback_scores");
+            template2.add("workspace_bounds", workspaceMinIds.keySet().toArray());
+
+            var statement1 = connection.createStatement(template1.render())
+                    .bind("cutoff_id", cutoffId);
+
+            var statement2 = connection.createStatement(template2.render())
+                    .bind("cutoff_id", cutoffId);
+
+            int i = 0;
+            for (var entry : workspaceMinIds.entrySet()) {
+                statement1.bind("ws_" + i, entry.getKey());
+                statement1.bind("min_" + i, entry.getValue());
+                statement2.bind("ws_" + i, entry.getKey());
+                statement2.bind("min_" + i, entry.getValue());
+                i++;
             }
 
             return Mono.from(statement1.execute())

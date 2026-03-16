@@ -20,6 +20,7 @@ import ru.vyarus.guicey.jdbi3.tx.TransactionTemplate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -103,49 +104,96 @@ public class RetentionPolicyService {
     }
 
     private Mono<Void> executeDeletes(List<WorkspaceRetention> resolved) {
-        // Group workspaces that share the same (cutoffId, minId) for batching
-        Map<CutoffKey, List<WorkspaceRetention>> grouped = resolved.stream()
-                .collect(Collectors.groupingBy(wr -> new CutoffKey(wr.cutoffId(), wr.minId())));
+        // Group by cutoffId — workspaces with the same retention period share the same cutoff
+        // (cutoff is normalized to start-of-day, and periods are pre-defined enum values).
+        Map<UUID, List<WorkspaceRetention>> byCutoff = resolved.stream()
+                .collect(Collectors.groupingBy(WorkspaceRetention::cutoffId));
 
         // Sequential execution (concatMap) to avoid overloading ClickHouse — retention
         // deletes can be very large and we don't want to saturate connections or cause
         // excessive merge pressure from parallel mutations.
-        return Flux.fromIterable(grouped.entrySet())
-                .concatMap(entry -> {
-                    var key = entry.getKey();
-                    var workspaceIds = entry.getValue().stream()
-                            .map(WorkspaceRetention::workspaceId)
-                            .toList();
-                    return deleteForRetentionLevel(workspaceIds, key.cutoffId(), key.minId());
-                })
+        return Flux.fromIterable(byCutoff.entrySet())
+                .concatMap(entry -> deleteForCutoff(entry.getKey(), entry.getValue()))
                 .then();
     }
 
-    private record CutoffKey(UUID cutoffId, UUID minId) {
+    /**
+     * For a single cutoff, split into two patterns:
+     * 1) applyToPast=true (minId=null): simple batch DELETE ... WHERE workspace_id IN (...) AND id < cutoff
+     * 2) applyToPast=false (minId!=null): per-workspace bounded DELETE with OR conditions,
+     *    packed into a single statement to reduce query count.
+     */
+    private Flux<Long> deleteForCutoff(UUID cutoffId, List<WorkspaceRetention> workspaces) {
+        var applyToPast = workspaces.stream()
+                .filter(wr -> wr.minId() == null)
+                .map(WorkspaceRetention::workspaceId)
+                .toList();
+
+        // Preserve insertion order for deterministic query generation
+        var bounded = workspaces.stream()
+                .filter(wr -> wr.minId() != null)
+                .collect(Collectors.toMap(
+                        WorkspaceRetention::workspaceId,
+                        WorkspaceRetention::minId,
+                        (a, b) -> a,
+                        LinkedHashMap::new));
+
+        return Flux.concat(
+                deleteApplyToPast(applyToPast, cutoffId),
+                deleteBounded(bounded, cutoffId));
     }
 
     /**
-     * Delete expired data across all tables for a single retention level.
-     * Workspace batching is done here so each DAO receives a pre-split batch.
+     * Pattern 1: applyToPast=true — standard batch delete, all workspaces in a single IN clause.
      * Order: feedback_scores → comments → spans → traces (children first).
      */
-    private Flux<Long> deleteForRetentionLevel(List<String> workspaceIds, UUID cutoffId, UUID minId) {
+    private Flux<Long> deleteApplyToPast(List<String> workspaceIds, UUID cutoffId) {
+        if (workspaceIds.isEmpty()) {
+            return Flux.empty();
+        }
         var batches = Lists.partition(workspaceIds, config.getWorkspaceBatchSize());
-
         return Flux.fromIterable(batches)
-                .concatMap(batch -> deleteBatchAcrossTables(batch, cutoffId, minId));
+                .concatMap(batch -> Flux.concat(
+                        feedbackScoreDAO.deleteForRetention(batch, cutoffId)
+                                .onErrorResume(e -> logAndSkip("feedback_scores", batch.size(), e)),
+                        commentDAO.deleteForRetention(batch, cutoffId)
+                                .onErrorResume(e -> logAndSkip("comments", batch.size(), e)),
+                        spanDAO.deleteForRetention(batch, cutoffId)
+                                .onErrorResume(e -> logAndSkip("spans", batch.size(), e)),
+                        traceDAO.deleteForRetention(batch, cutoffId)
+                                .onErrorResume(e -> logAndSkip("traces", batch.size(), e))));
     }
 
-    private Flux<Long> deleteBatchAcrossTables(List<String> batch, UUID cutoffId, UUID minId) {
-        return Flux.concat(
-                feedbackScoreDAO.deleteForRetention(batch, cutoffId, minId)
-                        .onErrorResume(e -> logAndSkip("feedback_scores", batch.size(), e)),
-                commentDAO.deleteForRetention(batch, cutoffId, minId)
-                        .onErrorResume(e -> logAndSkip("comments", batch.size(), e)),
-                spanDAO.deleteForRetention(batch, cutoffId, minId)
-                        .onErrorResume(e -> logAndSkip("spans", batch.size(), e)),
-                traceDAO.deleteForRetention(batch, cutoffId, minId)
-                        .onErrorResume(e -> logAndSkip("traces", batch.size(), e)));
+    /**
+     * Pattern 2: applyToPast=false — per-workspace bounded delete.
+     * Each workspace has its own minId (derived from the rule's createdAt), packed into a single
+     * query using OR conditions:
+     *   WHERE id < :cutoff AND ((workspace_id = :w0 AND id >= :min0) OR (workspace_id = :w1 AND id >= :min1) ...)
+     * Order: feedback_scores → comments → spans → traces (children first).
+     */
+    private Flux<Long> deleteBounded(Map<String, UUID> workspaceMinIds, UUID cutoffId) {
+        if (workspaceMinIds.isEmpty()) {
+            return Flux.empty();
+        }
+        // Batch by workspaceBatchSize to keep statement size reasonable
+        var entries = List.copyOf(workspaceMinIds.entrySet());
+        var batches = Lists.partition(entries, config.getWorkspaceBatchSize());
+        return Flux.fromIterable(batches)
+                .concatMap(batch -> {
+                    var batchMap = batch.stream()
+                            .collect(Collectors.toMap(
+                                    Map.Entry::getKey, Map.Entry::getValue,
+                                    (a, b) -> a, LinkedHashMap::new));
+                    return Flux.concat(
+                            feedbackScoreDAO.deleteForRetentionBounded(batchMap, cutoffId)
+                                    .onErrorResume(e -> logAndSkip("feedback_scores", batch.size(), e)),
+                            commentDAO.deleteForRetentionBounded(batchMap, cutoffId)
+                                    .onErrorResume(e -> logAndSkip("comments", batch.size(), e)),
+                            spanDAO.deleteForRetentionBounded(batchMap, cutoffId)
+                                    .onErrorResume(e -> logAndSkip("spans", batch.size(), e)),
+                            traceDAO.deleteForRetentionBounded(batchMap, cutoffId)
+                                    .onErrorResume(e -> logAndSkip("traces", batch.size(), e)));
+                });
     }
 
     private Mono<Long> logAndSkip(String table, int batchSize, Throwable error) {

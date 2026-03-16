@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,15 +58,15 @@ public interface CommentDAO {
     Flux<CommentEntityRef> getEntityRefsByCommentIds(Set<UUID> commentIds);
 
     /**
-     * Bulk delete comments for data retention enforcement.
-     * Uses UUID v7 cutoff on entity_id as an efficient time-based filter instead of created_at,
-     * since entity_id is part of the sort key (workspace_id, project_id, entity_id, id).
-     *
-     * @param workspaceIds workspaces whose comments should be purged
-     * @param cutoffId     UUID v7 representing the retention cutoff instant — all comments with entity_id &lt; cutoffId are deleted
-     * @param minId        if non-null, only deletes comments with entity_id &gt;= minId (for applyToPast=false rules)
+     * Bulk delete comments for data retention enforcement (applyToPast=true).
      */
-    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId, UUID minId);
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
+
+    /**
+     * Bulk delete comments for data retention enforcement (applyToPast=false).
+     * Per-workspace bounded delete with OR conditions.
+     */
+    Mono<Long> deleteForRetentionBounded(Map<String, UUID> workspaceMinIds, UUID cutoffId);
 }
 
 @Singleton
@@ -151,7 +152,14 @@ class CommentDAOImpl implements CommentDAO {
             DELETE FROM comments
             WHERE workspace_id IN :workspace_ids
             AND entity_id \\< :cutoff_id
-            <if(min_id)>AND entity_id >= :min_id<endif>
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String DELETE_FOR_RETENTION_BOUNDED = """
+            DELETE FROM comments
+            WHERE entity_id \\< :cutoff_id
+            AND (<workspace_bounds:{wb | (workspace_id = :ws_<i0> AND entity_id >= :min_<i0>)};separator=" OR ">)
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -290,26 +298,48 @@ class CommentDAOImpl implements CommentDAO {
     }
 
     @Override
-    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
-            UUID minId) {
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete comments: workspaces='{}', cutoffId='{}', minId='{}'",
-                workspaceIds.size(), cutoffId, minId);
+        log.info("Retention delete comments: workspaces='{}', cutoffId='{}'",
+                workspaceIds.size(), cutoffId);
 
         var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_comments", null,
                 workspaceIds.size());
-        if (minId != null) {
-            template.add("min_id", true);
-        }
 
         return asyncTemplate.nonTransaction(connection -> {
             var statement = connection.createStatement(template.render())
                     .bind("workspace_ids", workspaceIds.toArray(String[]::new))
                     .bind("cutoff_id", cutoffId);
-            if (minId != null) {
-                statement.bind("min_id", minId);
+
+            return Mono.from(statement.execute())
+                    .flatMap(result -> Mono.from(result.getRowsUpdated()));
+        });
+    }
+
+    @Override
+    public Mono<Long> deleteForRetentionBounded(@NonNull Map<String, UUID> workspaceMinIds,
+            @NonNull UUID cutoffId) {
+        Preconditions.checkArgument(
+                !workspaceMinIds.isEmpty(), "Argument 'workspaceMinIds' must not be empty");
+
+        log.info("Retention delete comments (bounded): workspaces='{}', cutoffId='{}'",
+                workspaceMinIds.size(), cutoffId);
+
+        var template = getSTWithLogComment(DELETE_FOR_RETENTION_BOUNDED,
+                "retention_delete_comments_bounded", null, workspaceMinIds.size());
+        template.add("workspace_bounds", workspaceMinIds.keySet().toArray());
+
+        return asyncTemplate.nonTransaction(connection -> {
+            var statement = connection.createStatement(template.render())
+                    .bind("cutoff_id", cutoffId);
+
+            int i = 0;
+            for (var entry : workspaceMinIds.entrySet()) {
+                statement.bind("ws_" + i, entry.getKey());
+                statement.bind("min_" + i, entry.getValue());
+                i++;
             }
 
             return Mono.from(statement.execute())

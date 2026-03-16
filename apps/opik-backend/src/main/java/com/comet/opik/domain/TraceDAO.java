@@ -129,15 +129,25 @@ interface TraceDAO {
     Mono<Void> bulkUpdate(@NonNull Set<UUID> ids, @NonNull TraceUpdate update, boolean mergeTags);
 
     /**
-     * Bulk delete traces for data retention enforcement.
+     * Bulk delete traces for data retention enforcement (applyToPast=true).
      * Uses UUID v7 cutoff as an efficient time-based filter instead of created_at,
      * since id is part of the sort key (workspace_id, project_id, id).
      *
      * @param workspaceIds workspaces whose traces should be purged
      * @param cutoffId     UUID v7 representing the retention cutoff instant — all traces with id &lt; cutoffId are deleted
-     * @param minId        if non-null, only deletes traces with id &gt;= minId (for applyToPast=false rules)
      */
-    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId, UUID minId);
+    Mono<Long> deleteForRetention(List<String> workspaceIds, UUID cutoffId);
+
+    /**
+     * Bulk delete traces for data retention enforcement (applyToPast=false).
+     * Each workspace has its own lower bound (minId) derived from the rule's createdAt,
+     * so only data created after the rule was established is deleted.
+     * Packed into a single query using per-workspace OR conditions.
+     *
+     * @param workspaceMinIds map of workspaceId → minId (lower bound for that workspace)
+     * @param cutoffId        UUID v7 representing the retention cutoff instant
+     */
+    Mono<Long> deleteForRetentionBounded(Map<String, UUID> workspaceMinIds, UUID cutoffId);
 }
 
 @Slf4j
@@ -1729,7 +1739,14 @@ class TraceDAOImpl implements TraceDAO {
             DELETE FROM traces
             WHERE workspace_id IN :workspace_ids
             AND id \\< :cutoff_id
-            <if(min_id)>AND id >= :min_id<endif>
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String DELETE_FOR_RETENTION_BOUNDED = """
+            DELETE FROM traces
+            WHERE id \\< :cutoff_id
+            AND (<workspace_bounds:{wb | (workspace_id = :ws_<i0> AND id >= :min_<i0>)};separator=" OR ">)
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -3765,27 +3782,50 @@ class TraceDAOImpl implements TraceDAO {
     }
 
     @Override
-    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
-            UUID minId) {
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId) {
         Preconditions.checkArgument(
                 CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
 
-        log.info("Retention delete traces: workspaces='{}', cutoffId='{}', minId='{}'",
-                workspaceIds.size(), cutoffId, minId);
+        log.info("Retention delete traces: workspaces='{}', cutoffId='{}'",
+                workspaceIds.size(), cutoffId);
 
         var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_traces", null,
                 workspaceIds.size());
-        if (minId != null) {
-            template.add("min_id", true);
-        }
 
         return Mono.from(connectionFactory.create())
                 .flatMap(connection -> {
                     var statement = connection.createStatement(template.render())
                             .bind("workspace_ids", workspaceIds.toArray(String[]::new))
                             .bind("cutoff_id", cutoffId);
-                    if (minId != null) {
-                        statement.bind("min_id", minId);
+
+                    return Mono.from(statement.execute())
+                            .flatMap(result -> Mono.from(result.getRowsUpdated()));
+                });
+    }
+
+    @Override
+    public Mono<Long> deleteForRetentionBounded(@NonNull Map<String, UUID> workspaceMinIds,
+            @NonNull UUID cutoffId) {
+        Preconditions.checkArgument(
+                !workspaceMinIds.isEmpty(), "Argument 'workspaceMinIds' must not be empty");
+
+        log.info("Retention delete traces (bounded): workspaces='{}', cutoffId='{}'",
+                workspaceMinIds.size(), cutoffId);
+
+        var template = getSTWithLogComment(DELETE_FOR_RETENTION_BOUNDED,
+                "retention_delete_traces_bounded", null, workspaceMinIds.size());
+        template.add("workspace_bounds", workspaceMinIds.keySet().toArray());
+
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var statement = connection.createStatement(template.render())
+                            .bind("cutoff_id", cutoffId);
+
+                    int i = 0;
+                    for (var entry : workspaceMinIds.entrySet()) {
+                        statement.bind("ws_" + i, entry.getKey());
+                        statement.bind("min_" + i, entry.getValue());
+                        i++;
                     }
 
                     return Mono.from(statement.execute())
