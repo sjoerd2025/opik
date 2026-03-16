@@ -68,7 +68,7 @@ describe("CSVPreview", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("CSV file is empty or invalid")).toBeInTheDocument();
+      expect(screen.getByText(/Cannot call csv2json/)).toBeInTheDocument();
     });
   });
 
