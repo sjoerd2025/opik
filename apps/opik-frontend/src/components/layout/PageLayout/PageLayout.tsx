@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import SideBar from "@/components/layout/SideBar/SideBar";
 import TopBar from "@/components/layout/TopBar/TopBar";
+import OllieSidebar from "@/components/layout/OllieSidebar/OllieSidebar";
 import { cn } from "@/lib/utils";
 import useLocalStorageState from "use-local-storage-state";
 import usePluginsStore from "@/store/PluginsStore";
@@ -17,6 +18,7 @@ const PageLayout = () => {
   const [storedExpanded = true, setStoredExpanded] =
     useLocalStorageState<boolean>("sidebar-expanded");
   const [bannerHeight, setBannerHeight] = useState(0);
+  const [ollieSidebarWidth, setOllieSidebarWidth] = useState(0);
   const [showWelcomeWizard, setShowWelcomeWizard] = useState(false);
 
   const welcomeWizardEnabled = useIsFeatureEnabled(
@@ -66,6 +68,7 @@ const PageLayout = () => {
       style={
         {
           "--banner-height": `${bannerHeight}px`,
+          "--ollie-sidebar-width": `${ollieSidebarWidth}px`,
         } as React.CSSProperties
       }
     >
@@ -80,6 +83,8 @@ const PageLayout = () => {
           <Outlet />
         </section>
       </main>
+
+      <OllieSidebar onWidthChange={setOllieSidebarWidth} />
 
       {/* Welcome Wizard Dialog */}
       <WelcomeWizardDialog

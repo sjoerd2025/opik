@@ -38,6 +38,7 @@ const DEFAULT_STATE: FeatureToggles = {
   [FeatureToggleKeys.OLLAMA_PROVIDER_ENABLED]: false,
   [FeatureToggleKeys.COLLABORATORS_TAB_ENABLED]: false,
   [FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED]: false,
+  [FeatureToggleKeys.OLLIE_CONSOLE_ENABLED]: false,
 };
 
 const initialState: FeatureTogglesState = {
