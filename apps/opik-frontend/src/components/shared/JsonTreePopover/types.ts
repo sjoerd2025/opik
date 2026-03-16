@@ -30,4 +30,5 @@ export interface JsonTreePopoverProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   searchQuery?: string;
+  onFocusedPathChange?: (path: string | null) => void;
 }

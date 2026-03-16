@@ -176,10 +176,12 @@ interface UseJsonPopoverReturn {
   isJsonPopoverOpen: boolean;
   jsonSearchQuery: string;
   popoverPosition: { top: number; left: number };
+  braceStartPos: number | null;
   handleJsonPathSelect: (path: string, value: JsonValue) => void;
   handlePopoverOpenChange: (open: boolean) => void;
   handleEditorUpdate: (update: ViewUpdate) => void;
   braceKeyExtension: ReturnType<typeof keymap.of> | null;
+  triggerVariableSearch: () => void;
 }
 
 export const useJsonPopover = ({
@@ -327,6 +329,39 @@ export const useJsonPopover = ({
     [isJsonPopoverOpen, braceStartPos, hasJsonData],
   );
 
+  const triggerVariableSearch = useCallback(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    const cursorPos = view.state.selection.main.head;
+    const newCursorPos = cursorPos + MUSTACHE_OPEN_LEN;
+
+    view.dispatch({
+      changes: { from: cursorPos, insert: MUSTACHE_OPEN },
+      selection: { anchor: newCursorPos },
+    });
+    view.focus();
+
+    setBraceStartPos(newCursorPos);
+    setJsonSearchQuery("");
+
+    view.requestMeasure({
+      read: () => ({
+        coords: view.coordsAtPos(newCursorPos),
+        editorRect: view.dom.getBoundingClientRect(),
+      }),
+      write: ({ coords, editorRect }) => {
+        if (coords && editorRect) {
+          setPopoverPosition({
+            top: coords.bottom - editorRect.top,
+            left: coords.left - editorRect.left,
+          });
+        }
+        setIsJsonPopoverOpen(true);
+      },
+    });
+  }, [editorViewRef]);
+
   // CodeMirror extension to detect mustache delimiters ({{ and }})
   const braceKeyExtension = useMemo(() => {
     if (!hasJsonData) return null;
@@ -345,9 +380,11 @@ export const useJsonPopover = ({
     isJsonPopoverOpen,
     jsonSearchQuery,
     popoverPosition,
+    braceStartPos,
     handleJsonPathSelect,
     handlePopoverOpenChange,
     handleEditorUpdate,
     braceKeyExtension,
+    triggerVariableSearch,
   };
 };

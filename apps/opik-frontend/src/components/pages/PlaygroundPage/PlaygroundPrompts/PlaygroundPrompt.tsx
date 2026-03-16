@@ -32,6 +32,7 @@ import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import PromptModelConfigs from "@/components/pages-shared/llm/PromptModelSettings/PromptModelConfigs";
 import {
   useDatasetVariables,
+  useDatasetSampleData,
   useDeletePrompt,
   usePromptById,
   usePromptCount,
@@ -74,6 +75,7 @@ const PlaygroundPrompt = ({
   const prompt = usePromptById(promptId);
   const promptCount = usePromptCount();
   const datasetVariables = useDatasetVariables();
+  const datasetSampleData = useDatasetSampleData();
   const providerValidationTrigger = useProviderValidationTrigger();
 
   const [, setLastPickedModel] = useLastPickedModel({
@@ -346,6 +348,7 @@ const PlaygroundPrompt = ({
           onChange={handleUpdateMessage}
           onAddMessage={handleAddMessage}
           promptVariables={promptVariablesArray}
+          jsonTreeData={datasetSampleData}
           hidePromptActions={false}
           improvePromptConfig={{
             model,

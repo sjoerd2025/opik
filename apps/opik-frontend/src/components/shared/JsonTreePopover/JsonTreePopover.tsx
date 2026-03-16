@@ -51,12 +51,21 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
   open,
   onOpenChange,
   searchQuery = "",
+  onFocusedPathChange,
 }) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () => new Set(),
   );
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleFocusPath = useCallback(
+    (path: string | null) => {
+      setFocusedPath(path);
+      onFocusedPathChange?.(path);
+    },
+    [onFocusedPathChange],
+  );
 
   useEffect(() => {
     if (open) {
@@ -118,9 +127,9 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
 
   useEffect(() => {
     if (!open) {
-      setFocusedPath(null);
+      handleFocusPath(null);
     }
-  }, [open]);
+  }, [open, handleFocusPath]);
 
   // Focus first child when user types "." or "[" to expand into a path
   useEffect(() => {
@@ -135,11 +144,11 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
         pathToExpand,
       );
       if (firstChildPath) {
-        setFocusedPath(firstChildPath);
+        handleFocusPath(firstChildPath);
       }
     }
     prevPathToExpandRef.current = pathToExpand;
-  }, [open, pathToExpand, filteredVisiblePaths]);
+  }, [open, pathToExpand, filteredVisiblePaths, handleFocusPath]);
 
   // Update focus when search term changes and current focus is not in filtered results
   useEffect(() => {
@@ -150,13 +159,13 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
       );
       if (!isFocusedPathVisible) {
         // Focus the first item in the filtered results
-        setFocusedPath(filteredVisiblePaths[0].path);
+        handleFocusPath(filteredVisiblePaths[0].path);
       }
     } else if (open && filteredVisiblePaths.length > 0 && !focusedPath) {
       // No focus set, set it to the first item
-      setFocusedPath(filteredVisiblePaths[0].path);
+      handleFocusPath(filteredVisiblePaths[0].path);
     }
-  }, [open, filteredVisiblePaths, focusedPath]);
+  }, [open, filteredVisiblePaths, focusedPath, handleFocusPath]);
 
   const handleSelect = useCallback(
     (path: string, value: JsonValue) => {
@@ -202,14 +211,14 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
             ? (currentIndex - 1 + filteredVisiblePaths.length) %
               filteredVisiblePaths.length
             : (currentIndex + 1) % filteredVisiblePaths.length;
-          setFocusedPath(filteredVisiblePaths[nextIndex].path);
+          handleFocusPath(filteredVisiblePaths[nextIndex].path);
           break;
         }
         case KEY_FOCUS_NEXT: {
           e.preventDefault();
           if (filteredVisiblePaths.length === 0) return;
           const nextIndex = (currentIndex + 1) % filteredVisiblePaths.length;
-          setFocusedPath(filteredVisiblePaths[nextIndex].path);
+          handleFocusPath(filteredVisiblePaths[nextIndex].path);
           break;
         }
         case KEY_FOCUS_PREV: {
@@ -218,7 +227,7 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
           const prevIndex =
             (currentIndex - 1 + filteredVisiblePaths.length) %
             filteredVisiblePaths.length;
-          setFocusedPath(filteredVisiblePaths[prevIndex].path);
+          handleFocusPath(filteredVisiblePaths[prevIndex].path);
           break;
         }
         case KEY_EXPAND: {
@@ -270,6 +279,7 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
     focusedPath,
     filteredVisiblePaths,
     expandedPaths,
+    handleFocusPath,
     handleSelect,
     handleToggleExpand,
     onOpenChange,
@@ -325,7 +335,7 @@ const JsonTreePopover: React.FC<JsonTreePopoverProps> = ({
               onSelect={handleSelect}
               showValues
               focusedPath={focusedPath}
-              onFocusPath={setFocusedPath}
+              onFocusPath={handleFocusPath}
             />
           );
         })}

@@ -147,7 +147,7 @@ const PromptsSelectBox: React.FC<PromptsSelectBoxProps> = ({
         "Loaded prompt";
 
       return (
-        <div className="flex max-w-44 items-center gap-1 px-2">
+        <div className="flex max-w-44 items-center px-2">
           <TooltipWrapper
             content={hasUnsavedChanges ? "Unsaved changes" : displayName}
           >
@@ -166,7 +166,7 @@ const PromptsSelectBox: React.FC<PromptsSelectBoxProps> = ({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="ml-0.5 shrink-0 text-muted-slate hover:text-primary-hover"
+                className="shrink-0 text-muted-slate hover:text-primary-hover"
                 onClick={onClear}
               >
                 <XCircle />
@@ -193,7 +193,7 @@ const PromptsSelectBox: React.FC<PromptsSelectBoxProps> = ({
         optionsCount={DEFAULT_LOADED_PROMPTS}
         trigger={
           <div>
-            <TooltipWrapper content="Load chat prompt">
+            <TooltipWrapper content="Load prompt">
               <Button
                 variant="ghost"
                 size="icon-sm"
