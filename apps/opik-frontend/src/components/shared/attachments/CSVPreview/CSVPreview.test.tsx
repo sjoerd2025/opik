@@ -42,9 +42,9 @@ describe("CSVPreview", () => {
 
   it("should render CSV headers", async () => {
     const csvData = "name,age,city\nAlice,30,New York\nBob,25,London";
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      text: async () => csvData,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ headers: { get: () => null } })
+      .mockResolvedValueOnce({ text: async () => csvData });
 
     render(<CSVPreview url="https://example.com/data.csv" />, {
       wrapper: createWrapper(),
@@ -59,16 +59,16 @@ describe("CSVPreview", () => {
 
   it("should handle empty CSV file", async () => {
     const csvData = "";
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      text: async () => csvData,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ headers: { get: () => null } })
+      .mockResolvedValueOnce({ text: async () => csvData });
 
     render(<CSVPreview url="https://example.com/data.csv" />, {
       wrapper: createWrapper(),
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Cannot call csv2json/)).toBeInTheDocument();
+      expect(screen.getByText("CSV file is empty or invalid")).toBeInTheDocument();
     });
   });
 
@@ -88,9 +88,9 @@ describe("CSVPreview", () => {
 
   it("should normalize line endings and render headers", async () => {
     const csvData = "name,age\r\nAlice,30\r\nBob,25";
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      text: async () => csvData,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ headers: { get: () => null } })
+      .mockResolvedValueOnce({ text: async () => csvData });
 
     render(<CSVPreview url="https://example.com/data.csv" />, {
       wrapper: createWrapper(),
