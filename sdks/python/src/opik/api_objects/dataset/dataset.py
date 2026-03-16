@@ -313,6 +313,7 @@ class Dataset(DatasetExportOperations):
         self,
         name: str,
         description: Optional[str],
+        project_name: Optional[str],
         rest_client: rest_api_client.OpikApi,
         dataset_items_count: Optional[int] = None,
     ) -> None:
@@ -323,6 +324,7 @@ class Dataset(DatasetExportOperations):
         self._description = description
         self._rest_client = rest_client
         self._dataset_items_count = dataset_items_count
+        self._project_name = project_name
 
         self._id_to_hash: Dict[str, str] = {}
         self._hashes: Set[str] = set()
@@ -338,6 +340,11 @@ class Dataset(DatasetExportOperations):
     def name(self) -> str:
         """The name of the dataset."""
         return self._name
+
+    @property
+    def project_name(self) -> Optional[str]:
+        """The name of the project this dataset belongs to."""
+        return self._project_name
 
     @property
     def description(self) -> Optional[str]:
