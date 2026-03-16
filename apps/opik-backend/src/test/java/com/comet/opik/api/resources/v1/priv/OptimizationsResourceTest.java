@@ -401,21 +401,22 @@ class OptimizationsResourceTest {
 
             mockTargetWorkspace(apiKey, workspaceName, workspaceId);
 
-            // Create dataset with items (use UUID in name to avoid conflicts on retry)
+            // Create dataset with items
+            var datasetName = "test-dataset-agg-" + RandomStringUtils.secure().nextAlphanumeric(20);
             Dataset dataset = podamFactory.manufacturePojo(Dataset.class).toBuilder()
-                    .name("test-dataset-" + UUID.randomUUID())
+                    .name(datasetName)
                     .build();
-            datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
+            var datasetId = datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
 
             List<DatasetItem> items = PodamFactoryUtils.manufacturePojoList(podamFactory, DatasetItem.class);
-            DatasetItemBatch itemBatch = DatasetItemBatch.builder().datasetId(dataset.id()).items(items).build();
+            DatasetItemBatch itemBatch = DatasetItemBatch.builder().datasetId(datasetId).items(items).build();
             datasetResourceClient.createDatasetItems(itemBatch, workspaceName, apiKey);
 
             // Create optimization with objectiveName
             var objectiveName = "accuracy";
             var optimization = optimizationResourceClient.createPartialOptimization()
-                    .datasetId(dataset.id())
-                    .datasetName(dataset.name())
+                    .datasetId(datasetId)
+                    .datasetName(datasetName)
                     .objectiveName(objectiveName)
                     .build();
 
@@ -423,7 +424,7 @@ class OptimizationsResourceTest {
 
             // Create project for traces
             Project project = podamFactory.manufacturePojo(Project.class).toBuilder()
-                    .name("Experiment-%s".formatted(dataset.name()))
+                    .name("Experiment-%s".formatted(datasetName))
                     .build();
             projectResourceClient.createProject(project, apiKey, workspaceName);
 
@@ -434,9 +435,9 @@ class OptimizationsResourceTest {
                     JsonUtils.writeValueAsString(Map.of("candidate_id", baselineCandidateId)));
 
             Experiment experiment1 = experimentResourceClient.createPartialExperiment()
-                    .datasetId(dataset.id())
+                    .datasetId(datasetId)
                     .optimizationId(optimizationId)
-                    .datasetName(dataset.name())
+                    .datasetName(datasetName)
                     .type(ExperimentType.TRIAL)
                     .metadata(baselineMetadata)
                     .experimentScores(List.of(
@@ -452,9 +453,9 @@ class OptimizationsResourceTest {
                     JsonUtils.writeValueAsString(Map.of("candidate_id", bestCandidateId)));
 
             Experiment experiment2 = experimentResourceClient.createPartialExperiment()
-                    .datasetId(dataset.id())
+                    .datasetId(datasetId)
                     .optimizationId(optimizationId)
-                    .datasetName(dataset.name())
+                    .datasetName(datasetName)
                     .type(ExperimentType.TRIAL)
                     .metadata(bestMetadata)
                     .experimentScores(List.of(
