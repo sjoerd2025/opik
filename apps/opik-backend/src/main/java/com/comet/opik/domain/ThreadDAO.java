@@ -140,6 +140,7 @@ class ThreadDAOImpl implements ThreadDAO {
                   AND workspace_id = :workspace_id
                   AND project_id IN :project_id
                   AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -160,6 +161,7 @@ class ThreadDAOImpl implements ThreadDAO {
                    AND workspace_id = :workspace_id
                    AND project_id IN :project_id
                    AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -460,6 +462,7 @@ class ThreadDAOImpl implements ThreadDAO {
                    AND workspace_id = :workspace_id
                    AND project_id = :project_id
                    AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                   AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -480,6 +483,7 @@ class ThreadDAOImpl implements ThreadDAO {
                    AND workspace_id = :workspace_id
                    AND project_id = :project_id
                    AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -747,6 +751,7 @@ class ThreadDAOImpl implements ThreadDAO {
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
                   AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -767,6 +772,7 @@ class ThreadDAOImpl implements ThreadDAO {
                    AND workspace_id = :workspace_id
                    AND project_id = :project_id
                    AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -1028,6 +1034,7 @@ class ThreadDAOImpl implements ThreadDAO {
                       AND workspace_id = :workspace_id
                       AND project_id IN :project_id
                       AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                      AND category_name != 'suite_assertion'
                     UNION ALL
                     SELECT
                         workspace_id,
@@ -1048,6 +1055,7 @@ class ThreadDAOImpl implements ThreadDAO {
                        AND workspace_id = :workspace_id
                        AND project_id IN :project_id
                        AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                       AND category_name != 'suite_assertion'
                  ),
                  feedback_scores_with_ranking AS (
                      SELECT workspace_id,

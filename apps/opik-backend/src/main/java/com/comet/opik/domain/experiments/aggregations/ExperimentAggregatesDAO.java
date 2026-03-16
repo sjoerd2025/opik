@@ -373,6 +373,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
+                AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     entity_id,
@@ -382,6 +383,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
+                AND category_name != 'suite_assertion'
             ), feedback_scores_final AS (
                 SELECT
                     entity_id,
@@ -694,6 +696,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
                 AND entity_id IN (SELECT trace_id FROM experiment_items)
+                AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -714,6 +717,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
                 AND entity_id IN (SELECT trace_id FROM experiment_items)
+                AND category_name != 'suite_assertion'
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,

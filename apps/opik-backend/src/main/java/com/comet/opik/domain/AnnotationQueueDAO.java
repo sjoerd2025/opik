@@ -234,6 +234,7 @@ class AnnotationQueueDAOImpl implements AnnotationQueueDAO {
                 WHERE workspace_id = :workspace_id
                     AND project_id IN (SELECT project_id FROM queues_final)
                     AND entity_id IN (SELECT item_id FROM queue_items_final)
+                    AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -248,6 +249,7 @@ class AnnotationQueueDAOImpl implements AnnotationQueueDAO {
                 WHERE workspace_id = :workspace_id
                    AND project_id IN (SELECT project_id FROM queues_final)
                    AND entity_id IN (SELECT item_id FROM queue_items_final)
+                   AND category_name != 'suite_assertion'
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,

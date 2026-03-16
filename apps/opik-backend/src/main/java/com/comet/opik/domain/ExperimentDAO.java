@@ -366,6 +366,7 @@ class ExperimentDAO {
                 AND project_id IN :target_project_ids
                 <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -382,6 +383,7 @@ class ExperimentDAO {
                 AND project_id IN :target_project_ids
                 <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                AND category_name != 'suite_assertion'
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -775,6 +777,7 @@ class ExperimentDAO {
                 AND project_id IN :target_project_ids
                 <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -791,6 +794,7 @@ class ExperimentDAO {
                 AND project_id IN :target_project_ids
                 <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                AND category_name != 'suite_assertion'
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -1196,6 +1200,7 @@ class ExperimentDAO {
                 AND project_id IN :target_project_ids
                 <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -1212,6 +1217,7 @@ class ExperimentDAO {
                 AND project_id IN :target_project_ids
                 <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                AND category_name != 'suite_assertion'
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,

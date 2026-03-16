@@ -170,6 +170,7 @@ class ExperimentItemDAO {
                     AND workspace_id = :workspace_id
                     <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
                     AND entity_id IN (SELECT trace_id FROM experiment_items_ids)
+                    AND category_name != 'suite_assertion'
                   UNION ALL
                   SELECT
                       workspace_id,
@@ -190,6 +191,7 @@ class ExperimentItemDAO {
                     AND workspace_id = :workspace_id
                     <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
                     AND entity_id IN (SELECT trace_id FROM experiment_items_ids)
+                    AND category_name != 'suite_assertion'
             ), feedback_scores_with_ranking AS (
                   SELECT workspace_id,
                          project_id,

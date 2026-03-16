@@ -411,6 +411,7 @@ class TraceDAOImpl implements TraceDAO {
                 AND workspace_id = :workspace_id
                 <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
                 AND entity_id IN :ids
+                AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -431,6 +432,7 @@ class TraceDAOImpl implements TraceDAO {
                  AND workspace_id = :workspace_id
                  <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
                  AND entity_id IN :ids
+                 AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -518,6 +520,7 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE fs.entity_type = 'span'
                 AND fs.workspace_id = :workspace_id
                 <if(has_target_projects)>AND fs.project_id IN :target_project_ids<endif>
+                AND fs.category_name != 'suite_assertion'
                 UNION ALL
                 SELECT afs.workspace_id,
                        afs.project_id,
@@ -539,6 +542,7 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE afs.entity_type = 'span'
                 AND afs.workspace_id = :workspace_id
                 <if(has_target_projects)>AND afs.project_id IN :target_project_ids<endif>
+                AND afs.category_name != 'suite_assertion'
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -816,6 +820,7 @@ class TraceDAOImpl implements TraceDAO {
                   AND project_id = :project_id
                   <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                   <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -836,6 +841,7 @@ class TraceDAOImpl implements TraceDAO {
                    AND project_id = :project_id
                    <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                    <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -980,6 +986,7 @@ class TraceDAOImpl implements TraceDAO {
                   <else>
                   AND entity_id IN (SELECT id FROM target_spans)
                   <endif>
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -1004,6 +1011,7 @@ class TraceDAOImpl implements TraceDAO {
                   <else>
                   AND entity_id IN (SELECT id FROM target_spans)
                   <endif>
+                  AND category_name != 'suite_assertion'
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -1376,6 +1384,7 @@ class TraceDAOImpl implements TraceDAO {
                   AND project_id = :project_id
                   <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                   <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -1390,6 +1399,7 @@ class TraceDAOImpl implements TraceDAO {
                    AND project_id = :project_id
                    <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                    <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -1477,6 +1487,7 @@ class TraceDAOImpl implements TraceDAO {
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
                   AND entity_id IN (SELECT id FROM target_spans)
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -1496,6 +1507,7 @@ class TraceDAOImpl implements TraceDAO {
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
                   AND entity_id IN (SELECT id FROM target_spans)
+                  AND category_name != 'suite_assertion'
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -1954,6 +1966,7 @@ class TraceDAOImpl implements TraceDAO {
                   AND project_id IN :project_ids
                   <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                   <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -1975,6 +1988,7 @@ class TraceDAOImpl implements TraceDAO {
                    AND project_id IN :project_ids
                    <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                    <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -2107,6 +2121,7 @@ class TraceDAOImpl implements TraceDAO {
                   <else>
                   AND entity_id IN (SELECT id FROM spans_data)
                   <endif>
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -2131,6 +2146,7 @@ class TraceDAOImpl implements TraceDAO {
                   <else>
                   AND entity_id IN (SELECT id FROM spans_data)
                   <endif>
+                  AND category_name != 'suite_assertion'
             ), span_feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,

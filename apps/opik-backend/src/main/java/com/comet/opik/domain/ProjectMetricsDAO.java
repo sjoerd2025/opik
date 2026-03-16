@@ -150,6 +150,7 @@ class ProjectMetricsDAOImpl implements ProjectMetricsDAO {
                   AND project_id = :project_id
                   <if(uuid_from_time)> AND entity_id >= :uuid_from_time<endif>
                   <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time<endif>
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -164,6 +165,7 @@ class ProjectMetricsDAOImpl implements ProjectMetricsDAO {
                    AND project_id = :project_id
                    <if(uuid_from_time)> AND entity_id >= :uuid_from_time<endif>
                    <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time<endif>
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -305,6 +307,7 @@ class ProjectMetricsDAOImpl implements ProjectMetricsDAO {
                   AND project_id = :project_id
                   <if(uuid_from_time)> AND entity_id >= :uuid_from_time<endif>
                   <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time<endif>
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -319,6 +322,7 @@ class ProjectMetricsDAOImpl implements ProjectMetricsDAO {
                    AND project_id = :project_id
                    <if(uuid_from_time)> AND entity_id >= :uuid_from_time<endif>
                    <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time<endif>
+                   AND category_name != 'suite_assertion'
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -470,6 +474,7 @@ class ProjectMetricsDAOImpl implements ProjectMetricsDAO {
                    AND workspace_id = :workspace_id
                    AND project_id = :project_id
                    AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                   AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -483,6 +488,7 @@ class ProjectMetricsDAOImpl implements ProjectMetricsDAO {
                    AND workspace_id = :workspace_id
                    AND project_id = :project_id
                    AND entity_id IN (SELECT thread_model_id FROM trace_threads_final)
+                   AND category_name != 'suite_assertion'
             ),
             feedback_scores_with_ranking AS (
                 SELECT workspace_id,
