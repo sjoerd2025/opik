@@ -38,7 +38,14 @@ public class OptimizationResourceClient {
                 .numTrials(0L)
                 .feedbackScores(null)
                 .experimentScores(null)
-                .studioConfig(null);
+                .studioConfig(null)
+                .baselineObjectiveScore(null)
+                .bestObjectiveScore(null)
+                .baselineDuration(null)
+                .bestDuration(null)
+                .baselineCost(null)
+                .bestCost(null)
+                .totalOptimizationCost(null);
     }
 
     public UUID create(Optimization optimization, String apiKey, String workspaceName) {
