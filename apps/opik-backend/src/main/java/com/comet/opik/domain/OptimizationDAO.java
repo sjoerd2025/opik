@@ -148,6 +148,7 @@ class OptimizationDAOImpl implements OptimizationDAO {
                 WHERE entity_type = :entity_type
                   AND workspace_id = :workspace_id
                   AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                  AND category_name != 'suite_assertion'
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -160,6 +161,7 @@ class OptimizationDAOImpl implements OptimizationDAO {
                 WHERE entity_type = :entity_type
                   AND workspace_id = :workspace_id
                   AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                  AND category_name != 'suite_assertion'
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,

@@ -85,16 +85,16 @@ def test_evaluation_suite__item_level_assertions__feedback_scores_created(
         items_total=2,
         items_passed=2,
         experiment_items_count=2,
-        total_feedback_scores=2,  # 1 assertion per item * 2 items
-        expected_score_names={geography_assertion, math_assertion},
+        total_assertion_results=2,  # 1 assertion per item * 2 items
+        expected_assertion_names={geography_assertion, math_assertion},
     )
 
-    # Verify score values are boolean (True=1.0, False=0.0)
+    # Verify assertion results have boolean passed values
     retrieved_experiment = opik_client.get_experiment_by_name(experiment_name)
     for exp_item in retrieved_experiment.get_items():
-        for score in exp_item.feedback_scores:
-            assert score["value"] in [0.0, 1.0, True, False], (
-                f"Score value should be boolean, got {score['value']}"
+        for ar in exp_item.assertion_results:
+            assert ar["passed"] in [True, False], (
+                f"Assertion passed should be boolean, got {ar['passed']}"
             )
 
 
@@ -137,8 +137,8 @@ def test_evaluation_suite__multiple_assertions_per_item__all_scores_created(
         items_total=1,
         items_passed=1,
         experiment_items_count=1,
-        total_feedback_scores=2,  # 2 assertions on 1 experiment item
-        expected_score_names={assertion_1, assertion_2},
+        total_assertion_results=2,  # 2 assertions on 1 experiment item
+        expected_assertion_names={assertion_1, assertion_2},
     )
 
 
@@ -180,8 +180,8 @@ def test_evaluation_suite__suite_level_assertions__applied_to_all_items(
         suite_result=suite_result,
         items_total=2,
         experiment_items_count=2,
-        total_feedback_scores=2,  # 1 assertion * 2 experiment items
-        expected_score_names={suite_assertion},
+        total_assertion_results=2,  # 1 assertion * 2 experiment items
+        expected_assertion_names={suite_assertion},
     )
 
 
@@ -224,8 +224,8 @@ def test_evaluation_suite__combined_suite_and_item_level_assertions__all_scores_
         suite_result=suite_result,
         items_total=1,
         experiment_items_count=1,
-        total_feedback_scores=2,  # 1 suite + 1 item assertion
-        expected_score_names={suite_assertion, item_assertion},
+        total_assertion_results=2,  # 1 suite + 1 item assertion
+        expected_assertion_names={suite_assertion, item_assertion},
     )
 
 
@@ -475,8 +475,8 @@ def test_evaluation_suite__assertion_fails__item_fails(
         items_total=1,
         items_passed=0,
         experiment_items_count=1,
-        total_feedback_scores=1,
-        expected_score_names={failing_assertion},
+        total_assertion_results=1,
+        expected_assertion_names={failing_assertion},
     )
 
     # Additionally verify the assertion result indicates failure
@@ -587,8 +587,8 @@ def test_evaluation_suite__multiple_assertions_multiple_runs__pass_threshold_log
         items_total=1,
         items_passed=1,
         experiment_items_count=3,  # 1 item * 3 runs
-        total_feedback_scores=9,  # 3 assertions * 3 runs
-        expected_score_names={assertion_1, assertion_2, assertion_3},
+        total_assertion_results=9,  # 3 assertions * 3 runs
+        expected_assertion_names={assertion_1, assertion_2, assertion_3},
     )
 
     item_result = list(suite_result.item_results.values())[0]
@@ -680,8 +680,8 @@ def test_evaluation_suite__create_get_and_run__end_to_end(
         suite_result=suite_result,
         items_total=2,
         experiment_items_count=4,  # 2 items * 2 runs
-        total_feedback_scores=6,  # France: 2 runs * 2 assertions + Germany: 2 runs * 1 assertion
-        expected_score_names={suite_assertion, item_assertion},
+        total_assertion_results=6,  # France: 2 runs * 2 assertions + Germany: 2 runs * 1 assertion
+        expected_assertion_names={suite_assertion, item_assertion},
     )
 
     for item_result in suite_result.item_results.values():
@@ -1120,6 +1120,6 @@ def test_evaluation_suite__add_items_batch__all_items_persisted(
         items_total=3,
         items_passed=3,
         experiment_items_count=3,
-        total_feedback_scores=3,
-        expected_score_names={assertion},
+        total_assertion_results=3,
+        expected_assertion_names={assertion},
     )

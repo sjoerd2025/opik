@@ -781,6 +781,8 @@ def verify_evaluation_suite_result(
     items_total: int = mock.ANY,  # type: ignore
     items_passed: int = mock.ANY,  # type: ignore
     experiment_items_count: int = mock.ANY,  # type: ignore
+    total_assertion_results: int = mock.ANY,  # type: ignore
+    expected_assertion_names: Optional[Set[str]] = None,
     total_feedback_scores: int = mock.ANY,  # type: ignore
     expected_score_names: Optional[Set[str]] = None,
 ):
@@ -796,10 +798,14 @@ def verify_evaluation_suite_result(
         experiment_items_count: Expected number of experiment items (traces)
             persisted in the backend. For multi-run suites this is
             dataset_items * runs_per_item.
-        total_feedback_scores: Expected total number of feedback scores
+        total_assertion_results: Expected total number of assertion results
             across all experiment items.
-        expected_score_names: If provided, the union of all score names
-            across all experiment items must equal this set.
+        expected_assertion_names: If provided, the union of all assertion
+            "value" fields across all experiment items must equal this set.
+        total_feedback_scores: Expected total number of feedback scores
+            across all experiment items (non-assertion scores only).
+        expected_score_names: If provided, the union of all feedback score
+            names across all experiment items must equal this set.
     """
     if items_total is not mock.ANY:
         assert suite_result.items_total == items_total, (
@@ -832,15 +838,32 @@ def verify_evaluation_suite_result(
         f"got {len(experiment_items)}"
     )
 
+    all_assertion_results = []
+    all_assertion_names: Set[str] = set()
     all_scores = []
     all_score_names: Set[str] = set()
     for exp_item in experiment_items:
+        if exp_item.assertion_results:
+            all_assertion_results.extend(exp_item.assertion_results)
+            all_assertion_names.update(ar["value"] for ar in exp_item.assertion_results)
         if exp_item.feedback_scores:
             all_scores.extend(exp_item.feedback_scores)
             all_score_names.update(s["name"] for s in exp_item.feedback_scores)
         if exp_item.assertion_results:
             all_scores.extend(exp_item.assertion_results)
             all_score_names.update(ar["value"] for ar in exp_item.assertion_results)
+
+    if total_assertion_results is not mock.ANY:
+        assert len(all_assertion_results) == total_assertion_results, (
+            f"Expected {total_assertion_results} total assertion results, "
+            f"got {len(all_assertion_results)}"
+        )
+
+    if expected_assertion_names is not None:
+        assert expected_assertion_names == all_assertion_names, (
+            f"Expected assertion names {expected_assertion_names}, "
+            f"got {all_assertion_names}"
+        )
 
     if total_feedback_scores is not mock.ANY:
         assert len(all_scores) == total_feedback_scores, (
