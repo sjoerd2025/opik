@@ -44,6 +44,7 @@ from .experiment import rest_operations as experiment_rest_operations
 from . import prompt as prompt_module
 from .prompt import client as prompt_client
 from .agent_config.config import AgentConfig
+from .agent_config.service import AgentConfigService
 from .threads import threads_client
 from .trace import migration as trace_migration, trace_client
 from .. import config as opik_config
@@ -2291,7 +2292,7 @@ class Opik:
 
         return annotation_queue_rest_operations.get_threads_annotation_queues(
             rest_client=self._rest_client,
-            project_id=project_id,
+            project_id='project_id',
             max_results=max_results,
         )
 
@@ -2306,15 +2307,101 @@ class Opik:
             ids=[queue_id]
         )
 
-    def get_agent_config(
+    @staticmethod
+    def     _validate_agent_config(config: AgentConfig, param_name: str = "config") -> None:
+        if not isinstance(config, AgentConfig):
+            raise TypeError(
+                f"{param_name} must be an instance of a class that inherits from AgentConfig, "
+                f"got {type(config).__name__}"
+            )
+
+    def create_agent_config(
         self,
+        config: AgentConfig,
+        description: Optional[str] = None,
         project_name: Optional[str] = None,
     ) -> AgentConfig:
-        project_name = project_name or self._project_name
-        return AgentConfig(
-            project_name=project_name,
+        """Create a new agent config blueprint from an AgentConfig subclass instance.
+
+        Args:
+            config: An AgentConfig subclass instance defining the config fields and values.
+            description: Human-readable description stored with the blueprint.
+            project_name: Project to create the config in. Defaults to the client's project.
+
+        Returns:
+            An AgentConfig populated from the created blueprint.
+        """
+        self._validate_agent_config(config)
+        service = AgentConfigService(
+            project_name=project_name or self._project_name,
             rest_client_=self._rest_client,
         )
+        blueprint = service.create_or_update_blueprint(
+            config=config,
+            description=description,
+        )
+        return AgentConfig._from_blueprint(blueprint, service=service)
+
+    def get_agent_config(
+        self,
+        version: Optional[str] = None,
+        env: Optional[str] = None,
+        id: Optional[str] = None,
+        project_name: Optional[str] = None,
+        mask_id: Optional[str] = None,
+        latest: bool = False,
+        fallback: Optional[AgentConfig] = None,
+    ) -> Optional[AgentConfig]:
+        """Retrieve an agent config.
+
+        If ``latest`` is True, returns the most recent blueprint.
+        If none of ``id``, ``version``, or ``env`` are provided, 
+        defaults to the ``"prod"`` environment.
+
+        Args:
+            version: Version name to look up (e.g. ``"v1"``).
+            env: Environment name to look up (e.g. ``"prod"``).
+            id: Exact blueprint ID to fetch.
+            mask_id: Mask blueprint ID to overlay on the result.
+            project_name: Project to look in. Defaults to the client's project.
+            latest: If True, return the most recent blueprint regardless of env.
+            fallback: An AgentConfig instance to return if the backend is unreachable.
+
+        Returns:
+            An AgentConfig populated from the blueprint, or the fallback on error,
+            or ``None`` if not found.
+        """
+        if fallback is not None:
+            self._validate_agent_config(fallback, "fallback")
+
+        service = AgentConfigService(
+            project_name=project_name or self._project_name,
+            rest_client_=self._rest_client,
+        )
+        try:
+            blueprint = service.resolve_blueprint(
+                version=version,
+                env=env,
+                id=id,
+                mask_id=mask_id,
+                latest=latest,
+            )
+        except Exception:
+            if fallback is not None:
+                LOGGER.warning(
+                    "Failed to get agent config from backend, using fallback.",
+                    exc_info=True,
+                )
+                fallback._is_fallback = True
+                return fallback
+            raise
+
+        if blueprint is None:
+            if fallback is not None:
+                fallback._is_fallback = True
+            return fallback
+
+        return AgentConfig._from_blueprint(blueprint, service=service)
 
 
 @functools.lru_cache()

@@ -1,211 +1,267 @@
+import copy
+import dataclasses
+import logging
 import typing
 
-from opik.rest_api import client as rest_client
-from opik.rest_api import core as rest_api_core
-from opik.rest_api.types.agent_blueprint_write import AgentBlueprintWrite
-from opik.rest_api.types.agent_config_value_write import AgentConfigValueWrite
-from opik.rest_api.types.agent_config_env import AgentConfigEnv
-from opik.api_objects import rest_helpers
-from opik import id_helpers
 from .blueprint import Blueprint
+from .context import get_active_config_mask
 from . import type_helpers
+
+if typing.TYPE_CHECKING:
+    from .service import AgentConfigService
+
+logger = logging.getLogger(__name__)
+
+_MISSING = object()
 
 
 class AgentConfig:
-    """Project-level agent config entity."""
+    """User-facing base class for typed agent configurations.
 
-    def __init__(
-        self,
-        project_name: str,
-        rest_client_: rest_client.OpikApi,
-    ) -> None:
-        self._project_name = project_name
-        self._rest_client = rest_client_
+    Subclass to define a config schema::
 
-    @property
-    def project_name(self) -> str:
-        return self._project_name
+        class MyConfig(AgentConfig):
+            model: str = "gpt-4"
+            temperature: float = 0.7
+            max_tokens: int = 2000
 
-    @staticmethod
-    def _resolve_fields_with_values(
-        parameters: typing.Optional[typing.Dict[str, typing.Any]],
-        fields_with_values: typing.Optional[
-            typing.Dict[str, typing.Tuple[typing.Any, typing.Any, typing.Optional[str]]]
-        ],
-    ) -> typing.Dict[str, typing.Tuple[typing.Any, typing.Any, typing.Optional[str]]]:
-        if fields_with_values is not None:
-            return fields_with_values
-        # None values have no runtime type to infer, and python_type_to_backend_type
-        # raises TypeError on NoneType, so exclude them here.
-        return {
-            k: (type(v), v, None)
-            for k, v in (parameters or {}).items()
-            if v is not None
-        }
+    Supported field types: ``str``, ``int``, ``float``, ``bool``, ``Prompt``.
 
-    def _build_blueprint_payload(
-        self,
-        fields_with_values: typing.Dict[
-            str, typing.Tuple[typing.Any, typing.Any, typing.Optional[str]]
-        ],
-        description: typing.Optional[str],
-        id: typing.Optional[str] = None,
-        config_type: str = "blueprint",
-    ) -> AgentBlueprintWrite:
-        backend_values = []
-        for field_name, (py_type, value, field_desc) in fields_with_values.items():
-            if value is None:
-                continue
-            backend_values.append(
-                AgentConfigValueWrite(
-                    key=field_name,
-                    type=type_helpers.python_type_to_backend_type(py_type),
-                    value=type_helpers.python_value_to_backend_value(value, py_type),
-                    description=field_desc,
-                )
-            )
-        return AgentBlueprintWrite(
-            id=id,
-            type=config_type,
-            values=backend_values,
-            description=description,
-        )
+    Subclass instances can be passed to ``Opik.create_agent_config()``.
+    When returned from ``Opik.get_agent_config()``, supports dict-like access via
+    ``config["key"]``, ``config.get("key")``, and ``config.values``.
 
-    def get_blueprint(
-        self,
-        *,
-        id: typing.Optional[str] = None,
-        env: typing.Optional[str] = None,
-        mask_id: typing.Optional[str] = None,
-        field_types: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Optional[Blueprint]:
-        """Fetch a blueprint by ID, environment name, or latest.
+    Context masks are supported: when accessed inside an
+    ``agent_config_context(mask_id=...)``, values from the mask blueprint
+    take precedence.
+    """
 
-        Priority: ``id`` > ``env`` > latest. Returns ``None`` if not found.
+    _values: typing.Dict[str, typing.Any]
+    _blueprint_id: typing.Optional[str]
+    _blueprint_envs: typing.Optional[typing.List[str]]
+    _service: typing.Optional["AgentConfigService"]
+    _mask_cache: typing.Dict[str, typing.Dict[str, typing.Any]]
+    _is_fallback: bool
 
-        Args:
-            id: Fetch the blueprint with this exact ID.
-            env: Fetch the blueprint tagged with this environment name.
-            mask_id: ID of a mask blueprint to overlay on the result.
-            field_types: Mapping of prefixed field key to Python type used
-                for deserialising backend values.
+    def __init_subclass__(cls, **kwargs: typing.Any) -> None:
+        super().__init_subclass__(**kwargs)
+        if not dataclasses.is_dataclass(cls):
+            dataclasses.dataclass(cls)
+
+    @classmethod
+    def _from_blueprint(
+        cls,
+        blueprint: Blueprint,
+        service: typing.Optional["AgentConfigService"] = None,
+    ) -> "AgentConfig":
+        """Create an AgentConfig populated from a Blueprint."""
+        instance = object.__new__(cls)
+        instance._values = blueprint.values
+        instance._blueprint_id = blueprint.id
+        instance._blueprint_envs = blueprint.envs
+        instance._service = service
+        instance._mask_cache = {}
+        instance._is_fallback = False
+        return instance
+
+    def _resolve_masked_value(self, key: str) -> typing.Any:
+        """Check the active context mask for an override value.
+
+        Returns the masked value or ``_MISSING`` if no mask is active
+        or the mask doesn't contain the key.
         """
+        context_mask = get_active_config_mask()
+        if context_mask is None or self._service is None:
+            return _MISSING
+
         try:
-            if id is not None:
-                raw = self._rest_client.agent_configs.get_blueprint_by_id(
-                    id, mask_id=mask_id
+            if context_mask not in self._mask_cache:
+                env = self._blueprint_envs[0] if self._blueprint_envs else None
+                bp = self._service.get_blueprint(
+                    mask_id=context_mask,
+                    env=env,
+                )
+                self._mask_cache[context_mask] = bp.values if bp is not None else {}
+
+            masked_values = self._mask_cache[context_mask]
+            if key in masked_values:
+                return masked_values[key]
+        except Exception:
+            logger.debug("Failed to get masked config value", exc_info=True)
+
+        return _MISSING
+
+    def _extract_fields_with_values(
+        self,
+    ) -> typing.Dict[str, typing.Tuple[typing.Any, typing.Any, typing.Optional[str]]]:
+        """Extract typed fields from this subclass instance.
+
+        Returns:
+            Dict of ``{field_name: (python_type, value, description)}``.
+        """
+        # AgentConfigService is a forward ref on private fields (skipped below),
+        # stub it so get_type_hints doesn't raise NameError.
+        hints = typing.get_type_hints(
+            type(self), include_extras=True,
+            localns={"AgentConfigService": typing.Any},
+        )
+        result: typing.Dict[
+            str, typing.Tuple[typing.Any, typing.Any, typing.Optional[str]]
+        ] = {}
+
+        for name, raw_hint in hints.items():
+            if name.startswith("_"):
+                continue
+
+            description: typing.Optional[str] = None
+            if typing.get_origin(raw_hint) is typing.Annotated:
+                args = typing.get_args(raw_hint)
+                py_type = args[0]
+                description = next(
+                    (a for a in args[1:] if isinstance(a, str)), None
                 )
             else:
-                project_id = rest_helpers.resolve_project_id_by_name(
-                    self._rest_client, self._project_name
-                )
-                if env is not None:
-                    raw = self._rest_client.agent_configs.get_blueprint_by_env(
-                        env_name=env,
-                        project_id=project_id,
-                        mask_id=mask_id,
-                    )
-                else:
-                    raw = self._rest_client.agent_configs.get_latest_blueprint(
-                        project_id=project_id,
-                        mask_id=mask_id,
-                    )
-        except rest_api_core.ApiError as e:
-            if e.status_code == 404:
-                return None
-            raise
-        return Blueprint(
-            raw_blueprint=raw,
-            field_types=field_types,
-            rest_client_=self._rest_client,
-        )
+                py_type = raw_hint
 
-    def create_blueprint(
+            inner = type_helpers.unwrap_optional(py_type)
+            if inner is not None:
+                py_type = inner
+
+            if not type_helpers.is_supported_type(py_type):
+                continue
+
+            value = getattr(self, name, _MISSING)
+            if value is not _MISSING:
+                result[name] = (py_type, value, description)
+
+        return result
+
+    @property
+    def values(self) -> typing.Dict[str, typing.Any]:
+        """All config values as a dict."""
+        return copy.deepcopy(self._values)
+
+    @property
+    def id(self) -> typing.Optional[str]:
+        """The blueprint ID backing this config."""
+        return self._blueprint_id
+
+    @property
+    def envs(self) -> typing.Optional[typing.List[str]]:
+        """Environment names tagged to the backing blueprint."""
+        return self._blueprint_envs
+
+    @property
+    def is_fallback(self) -> bool:
+        """Whether this config is a local fallback (backend was unreachable)."""
+        return self._is_fallback
+
+    def _inject_trace_metadata(
         self,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        fields_with_values: typing.Optional[
-            typing.Dict[str, typing.Tuple[typing.Any, typing.Any, typing.Optional[str]]]
-        ] = None,
-        description: typing.Optional[str] = None,
-        field_types: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> Blueprint:
-        """Create a new blueprint and return it.
+        key: str,
+        value: typing.Any,
+        mask_id: typing.Optional[str] = None,
+    ) -> None:
+        """Attach the accessed config value to the active trace's metadata.
 
-        Pass either ``parameters`` (plain key-value pairs whose types are
-        inferred) or ``fields_with_values`` (explicit ``{key: (type, value)}``
-        mapping). If both are given ``fields_with_values`` takes precedence.
-
-        Args:
-            parameters: Plain ``{field_name: value}`` dict; types are inferred
-                via ``type(value)``.
-            fields_with_values: Explicit ``{field_name: (python_type, value)}``
-                mapping, bypassing type inference.
-            description: Human-readable description stored with the blueprint.
-            field_types: Mapping of prefixed field key to Python type used
-                when fetching back the created blueprint.
+        No-ops silently when there is no active trace or on any error.
         """
-        fields_with_values = self._resolve_fields_with_values(
-            parameters, fields_with_values
-        )
-        blueprint_id = id_helpers.generate_id()
-        payload = self._build_blueprint_payload(
-            fields_with_values, description, id=blueprint_id
-        )
-        self._rest_client.agent_configs.create_agent_config(
-            blueprint=payload,
-            project_name=self._project_name,
-        )
-        raw = self._rest_client.agent_configs.get_blueprint_by_id(blueprint_id)
-        return Blueprint(
-            raw_blueprint=raw,
-            field_types=field_types,
-            rest_client_=self._rest_client,
-        )
+        from opik import exceptions, opik_context
 
-    def tag_blueprint_with_env(self, env: str, blueprint_id: str) -> None:
-        """Associate a blueprint with an environment name.
+        try:
+            # ALEX
+            # add the version
+            agent_config_metadata: typing.Dict[str, typing.Any] = {
+                "blueprint_id": self._blueprint_id,
+            }
+            if mask_id is not None:
+                agent_config_metadata["_mask_id"] = mask_id
+            if value is not _MISSING:
+                agent_config_metadata["values"] = {key: {"value": value}}
 
-        Args:
-            env: Environment name (e.g. ``"production"``).
-            blueprint_id: ID of the blueprint to tag.
-        """
-        project_id = rest_helpers.resolve_project_id_by_name(
-            self._rest_client, self._project_name
-        )
-        self._rest_client.agent_configs.create_or_update_envs(
-            project_id=project_id,
-            envs=[AgentConfigEnv(env_name=env, blueprint_id=blueprint_id)],
-        )
+            opik_context.update_current_trace(
+                metadata={"agent_configuration": agent_config_metadata}
+            )
+        except exceptions.OpikException:
+            pass
+        except Exception:
+            logger.debug("Failed to inject config metadata into trace", exc_info=True)
+
+    def get(self, key: str, default: typing.Any = None) -> typing.Any:
+        """Get a config value by key, with an optional default."""
+        masked = self._resolve_masked_value(key)
+        if masked is not _MISSING:
+            self._inject_trace_metadata(key, masked, mask_id=get_active_config_mask())
+            return masked
+        value = self._values.get(key, default)
+        self._inject_trace_metadata(key, value)
+        return value
+
+    def __getitem__(self, key: str) -> typing.Any:
+        masked = self._resolve_masked_value(key)
+        if masked is not _MISSING:
+            self._inject_trace_metadata(key, masked, mask_id=get_active_config_mask())
+            return masked
+        value = self._values[key]
+        self._inject_trace_metadata(key, value)
+        return value
+
+    def __getattr__(self, name: str) -> typing.Any:
+        if name.startswith("_"):
+            raise AttributeError(name)
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
 
     def create_mask(
         self,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        fields_with_values: typing.Optional[
-            typing.Dict[str, typing.Tuple[typing.Any, typing.Any, typing.Optional[str]]]
-        ] = None,
+        parameters: typing.Dict[str, typing.Any],
         description: typing.Optional[str] = None,
     ) -> str:
         """Create a mask blueprint and return its ID.
 
-        A mask overlays a subset of fields on top of an existing blueprint.
-        Apply it by passing the returned ID to ``get_blueprint(mask_id=...)``.
+        Args:
+            parameters: ``{field_name: value}`` overrides to apply on top of this config.
+            description: Human-readable description stored with the mask.
+
+        Returns:
+            The mask ID, usable with ``get_agent_config(mask_id=...)`` or
+            ``agent_config_context(mask_id=...)``.
+        """
+        if self._service is None:
+            raise RuntimeError(
+                "Cannot create a mask on a locally-created config. "
+                "Use a config returned from create_agent_config() or get_agent_config()."
+            )
+        return self._service.create_mask(
+            parameters=parameters,
+            description=description,
+        )
+
+    def update_env(self, env: str) -> None:
+        """Tag this config's blueprint with an environment name.
 
         Args:
-            parameters: Plain ``{field_name: value}`` dict; types are inferred
-                via ``type(value)``.
-            fields_with_values: Explicit ``{field_name: (python_type, value)}``
-                mapping, bypassing type inference.
-            description: Human-readable description stored with the mask.
+            env: Environment name to associate (e.g. ``"dev"``, ``"prod"``).
         """
-        fields_with_values = self._resolve_fields_with_values(
-            parameters, fields_with_values
+        if self._service is None:
+            raise RuntimeError(
+                "Cannot update env on a locally-created config. "
+                "Use a config returned from create_agent_config() or get_agent_config()."
+            )
+
+        if self._blueprint_id is None:
+            raise ValueError("This config has no blueprint ID to tag.")
+
+        self._service.tag_blueprint_with_env(
+            env=env,
+            blueprint_id=self._blueprint_id,
         )
-        mask_id = id_helpers.generate_id()
-        payload = self._build_blueprint_payload(
-            fields_with_values, description, id=mask_id, config_type="mask"
-        )
-        self._rest_client.agent_configs.create_agent_config(
-            blueprint=payload,
-            project_name=self._project_name,
-        )
-        return mask_id
+
+        refreshed = self._service.get_blueprint(id=self._blueprint_id)
+        if refreshed is not None:
+            self._blueprint_envs = refreshed.envs
+
+    def keys(self) -> typing.KeysView[str]:
+        return self._values.keys()

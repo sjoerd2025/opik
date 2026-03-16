@@ -12,7 +12,6 @@ from .api_objects.experiment.experiment_item import (
     ExperimentItemReferences,
 )
 from .api_objects.agent_config import AgentConfig, Blueprint
-from .api_objects.agent_config.decorator import agent_config_decorator as agent_config
 from .api_objects.agent_config.context import agent_config_context
 from .api_objects.opik_client import Opik
 from .api_objects.prompt import Prompt, ChatPrompt
@@ -81,7 +80,6 @@ __all__ = [
     "record_traces_locally",
     "AgentConfig",
     "Blueprint",
-    "agent_config",
     "agent_config_context",
 ]
 

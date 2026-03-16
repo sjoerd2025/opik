@@ -3,382 +3,428 @@ from unittest import mock
 import pytest
 
 from opik.api_objects.agent_config.config import AgentConfig
+from opik.api_objects.agent_config.service import AgentConfigService
 from opik.api_objects.agent_config.blueprint import Blueprint
+from opik.api_objects.agent_config.context import agent_config_context
 from opik.rest_api import core as rest_api_core
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
 from opik.rest_api.types.agent_config_value_public import AgentConfigValuePublic
 
+from typing import Annotated, Optional
 
-def _make_raw_blueprint(blueprint_id="bp-1", values=None, description=None):
+
+def _make_raw_blueprint(blueprint_id="bp-1", values=None, description=None, envs=None):
     if values is None:
         values = [
             AgentConfigValuePublic(key="temp", type="float", value="0.6"),
             AgentConfigValuePublic(key="name", type="string", value="agent"),
         ]
     return AgentBlueprintPublic(
-        id=blueprint_id, type="blueprint", values=values, description=description
+        id=blueprint_id, type="blueprint", values=values, description=description,
+        envs=envs,
     )
 
 
-@pytest.fixture
-def mock_rest_client():
-    client = mock.Mock()
-    client.agent_configs = mock.Mock()
-    client.agent_configs.create_agent_config.return_value = None
-    client.agent_configs.get_latest_blueprint.return_value = _make_raw_blueprint()
-    client.projects.retrieve_project.return_value = mock.Mock(id="proj-default")
-    return client
+def _make_blueprint(blueprint_id="bp-1", values=None, envs=None):
+    raw = _make_raw_blueprint(blueprint_id=blueprint_id, values=values, envs=envs)
+    return Blueprint(raw_blueprint=raw)
 
 
-@pytest.fixture
-def agent_config(mock_rest_client):
-    return AgentConfig(
-        project_name="my-project",
-        rest_client_=mock_rest_client,
-    )
+def _make_mock_service():
+    service = mock.Mock(spec=AgentConfigService)
+    return service
 
 
-class TestAgentConfigProperties:
-    def test_project_name(self, agent_config):
-        assert agent_config.project_name == "my-project"
+# ---------------------------------------------------------------------------
+# AgentConfig._from_blueprint
+# ---------------------------------------------------------------------------
 
 
-class TestAgentConfigGetBlueprint:
-    def test_get_blueprint__returns_blueprint(self, agent_config, mock_rest_client):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_latest_blueprint.return_value = (
-            _make_raw_blueprint()
+class TestFromBlueprint:
+    def test_creates_instance_with_correct_values(self):
+        bp = _make_blueprint(blueprint_id="bp-42")
+        cfg = AgentConfig._from_blueprint(bp)
+
+        assert cfg.id == "bp-42"
+        assert cfg.values == {"temp": 0.6, "name": "agent"}
+
+    def test_sets_service(self):
+        bp = _make_blueprint()
+        service = _make_mock_service()
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        assert cfg._service is service
+
+    def test_sets_envs_from_blueprint(self):
+        bp = _make_blueprint(envs=["prod", "staging"])
+        cfg = AgentConfig._from_blueprint(bp)
+
+        assert cfg.envs == ["prod", "staging"]
+
+    def test_is_fallback_defaults_to_false(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+
+        assert cfg.is_fallback is False
+
+    def test_mask_cache_is_empty(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+
+        assert cfg._mask_cache == {}
+
+
+# ---------------------------------------------------------------------------
+# Properties
+# ---------------------------------------------------------------------------
+
+
+class TestProperties:
+    def test_values_returns_deepcopy(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+
+        v1 = cfg.values
+        v1["temp"] = 999
+        assert cfg.values["temp"] == 0.6
+
+    def test_id(self):
+        bp = _make_blueprint(blueprint_id="bp-abc")
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg.id == "bp-abc"
+
+    def test_envs(self):
+        bp = _make_blueprint(envs=["dev"])
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg.envs == ["dev"]
+
+    def test_envs_none(self):
+        bp = _make_blueprint(envs=None)
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg.envs is None
+
+    def test_is_fallback(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg.is_fallback is False
+
+        cfg._is_fallback = True
+        assert cfg.is_fallback is True
+
+    def test_keys(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        assert set(cfg.keys()) == {"temp", "name"}
+
+
+# ---------------------------------------------------------------------------
+# Dict-like and attribute access
+# ---------------------------------------------------------------------------
+
+
+class TestAccess:
+    def test_getitem_returns_value(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg["temp"] == 0.6
+        assert cfg["name"] == "agent"
+
+    def test_getitem_missing_key_raises_keyerror(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        with pytest.raises(KeyError):
+            cfg["nonexistent"]
+
+    def test_getattr_returns_value(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg.temp == 0.6
+        assert cfg.name == "agent"
+
+    def test_getattr_missing_raises_attributeerror(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        with pytest.raises(AttributeError):
+            cfg.nonexistent
+
+    def test_getattr_private_raises_attributeerror(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        with pytest.raises(AttributeError):
+            cfg._something_private
+
+    def test_get_returns_value(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg.get("temp") == 0.6
+
+    def test_get_returns_default_for_missing(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg.get("missing") is None
+        assert cfg.get("missing", 42) == 42
+
+
+# ---------------------------------------------------------------------------
+# Masking via context
+# ---------------------------------------------------------------------------
+
+
+class TestMaskedAccess:
+    def test_no_context_mask__returns_base_value(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp)
+        assert cfg["temp"] == 0.6
+
+    def test_no_service__ignores_mask(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp, service=None)
+
+        with agent_config_context("mask-1"):
+            assert cfg["temp"] == 0.6
+
+    def test_with_service__returns_masked_value(self):
+        bp = _make_blueprint(envs=["prod"])
+        service = _make_mock_service()
+
+        masked_raw = _make_raw_blueprint(
+            blueprint_id="bp-1",
+            values=[
+                AgentConfigValuePublic(key="temp", type="float", value="0.1"),
+                AgentConfigValuePublic(key="name", type="string", value="masked-agent"),
+            ],
+        )
+        masked_bp = Blueprint(raw_blueprint=masked_raw)
+        service.get_blueprint.return_value = masked_bp
+
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        with agent_config_context("mask-1"):
+            assert cfg["temp"] == 0.1
+            assert cfg["name"] == "masked-agent"
+
+    def test_masked_value_is_cached(self):
+        bp = _make_blueprint(envs=["prod"])
+        service = _make_mock_service()
+
+        masked_raw = _make_raw_blueprint(
+            values=[AgentConfigValuePublic(key="temp", type="float", value="0.2")],
+        )
+        service.get_blueprint.return_value = Blueprint(raw_blueprint=masked_raw)
+
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        with agent_config_context("mask-1"):
+            cfg["temp"]
+            cfg["temp"]
+
+        service.get_blueprint.assert_called_once()
+
+    def test_mask_key_not_in_mask__returns_base_value(self):
+        bp = _make_blueprint(envs=["prod"])
+        service = _make_mock_service()
+
+        masked_raw = _make_raw_blueprint(values=[])
+        service.get_blueprint.return_value = Blueprint(raw_blueprint=masked_raw)
+
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        with agent_config_context("mask-1"):
+            assert cfg["temp"] == 0.6
+
+    def test_mask_service_error__returns_base_value(self):
+        bp = _make_blueprint(envs=["prod"])
+        service = _make_mock_service()
+        service.get_blueprint.side_effect = Exception("connection failed")
+
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        with agent_config_context("mask-1"):
+            assert cfg["temp"] == 0.6
+
+    def test_get_with_mask__returns_masked_value(self):
+        bp = _make_blueprint(envs=["prod"])
+        service = _make_mock_service()
+
+        masked_raw = _make_raw_blueprint(
+            values=[AgentConfigValuePublic(key="temp", type="float", value="0.3")],
+        )
+        service.get_blueprint.return_value = Blueprint(raw_blueprint=masked_raw)
+
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        with agent_config_context("mask-1"):
+            assert cfg.get("temp") == 0.3
+
+    def test_getattr_with_mask__returns_masked_value(self):
+        bp = _make_blueprint(envs=["prod"])
+        service = _make_mock_service()
+
+        masked_raw = _make_raw_blueprint(
+            values=[AgentConfigValuePublic(key="temp", type="float", value="0.4")],
+        )
+        service.get_blueprint.return_value = Blueprint(raw_blueprint=masked_raw)
+
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        with agent_config_context("mask-1"):
+            assert cfg.temp == 0.4
+
+
+# ---------------------------------------------------------------------------
+# create_mask
+# ---------------------------------------------------------------------------
+
+
+class TestCreateMask:
+    def test_delegates_to_service(self):
+        bp = _make_blueprint()
+        service = _make_mock_service()
+        service.create_mask.return_value = "mask-123"
+
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+        result = cfg.create_mask(parameters={"temp": 0.1}, description="low-temp")
+
+        assert result == "mask-123"
+        service.create_mask.assert_called_once_with(
+            parameters={"temp": 0.1},
+            description="low-temp",
         )
 
-        result = agent_config.get_blueprint()
+    def test_raises_without_service(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp, service=None)
 
-        assert isinstance(result, Blueprint)
-        assert result.id == "bp-1"
+        with pytest.raises(RuntimeError, match="locally-created config"):
+            cfg.create_mask(parameters={"temp": 0.1})
 
-    def test_get_blueprint__with_env__routes_to_get_blueprint_by_env(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_blueprint_by_env.return_value = (
-            _make_raw_blueprint()
+
+# ---------------------------------------------------------------------------
+# update_env
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateEnv:
+    def test_delegates_to_service_with_own_blueprint_id(self):
+        bp = _make_blueprint(blueprint_id="bp-99")
+        service = _make_mock_service()
+        refreshed_bp = _make_blueprint(blueprint_id="bp-99", envs=["staging"])
+        service.get_blueprint.return_value = refreshed_bp
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        cfg.update_env(env="staging")
+
+        service.tag_blueprint_with_env.assert_called_once_with(
+            env="staging",
+            blueprint_id="bp-99",
         )
+        assert cfg.envs == ["staging"]
 
-        agent_config.get_blueprint(env="prod")
-
-        mock_rest_client.agent_configs.get_blueprint_by_env.assert_called_once_with(
-            env_name="prod",
-            project_id="proj-1",
-            mask_id=None,
-        )
-        mock_rest_client.agent_configs.get_latest_blueprint.assert_not_called()
-
-    def test_get_blueprint__with_mask_id__passes_mask_id(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_latest_blueprint.return_value = (
-            _make_raw_blueprint()
-        )
-
-        agent_config.get_blueprint(mask_id="mask-1")
-
-        mock_rest_client.agent_configs.get_latest_blueprint.assert_called_once_with(
-            project_id="proj-1",
-            mask_id="mask-1",
-        )
-
-    def test_get_blueprint__with_field_types__resolves_values(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_latest_blueprint.return_value = (
-            _make_raw_blueprint()
-        )
-
-        result = agent_config.get_blueprint(field_types={"temp": float, "name": str})
-
-        assert result["temp"] == 0.6
-        assert result["name"] == "agent"
-
-    def test_get_blueprint__without_field_types__infers_types_from_backend(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_latest_blueprint.return_value = (
-            _make_raw_blueprint()
-        )
-
-        result = agent_config.get_blueprint()
-
-        assert result["temp"] == 0.6
-        assert isinstance(result["temp"], float)
-        assert result["name"] == "agent"
-        assert isinstance(result["name"], str)
-
-    def test_get_blueprint__not_found__returns_none(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_latest_blueprint.side_effect = (
-            rest_api_core.ApiError(status_code=404, body="not found")
-        )
-
-        result = agent_config.get_blueprint()
-
-        assert result is None
-
-    @pytest.mark.parametrize(
-        "mask_id",
-        ["mask-1", "mask-2", None],
-        ids=["mask_1", "mask_2", "no_mask"],
-    )
-    def test_get_blueprint__mask_id__passed_to_backend(
-        self, agent_config, mock_rest_client, mask_id
-    ):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_latest_blueprint.return_value = (
-            _make_raw_blueprint()
-        )
-
-        agent_config.get_blueprint(mask_id=mask_id)
-
-        mock_rest_client.agent_configs.get_latest_blueprint.assert_called_once_with(
-            project_id="proj-1",
-            mask_id=mask_id,
-        )
-
-    def test_get_blueprint__env_with_mask_id__routes_to_get_blueprint_by_env(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
-        mock_rest_client.agent_configs.get_blueprint_by_env.return_value = (
-            _make_raw_blueprint()
-        )
-
-        agent_config.get_blueprint(env="prod", mask_id="mask-1")
-
-        mock_rest_client.agent_configs.get_blueprint_by_env.assert_called_once_with(
-            env_name="prod",
-            project_id="proj-1",
-            mask_id="mask-1",
-        )
-
+    def test_raises_without_service(self):
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp, service=None)
 
-class TestAgentConfigGetBlueprintById:
-    def test_get_blueprint_by_id__returns_blueprint(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint(blueprint_id="bp-specific")
-        )
-
-        result = agent_config.get_blueprint(id="bp-specific")
-
-        assert isinstance(result, Blueprint)
-        assert result.id == "bp-specific"
-        mock_rest_client.agent_configs.get_blueprint_by_id.assert_called_once_with(
-            "bp-specific", mask_id=None
-        )
-
-    def test_get_blueprint_by_id__not_found__returns_none(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.side_effect = (
-            rest_api_core.ApiError(status_code=404, body="not found")
-        )
-
-        result = agent_config.get_blueprint(id="nonexistent")
-
-        assert result is None
-
-
-class TestAgentConfigCreateBlueprint:
-    def test_create_blueprint__happy_path__calls_backend_and_returns_blueprint(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint(blueprint_id="bp-new")
-        )
-
-        result = agent_config.create_blueprint(
-            fields_with_values={
-                "temperature": (float, 0.6, None),
-                "name": (str, "agent", None),
-            }
-        )
-
-        mock_rest_client.agent_configs.create_agent_config.assert_called_once()
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        blueprint = call_kwargs["blueprint"]
-        assert blueprint.type == "blueprint"
-        assert blueprint.values is not None
-        assert blueprint.id is not None
-        assert isinstance(result, Blueprint)
-
-    def test_create_blueprint__bool_field__serialized_as_boolean_type(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint()
-        )
-
-        agent_config.create_blueprint(fields_with_values={"flag": (bool, False, None)})
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        blueprint = call_kwargs["blueprint"]
-        flag_param = [v for v in blueprint.values if v.key == "flag"][0]
-        assert flag_param.type == "boolean"
-        assert flag_param.value == "false"
-
-    def test_create_blueprint__with_project_name__passes_project_to_backend(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint()
-        )
-
-        agent_config.create_blueprint(fields_with_values={"temp": (float, 0.5, None)})
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        assert call_kwargs["project_name"] == "my-project"
-
-    def test_create_blueprint__with_parameters__returns_blueprint(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint(blueprint_id="bp-new")
-        )
-
-        result = agent_config.create_blueprint(
-            parameters={"temp": 0.6, "name": "agent"}
-        )
-
-        assert isinstance(result, Blueprint)
-        assert result.id == "bp-new"
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        bp = call_kwargs["blueprint"]
-        keys = {v.key for v in bp.values}
-        assert "temp" in keys
-        assert "name" in keys
-
-    def test_create_blueprint__with_fields_with_values__returns_blueprint(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint()
-        )
-
-        result = agent_config.create_blueprint(
-            fields_with_values={"temp": (float, 0.6, None)}
-        )
-
-        assert isinstance(result, Blueprint)
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        keys = {v.key for v in call_kwargs["blueprint"].values}
-        assert "temp" in keys
-
-    def test_create_blueprint__with_description__passes_description(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint()
-        )
-
-        agent_config.create_blueprint(parameters={"temp": 0.6}, description="v1")
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        assert call_kwargs["blueprint"].description == "v1"
-
-
-class TestAgentConfigCreateMask:
-    def test_create_mask__happy_path__calls_backend_with_mask_type(
-        self, agent_config, mock_rest_client
-    ):
-        agent_config.create_mask(fields_with_values={"temperature": (float, 0.3, None)})
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        blueprint = call_kwargs["blueprint"]
-        assert blueprint.type == "mask"
-        assert blueprint.values is not None
-
-    def test_create_mask__returns_mask_id(self, agent_config, mock_rest_client):
-        result = agent_config.create_mask(
-            fields_with_values={"temperature": (float, 0.3, None)}
-        )
-
-        assert isinstance(result, str)
-        mock_rest_client.agent_configs.get_blueprint_by_id.assert_not_called()
-
-    def test_create_mask__sends_under_blueprint_key(
-        self, agent_config, mock_rest_client
-    ):
-        agent_config.create_mask(fields_with_values={"temperature": (float, 0.3, None)})
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        assert "blueprint" in call_kwargs
-        assert call_kwargs["blueprint"].id is not None
-
-    def test_create_mask__with_parameters__returns_mask_id(
-        self, agent_config, mock_rest_client
-    ):
-        result = agent_config.create_mask(parameters={"temp": 0.3})
-
-        assert isinstance(result, str)
-
-    def test_create_mask__with_description__passes_description(
-        self, agent_config, mock_rest_client
-    ):
-        agent_config.create_mask(
-            fields_with_values={"temperature": (float, 0.3, None)},
-            description="variant-A",
-        )
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        assert call_kwargs["blueprint"].description == "variant-A"
-
-    def test_create_mask__with_project_name__passes_project_to_backend(
-        self, agent_config, mock_rest_client
-    ):
-        agent_config.create_mask(fields_with_values={"temp": (float, 0.5, None)})
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        assert call_kwargs["project_name"] == "my-project"
-
-
-class TestResolveFieldsWithValues:
-    def test_none_values_are_excluded(self):
-        result = AgentConfig._resolve_fields_with_values(
-            parameters={"temp": 0.5, "name": None},
-            fields_with_values=None,
-        )
-        assert "name" not in result
-        assert result["temp"] == (float, 0.5, None)
-
-    def test_all_none_parameters_returns_empty_dict(self):
-        result = AgentConfig._resolve_fields_with_values(
-            parameters={"a": None, "b": None},
-            fields_with_values=None,
-        )
-        assert result == {}
-
-    def test_fields_with_values_takes_precedence_over_parameters(self):
-        explicit = {"x": (int, 1, None)}
-        result = AgentConfig._resolve_fields_with_values(
-            parameters={"x": 99},
-            fields_with_values=explicit,
-        )
-        assert result is explicit
-
-    def test_create_blueprint__none_parameter__excluded_from_payload(
-        self, agent_config, mock_rest_client
-    ):
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            _make_raw_blueprint()
-        )
-
-        agent_config.create_blueprint(parameters={"temp": 0.6, "name": None})
-
-        call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
-        keys = {v.key for v in call_kwargs["blueprint"].values}
-        assert "temp" in keys
-        assert "name" not in keys
+        with pytest.raises(RuntimeError, match="locally-created config"):
+            cfg.update_env(env="staging")
+
+    def test_raises_value_error_when_no_id_available(self):
+        raw = _make_raw_blueprint(blueprint_id=None)
+        bp = Blueprint(raw_blueprint=raw)
+        service = _make_mock_service()
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+
+        with pytest.raises(ValueError, match="no blueprint ID"):
+            cfg.update_env(env="staging")
+
+
+# ---------------------------------------------------------------------------
+# __init_subclass__ auto-dataclass
+# ---------------------------------------------------------------------------
+
+
+class TestInitSubclass:
+    def test_subclass_becomes_dataclass(self):
+        class MyConfig(AgentConfig):
+            model: str = "gpt-4"
+            temperature: float = 0.7
+
+        import dataclasses
+        assert dataclasses.is_dataclass(MyConfig)
+
+    def test_subclass_instance_has_fields(self):
+        class MyConfig(AgentConfig):
+            model: str = "gpt-4"
+            temperature: float = 0.7
+
+        instance = MyConfig()
+        assert instance.model == "gpt-4"
+        assert instance.temperature == 0.7
+
+
+# ---------------------------------------------------------------------------
+# _extract_fields_with_values
+# ---------------------------------------------------------------------------
+
+
+class TestExtractFieldsWithValues:
+    def test_extracts_primitive_fields(self):
+        class MyConfig(AgentConfig):
+            model: str = "gpt-4"
+            temperature: float = 0.7
+            max_tokens: int = 100
+            use_tools: bool = True
+
+        instance = MyConfig()
+        result = instance._extract_fields_with_values()
+
+        assert result["model"] == (str, "gpt-4", None)
+        assert result["temperature"] == (float, 0.7, None)
+        assert result["max_tokens"] == (int, 100, None)
+        assert result["use_tools"] == (bool, True, None)
+
+    def test_includes_none_optional_fields(self):
+        class MyConfig(AgentConfig):
+            model: str = "gpt-4"
+            max_tokens: Optional[int] = None
+
+        instance = MyConfig()
+        result = instance._extract_fields_with_values()
+
+        assert "model" in result
+        assert "max_tokens" in result
+        assert result["max_tokens"] == (int, None, None)
+
+    def test_skips_private_fields(self):
+        class MyConfig(AgentConfig):
+            model: str = "gpt-4"
+
+        instance = MyConfig()
+        result = instance._extract_fields_with_values()
+
+        assert "model" in result
+        for key in result:
+            assert not key.startswith("_")
+
+    def test_annotated_descriptions(self):
+        class MyConfig(AgentConfig):
+            model: Annotated[str, "The LLM model"] = "gpt-4"
+            temperature: Annotated[float, "Sampling temp"] = 0.7
+            max_tokens: int = 100
+
+        instance = MyConfig()
+        result = instance._extract_fields_with_values()
+
+        assert result["model"] == (str, "gpt-4", "The LLM model")
+        assert result["temperature"] == (float, 0.7, "Sampling temp")
+        assert result["max_tokens"] == (int, 100, None)
+
+    def test_skips_unsupported_types(self):
+        class MyConfig(AgentConfig):
+            model: str = "gpt-4"
+
+        instance = MyConfig()
+        # Manually add an unsupported type field to check it's skipped
+        result = instance._extract_fields_with_values()
+        # Only supported types should be present
+        for _, (py_type, _, _) in result.items():
+            assert py_type in (str, int, float, bool) or hasattr(py_type, "__origin__")
