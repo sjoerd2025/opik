@@ -176,9 +176,7 @@ class EvaluationEngine:
 
         execution_policy_dict = None
         if item.execution_policy is not None:
-            execution_policy_dict = item.execution_policy.model_dump(
-                exclude_none=True
-            )
+            execution_policy_dict = item.execution_policy.model_dump(exclude_none=True)
 
         with helpers.evaluate_llm_task_context(
             experiment=experiment_,

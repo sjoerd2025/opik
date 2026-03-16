@@ -76,7 +76,7 @@ const useScatterDot = ({
       const isSelected = payload.candidateId === selectedTrialId;
       const radius = isBest ? DOT_RADIUS_BEST : DOT_RADIUS_DEFAULT;
 
-      const handleClick = () => {
+      const handleTrialSelectClick = () => {
         if (onTrialClick) {
           onTrialClick(payload.candidateId);
         } else {
@@ -89,7 +89,7 @@ const useScatterDot = ({
       return (
         <g
           key={payload.candidateId}
-          onClick={handleClick}
+          onClick={handleTrialSelectClick}
           onMouseEnter={() =>
             setHoveredTrial({ candidateId: payload.candidateId, cx, cy })
           }

@@ -1,5 +1,5 @@
 --liquibase formatted sql
---changeset itamarg:000067_add_mutation_experiment_type
+--changeset itamarg:000068_add_mutation_experiment_type
 --comment: Add 'mutation' value to experiment type enum in experiments and experiment_aggregates tables
 
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.experiments ON CLUSTER '{cluster}'

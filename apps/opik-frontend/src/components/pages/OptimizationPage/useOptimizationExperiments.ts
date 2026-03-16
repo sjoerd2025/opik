@@ -72,7 +72,11 @@ const aggregateCandidates = (
     const existing = groups.get(key);
     if (existing) {
       existing.experiments.push(exp);
-      if (meta.step_index >= 0 && meta.step_index < existing.meta.step_index) {
+      if (
+        meta.step_index >= 0 &&
+        (existing.meta.step_index < 0 ||
+          meta.step_index < existing.meta.step_index)
+      ) {
         existing.meta = meta;
       }
     } else {
