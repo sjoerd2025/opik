@@ -193,9 +193,8 @@ export interface ExperimentItem {
 }
 
 export interface AssertionResult {
-  name: string;
+  value: string;
   passed: boolean;
-  pass_score?: number;
   reason?: string;
 }
 
@@ -206,8 +205,15 @@ export interface AssertionAggregation {
   total_count: number;
 }
 
+export interface ExperimentRunSummary {
+  passed_runs: number;
+  total_runs: number;
+  status: ExperimentItemStatus;
+}
+
 export interface ExperimentsCompare extends DatasetItem {
   experiment_items: ExperimentItem[];
+  run_summaries_by_experiment?: Record<string, ExperimentRunSummary>;
 }
 
 export interface ExperimentsAggregations {

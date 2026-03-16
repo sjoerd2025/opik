@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import sortBy from "lodash/sortBy";
+import isNumber from "lodash/isNumber";
 import { BooleanParam, useQueryParam } from "use-query-params";
 import { CircleCheck, Maximize2, Minimize2 } from "lucide-react";
 
@@ -162,6 +163,8 @@ const CompareExperimentsDetails: React.FunctionComponent<
     if (!isCompare || !showCharts || isPending || view === VIEW_TYPE.DASHBOARDS)
       return null;
 
+    if (allEvalSuite && !assertionsCharts.barChartKeys.length) return null;
+
     const charts = allEvalSuite
       ? {
           radarName: "Assertion pass rates",
@@ -276,26 +279,34 @@ const CompareExperimentsDetails: React.FunctionComponent<
             tooltipContent="View all traces for this experiment"
           />
         )}
-        {!isCompare && isEvalSuiteExperiment(experiment) && (
-          <TooltipWrapper
-            content={formatPassRate(
-              experiment.pass_rate,
-              experiment.passed_count,
-              experiment.total_count,
-            )}
-          >
-            <Tag
-              size="md"
-              variant="transparent"
-              className="flex shrink-0 items-center gap-1"
+        {!isCompare &&
+          isEvalSuiteExperiment(experiment) &&
+          isNumber(experiment.pass_rate) && (
+            <TooltipWrapper
+              content={formatPassRate(
+                experiment.pass_rate,
+                experiment.passed_count,
+                experiment.total_count,
+              )}
             >
-              <CircleCheck className={`size-3 shrink-0 ${experiment.pass_rate === 1 ? "text-[var(--color-green)]" : "text-[var(--color-red)]"}`} />
-              <div className="comet-body-s-accented truncate text-muted-slate">
-                {Math.round(experiment.pass_rate * 100)}% pass rate
-              </div>
-            </Tag>
-          </TooltipWrapper>
-        )}
+              <Tag
+                size="md"
+                variant="transparent"
+                className="flex shrink-0 items-center gap-1"
+              >
+                <CircleCheck
+                  className={`size-3 shrink-0 ${
+                    experiment.pass_rate === 1
+                      ? "text-[var(--color-green)]"
+                      : "text-[var(--color-red)]"
+                  }`}
+                />
+                <div className="comet-body-s-accented truncate text-muted-slate">
+                  {Math.round(experiment.pass_rate * 100)}% pass rate
+                </div>
+              </Tag>
+            </TooltipWrapper>
+          )}
       </div>
       {!isCompare && experiment && (
         <ExperimentTagsList

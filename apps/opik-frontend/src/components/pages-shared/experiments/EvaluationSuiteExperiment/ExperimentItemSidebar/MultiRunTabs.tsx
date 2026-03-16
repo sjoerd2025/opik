@@ -26,7 +26,7 @@ const MultiRunTabs: React.FC<MultiRunTabsProps> = ({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex shrink-0 items-center rounded-md border border-border p-1">
+      <div className="flex w-fit max-w-full shrink-0 items-center overflow-x-auto rounded-md border border-border p-1">
         {experimentItems.map((item, idx) => {
           const isPassed = item.status === ExperimentItemStatus.PASSED;
           const dotColor = isPassed
@@ -39,7 +39,7 @@ const MultiRunTabs: React.FC<MultiRunTabsProps> = ({
               type="button"
               onClick={() => onActiveIndexChange(idx)}
               className={cn(
-                "flex items-center gap-1.5 rounded px-2 py-1 comet-body-s",
+                "flex shrink-0 items-center gap-1.5 rounded px-2 py-1 comet-body-s",
                 activeIndex === idx && "bg-[var(--separator-light)]",
               )}
             >

@@ -509,6 +509,9 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
           type: COLUMN_TYPE.string,
           cell: PassedCell as never,
           size: 140,
+          customMeta: {
+            experimentsIds,
+          },
         }),
       );
     }

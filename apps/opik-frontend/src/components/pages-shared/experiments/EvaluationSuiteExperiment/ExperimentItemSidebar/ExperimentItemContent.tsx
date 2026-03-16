@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import sortBy from "lodash/sortBy";
+import groupBy from "lodash/groupBy";
 import { Database, ListTree } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -11,32 +12,36 @@ import {
 import SyntaxHighlighter from "@/components/shared/SyntaxHighlighter/SyntaxHighlighter";
 import NoData from "@/components/shared/NoData/NoData";
 import { Tag } from "@/components/ui/tag";
-import { DatasetItem, Experiment, ExperimentItem } from "@/types/datasets";
+import {
+  DatasetItem,
+  Experiment,
+  ExperimentItem,
+  ExperimentRunSummary,
+} from "@/types/datasets";
+import { ExperimentItemStatus } from "@/types/evaluation-suites";
 import { OnChangeFn } from "@/types/shared";
 import { traceExist, traceVisible } from "@/lib/traces";
 import useAppStore from "@/store/AppStore";
+import { useObserveResizeNode } from "@/hooks/useObserveResizeNode";
 import PassFailBadge from "./PassFailBadge";
 import AssertionResultsTable from "./AssertionResultsTable";
 import MultiRunTabs from "./MultiRunTabs";
 
-type ExperimentItemContentProps = {
-  data?: DatasetItem["data"];
+type SingleExperimentSectionProps = {
   experimentItems: ExperimentItem[];
+  experimentName: string;
+  status: ExperimentItemStatus | undefined;
   openTrace: OnChangeFn<string>;
-  description?: string;
-  experiments?: Experiment[];
-  datasetId?: string;
+  sectionIdx: number;
 };
 
-export const ExperimentItemContent: React.FC<ExperimentItemContentProps> = ({
-  data,
+const SingleExperimentSection: React.FC<SingleExperimentSectionProps> = ({
   experimentItems,
+  experimentName,
+  status,
   openTrace,
-  description,
-  experiments,
-  datasetId,
+  sectionIdx,
 }) => {
-  const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const [activeRunIndex, setActiveRunIndex] = useState(0);
 
   const sortedItems = useMemo(
@@ -46,10 +51,21 @@ export const ExperimentItemContent: React.FC<ExperimentItemContentProps> = ({
 
   useEffect(() => setActiveRunIndex(0), [experimentItems]);
 
-  const aggregateStatus = useMemo(() => {
-    if (sortedItems.length === 0) return undefined;
-    return sortedItems[0].status;
-  }, [sortedItems]);
+  const resolvedStatus =
+    status ?? (sortedItems.length > 0 ? sortedItems[0].status : undefined);
+
+  const activeItem = sortedItems[activeRunIndex];
+  const showGoToTraces =
+    activeItem && traceExist(activeItem) && traceVisible(activeItem);
+
+  const [outputMaxHeight, setOutputMaxHeight] = useState("700px");
+  const handleOutputResize = useCallback((node: HTMLDivElement) => {
+    // 40px = SyntaxHighlighterLayout header (h-10)
+    const available = node.clientHeight - 40;
+    setOutputMaxHeight(`${Math.max(available, 100)}px`);
+  }, []);
+  const { ref: outputRef } =
+    useObserveResizeNode<HTMLDivElement>(handleOutputResize);
 
   const renderRunContent = (item: ExperimentItem, idx: number) => {
     const assertions = item.assertion_results ?? [];
@@ -68,17 +84,17 @@ export const ExperimentItemContent: React.FC<ExperimentItemContentProps> = ({
 
     return (
       <>
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div ref={outputRef} className="min-h-0 flex-1 overflow-hidden">
           {item.output && (
             <SyntaxHighlighter
               data={item.output}
-              prettifyConfig={{ fieldType: "output" }}
-              preserveKey={`eval-suite-sidebar-output-${idx}`}
+              preserveKey={`eval-suite-sidebar-output-${sectionIdx}-${idx}`}
+              maxHeight={outputMaxHeight}
             />
           )}
         </div>
         {assertions.length > 0 && (
-          <div className="flex-end mt-4 flex max-h-[50%] min-h-[50%] shrink-0 flex-col justify-end overflow-auto py-4">
+          <div className="min-h-0 flex-1 overflow-hidden border-t border-border py-4">
             <AssertionResultsTable assertions={assertions} />
           </div>
         )}
@@ -86,96 +102,155 @@ export const ExperimentItemContent: React.FC<ExperimentItemContentProps> = ({
     );
   };
 
-  const activeItem = sortedItems[activeRunIndex];
-  const showGoToTraces =
-    activeItem && traceExist(activeItem) && traceVisible(activeItem);
-
   return (
-    <ResizablePanelGroup
-      direction="horizontal"
-      autoSaveId="eval-suite-sidebar"
-      className="h-full"
-    >
-      <ResizablePanel defaultSize={35} className="min-w-72">
-        <div className="h-full overflow-auto pr-6 pt-4">
-          <div className="flex items-center justify-between pb-4">
-            <h4 className="comet-body-accented">Item context</h4>
-            {datasetId && (
-              <Link
-                to="/$workspaceName/evaluation-suites/$suiteId/items"
-                params={{ workspaceName, suiteId: datasetId }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Tag
-                  variant="default"
-                  size="md"
-                  className="flex cursor-pointer items-center gap-1.5"
-                >
-                  <Database className="size-3" />
-                  View evaluation item
-                </Tag>
-              </Link>
-            )}
-          </div>
-          {description && (
-            <div className="pb-4">
-              <h4 className="comet-body-s-accented px-0.5 pb-0.5">
-                Description
-              </h4>
-              <div className="rounded-md border border-border px-3 py-2">
-                <p className="comet-body-s truncate">{description}</p>
-              </div>
-            </div>
-          )}
-          <div>
-            <h4 className="comet-body-s-accented px-0.5 pb-0.5">Data</h4>
-            {data ? (
-              <SyntaxHighlighter
-                data={data}
-                prettifyConfig={{ fieldType: "input" }}
-                preserveKey="eval-suite-sidebar-context"
-              />
-            ) : (
-              <NoData title="No data" className="min-h-24" />
-            )}
-          </div>
+    <div className="flex h-full flex-col px-6 pt-4">
+      <div className="flex shrink-0 items-center justify-between pb-4">
+        <div className="flex items-center gap-2">
+          <h4 className="comet-body-accented truncate">{experimentName}</h4>
+          <PassFailBadge status={resolvedStatus} />
         </div>
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel className="min-w-72">
-        <div className="flex h-full flex-col px-6 pt-4">
-          <div className="flex shrink-0 items-center justify-between pb-4">
-            <div className="flex items-center gap-2">
-              <h4 className="comet-body-accented">
-                {experiments?.[0]?.name ?? "Experiment results"}
-              </h4>
-              <PassFailBadge status={aggregateStatus} />
-            </div>
-            {showGoToTraces && (
+        {showGoToTraces && (
+          <Tag
+            variant="default"
+            size="md"
+            className="flex shrink-0 cursor-pointer items-center gap-1.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (activeItem.trace_id) {
+                openTrace(activeItem.trace_id);
+              }
+            }}
+          >
+            <ListTree className="size-3" />
+            Go to traces
+          </Tag>
+        )}
+      </div>
+      <MultiRunTabs
+        experimentItems={sortedItems}
+        renderRunContent={renderRunContent}
+        activeIndex={activeRunIndex}
+        onActiveIndexChange={setActiveRunIndex}
+      />
+    </div>
+  );
+};
+
+type ExperimentItemContentProps = {
+  data?: DatasetItem["data"];
+  experimentItems: ExperimentItem[];
+  openTrace: OnChangeFn<string>;
+  description?: string;
+  experiments?: Experiment[];
+  datasetId?: string;
+  experimentsIds: string[];
+  runSummariesByExperiment?: Record<string, ExperimentRunSummary>;
+};
+
+export const ExperimentItemContent: React.FC<ExperimentItemContentProps> = ({
+  data,
+  experimentItems,
+  openTrace,
+  description,
+  experiments,
+  datasetId,
+  experimentsIds,
+  runSummariesByExperiment,
+}) => {
+  const workspaceName = useAppStore((state) => state.activeWorkspaceName);
+
+  const itemsByExperiment = useMemo(
+    () => groupBy(experimentItems, "experiment_id"),
+    [experimentItems],
+  );
+
+  const experimentNameMap = useMemo(
+    () =>
+      Object.fromEntries((experiments ?? []).map((exp) => [exp.id, exp.name])),
+    [experiments],
+  );
+
+  const renderItemContextPanel = () => (
+    <ResizablePanel defaultSize={35} className="min-w-72">
+      <div className="h-full overflow-auto pr-6 pt-4">
+        <div className="flex items-center justify-between pb-4">
+          <h4 className="comet-body-accented">Item context</h4>
+          {datasetId && (
+            <Link
+              to="/$workspaceName/evaluation-suites/$suiteId/items"
+              params={{ workspaceName, suiteId: datasetId }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <Tag
                 variant="default"
                 size="md"
                 className="flex cursor-pointer items-center gap-1.5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (activeItem.trace_id) {
-                    openTrace(activeItem.trace_id);
-                  }
-                }}
               >
-                <ListTree className="size-3" />
-                Go to traces
+                <Database className="size-3" />
+                View evaluation item
               </Tag>
-            )}
-          </div>
-          <MultiRunTabs
-            experimentItems={sortedItems}
-            renderRunContent={renderRunContent}
-            activeIndex={activeRunIndex}
-            onActiveIndexChange={setActiveRunIndex}
-          />
+            </Link>
+          )}
         </div>
-      </ResizablePanel>
+        {description && (
+          <div className="pb-4">
+            <h4 className="comet-body-s-accented px-0.5 pb-0.5">Description</h4>
+            <div className="rounded-md border border-border px-3 py-2">
+              <p className="comet-body-s truncate">{description}</p>
+            </div>
+          </div>
+        )}
+        <div>
+          <h4 className="comet-body-s-accented px-0.5 pb-0.5">Data</h4>
+          {data ? (
+            <SyntaxHighlighter
+              data={data}
+              preserveKey="eval-suite-sidebar-context"
+            />
+          ) : (
+            <NoData title="No data" className="min-h-24" />
+          )}
+        </div>
+      </div>
+    </ResizablePanel>
+  );
+
+  const autoSaveId =
+    experimentsIds.length > 1
+      ? "eval-suite-sidebar-compare"
+      : "eval-suite-sidebar";
+
+  return (
+    <ResizablePanelGroup
+      direction="horizontal"
+      autoSaveId={autoSaveId}
+      className="h-full"
+    >
+      {renderItemContextPanel()}
+      {experimentsIds.map((expId, idx) => {
+        const items = itemsByExperiment[expId] ?? [];
+        const defaultName =
+          experimentsIds.length > 1
+            ? `Experiment ${idx + 1}`
+            : "Experiment results";
+        const name = experimentNameMap[expId] ?? defaultName;
+        const status = runSummariesByExperiment?.[expId]?.status;
+
+        return (
+          <React.Fragment key={expId}>
+            <ResizableHandle />
+            <ResizablePanel className="min-w-72">
+              <SingleExperimentSection
+                experimentItems={items}
+                experimentName={name}
+                status={status}
+                openTrace={openTrace}
+                sectionIdx={idx}
+              />
+            </ResizablePanel>
+          </React.Fragment>
+        );
+      })}
     </ResizablePanelGroup>
   );
 };

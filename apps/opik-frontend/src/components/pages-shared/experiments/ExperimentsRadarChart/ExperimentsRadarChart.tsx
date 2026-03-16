@@ -19,7 +19,14 @@ interface ExperimentsRadarChartProps {
 
 const ExperimentsRadarChart: React.FunctionComponent<
   ExperimentsRadarChartProps
-> = ({ name, chartId, data, keys, experimentLabelsMap, renderTooltipValue }) => {
+> = ({
+  name,
+  chartId,
+  data,
+  keys,
+  experimentLabelsMap,
+  renderTooltipValue,
+}) => {
   const config = useChartConfig(keys, experimentLabelsMap);
 
   return (

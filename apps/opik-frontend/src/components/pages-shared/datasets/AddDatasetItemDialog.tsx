@@ -75,7 +75,7 @@ const AddDatasetItemDialog: React.FC<AddDatasetItemDialogProps> = ({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-lg sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>Create a new suite item</DialogTitle>
+          <DialogTitle>Add suite item</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
           <div className="flex flex-col gap-2 pb-4">

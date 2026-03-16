@@ -213,7 +213,7 @@ const EvaluationSuiteItemPanelLayout: React.FC<
           <div className="sticky top-0 z-10 border-b bg-background p-6 pb-4">
             <div className="comet-body-accented">
               {isNewItem ? (
-                "New suite item"
+                "Add suite item"
               ) : (
                 <>
                   Suite item{" "}

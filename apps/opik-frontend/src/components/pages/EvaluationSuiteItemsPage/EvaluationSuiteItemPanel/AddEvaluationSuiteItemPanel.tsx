@@ -101,7 +101,7 @@ const AddEvaluationSuiteItemPanelContent: React.FC<{
       <div className="relative size-full overflow-y-auto">
         <div className="sticky top-0 z-10 border-b bg-background p-6 pb-4">
           <div className="flex items-center justify-between gap-2">
-            <div className="comet-body-accented">New suite item</div>
+            <div className="comet-body-accented">Add suite item</div>
             <div className="flex items-center gap-2">
               <Button
                 variant="default"

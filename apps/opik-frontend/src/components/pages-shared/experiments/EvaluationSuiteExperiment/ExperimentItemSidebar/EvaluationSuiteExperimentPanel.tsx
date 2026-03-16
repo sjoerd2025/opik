@@ -30,7 +30,7 @@ type EvaluationSuiteExperimentPanelProps = {
   isTraceDetailsOpened: boolean;
 };
 
-const EvaluationSuiteExperimentPanel: React.FunctionComponent<
+export const EvaluationSuiteExperimentPanel: React.FC<
   EvaluationSuiteExperimentPanelProps
 > = ({
   experimentsCompareId,
@@ -72,15 +72,16 @@ const EvaluationSuiteExperimentPanel: React.FunctionComponent<
     },
   );
 
-  const nonTruncatedExperimentsCompare = nonTruncatedData?.content?.[0];
   const activeExperimentsCompare =
-    nonTruncatedExperimentsCompare ?? experimentsCompare;
+    nonTruncatedData?.content?.[0] ?? experimentsCompare;
 
-  const experimentItems = useMemo(() => {
-    return sortBy(activeExperimentsCompare?.experiment_items || [], (e) =>
-      experimentsIds.indexOf(e.id),
-    );
-  }, [activeExperimentsCompare?.experiment_items, experimentsIds]);
+  const experimentItems = useMemo(
+    () =>
+      sortBy(activeExperimentsCompare?.experiment_items || [], (e) =>
+        experimentsIds.indexOf(e.experiment_id),
+      ),
+    [activeExperimentsCompare?.experiment_items, experimentsIds],
+  );
 
   const datasetItemId = activeExperimentsCompare?.id;
   const { data: datasetItem } = useDatasetItemById(
@@ -139,30 +140,32 @@ const EvaluationSuiteExperimentPanel: React.FunctionComponent<
             description={description}
             experiments={experiments}
             datasetId={datasetId}
+            experimentsIds={experimentsIds}
+            runSummariesByExperiment={
+              activeExperimentsCompare?.run_summaries_by_experiment
+            }
           />
         </div>
       </div>
     );
   };
 
-  const renderHeaderContent = () => {
-    return (
-      <div className="flex flex-auto justify-end gap-2 pl-6">
-        <ShareURLButton />
-        <Button size="sm" variant="outline" onClick={copyClickHandler}>
-          <Copy className="mr-2 size-4" />
-          Copy ID
-        </Button>
-      </div>
-    );
-  };
+  const headerContent = (
+    <div className="flex flex-auto justify-end gap-2 pl-6">
+      <ShareURLButton />
+      <Button size="sm" variant="outline" onClick={copyClickHandler}>
+        <Copy className="mr-2 size-4" />
+        Copy ID
+      </Button>
+    </div>
+  );
 
   return (
     <ResizableSidePanel
       panelId="eval-suite-experiment"
       entity="item"
       open={Boolean(experimentsCompareId)}
-      headerContent={renderHeaderContent()}
+      headerContent={headerContent}
       onClose={onClose}
       initialWidth={0.8}
       ignoreHotkeys={isTraceDetailsOpened}
