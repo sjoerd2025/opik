@@ -24,4 +24,11 @@ public class LlmModule extends AbstractModule {
             OpikConfiguration configuration) {
         return new LlmProviderFactoryImpl(llmProviderApiKeyService, configuration);
     }
+
+    @Provides
+    @Singleton
+    public LlmModelRegistryService llmModelRegistryService(
+            @NonNull @Config OpikConfiguration configuration) {
+        return new LlmModelRegistryService(configuration.getLlmModelRegistry());
+    }
 }
