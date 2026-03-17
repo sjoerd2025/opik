@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
   const devPort = parseInt(env.VITE_DEV_PORT || "5174", 10);
   const backendPort = parseInt(env.VITE_BACKEND_PORT || "8080", 10);
   const opikAiBackendPort = parseInt(env.VITE_OPIK_AI_BACKEND_PORT || "8081", 10);
+  const olliePort = parseInt(env.VITE_OLLIE_PORT || "3333", 10);
 
   return {
     base: env.VITE_BASE_URL || "/",
@@ -39,9 +40,6 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
-        // Force ollie-sidebar (and all deps) to use Opik's React, not its own
-        react: path.resolve(__dirname, "./node_modules/react"),
-        "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
       },
     },
     build: {
@@ -61,6 +59,11 @@ export default defineConfig(({ mode }) => {
         "/opik-ai": {
           target: `http://localhost:${opikAiBackendPort}`,
           changeOrigin: true,
+        },
+        "/ollie": {
+          target: `http://localhost:${olliePort}`,
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/ollie/, ""),
         },
       },
     },

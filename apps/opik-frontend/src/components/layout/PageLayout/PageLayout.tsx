@@ -13,24 +13,24 @@ import QuickstartDialog from "@/components/pages-shared/onboarding/QuickstartDia
 
 const MOBILE_BREAKPOINT = 1024; // lg breakpoint in Tailwind
 
-// Fallback: load OllieSidebar directly when plugin system is not active (dev mode)
-const OllieSidebarFallback = lazy(() =>
-  import("@/plugins/comet/OllieSidebar"),
+// Fallback: load AssistantSidebar directly when plugin system is not active (dev mode)
+const AssistantSidebarFallback = lazy(() =>
+  import("@/plugins/comet/AssistantSidebar"),
 );
 
 const PageLayout = () => {
   const [storedExpanded = true, setStoredExpanded] =
     useLocalStorageState<boolean>("sidebar-expanded");
   const [bannerHeight, setBannerHeight] = useState(0);
-  const [ollieSidebarWidth, setOllieSidebarWidth] = useState(0);
+  const [assistantSidebarWidth, setAssistantSidebarWidth] = useState(0);
   const [showWelcomeWizard, setShowWelcomeWizard] = useState(false);
 
   const welcomeWizardEnabled = useIsFeatureEnabled(
     FeatureToggleKeys.WELCOME_WIZARD_ENABLED,
   );
 
-  const ollieEnabled = useIsFeatureEnabled(
-    FeatureToggleKeys.OLLIE_CONSOLE_ENABLED,
+  const assistantEnabled = useIsFeatureEnabled(
+    FeatureToggleKeys.ASSISTANT_SIDEBAR_ENABLED,
   );
 
   const { data: wizardStatus } = useWelcomeWizardStatus({
@@ -38,10 +38,10 @@ const PageLayout = () => {
   });
 
   const RetentionBanner = usePluginsStore((state) => state.RetentionBanner);
-  const OllieSidebarPlugin = usePluginsStore((state) => state.OllieSidebar);
+  const AssistantSidebarPlugin = usePluginsStore((state) => state.AssistantSidebar);
 
   // Use plugin if available, otherwise fall back to direct lazy import
-  const OllieSidebar = OllieSidebarPlugin || (ollieEnabled ? OllieSidebarFallback : null);
+  const AssistantSidebar = AssistantSidebarPlugin || (assistantEnabled ? AssistantSidebarFallback : null);
 
   // Force sidebar collapsed on mobile, use stored preference on desktop
   const isMobile =
@@ -80,7 +80,7 @@ const PageLayout = () => {
       style={
         {
           "--banner-height": `${bannerHeight}px`,
-          "--ollie-sidebar-width": `${ollieSidebarWidth}px`,
+          "--assistant-sidebar-width": `${assistantSidebarWidth}px`,
         } as React.CSSProperties
       }
     >
@@ -89,16 +89,16 @@ const PageLayout = () => {
       ) : null}
 
       <SideBar expanded={expanded} setExpanded={setStoredExpanded} />
-      <main className="comet-content-inset absolute bottom-0 right-0 top-[var(--banner-height)] flex transition-all">
+      <main className="comet-content-inset absolute bottom-0 top-[var(--banner-height)] flex transition-all">
         <TopBar />
         <section className="comet-header-inset absolute inset-x-0 bottom-0 overflow-auto bg-soft-background px-6">
           <Outlet />
         </section>
       </main>
 
-      {OllieSidebar ? (
+      {AssistantSidebar ? (
         <Suspense>
-          <OllieSidebar onWidthChange={setOllieSidebarWidth} />
+          <AssistantSidebar onWidthChange={setAssistantSidebarWidth} />
         </Suspense>
       ) : null}
 

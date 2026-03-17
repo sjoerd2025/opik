@@ -55,5 +55,5 @@ public class ServiceTogglesConfig {
     @JsonProperty
     @NotNull boolean agentConfigurationEnabled;
     @JsonProperty
-    @NotNull boolean ollieConsoleEnabled;
+    @NotNull boolean assistantSidebarEnabled;
 }

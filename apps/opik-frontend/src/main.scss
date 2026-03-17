@@ -492,6 +492,22 @@
   body {
     @apply bg-background text-foreground comet-body;
   }
+
+  /* Reset @layer base styles (preflight, border-border, body font/color)
+     at the microfrontend boundary. revert-layer rolls back only this layer,
+     so unlayered ollie.css still applies normally. */
+  .assistant-sidebar-root {
+    font: revert-layer;
+    color: revert-layer;
+    letter-spacing: revert-layer;
+    line-height: revert-layer;
+  }
+
+  .assistant-sidebar-root *,
+  .assistant-sidebar-root *::before,
+  .assistant-sidebar-root *::after {
+    all: revert-layer;
+  }
 }
 
 /* custom classes */
@@ -568,10 +584,10 @@
 
   .comet-content-inset {
     --comet-content-width: calc(
-      100vw - var(--sidebar-width) - var(--ollie-sidebar-width, 0px)
+      100vw - var(--sidebar-width) - var(--assistant-sidebar-width, 0px)
     );
     left: var(--sidebar-width);
-    right: var(--ollie-sidebar-width, 0px);
+    right: var(--assistant-sidebar-width, 0px);
   }
 
   .comet-table-row-best td {

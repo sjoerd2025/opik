@@ -24,5 +24,5 @@ export enum FeatureToggleKeys {
   OLLAMA_PROVIDER_ENABLED = "ollama_provider_enabled",
   COLLABORATORS_TAB_ENABLED = "collaborators_tab_enabled",
   AGENT_CONFIGURATION_ENABLED = "agent_configuration_enabled",
-  OLLIE_CONSOLE_ENABLED = "ollie_console_enabled",
+  ASSISTANT_SIDEBAR_ENABLED = "assistant_sidebar_enabled",
 }

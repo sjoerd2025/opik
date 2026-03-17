@@ -25,7 +25,7 @@ type PluginStore = {
   CollaboratorsTab: React.ComponentType | null;
   CollaboratorsTabTrigger: React.ComponentType<CollaboratorsTabTriggerProps> | null;
   WorkspaceSelector: React.ComponentType | null;
-  OllieSidebar: React.ComponentType<{
+  AssistantSidebar: React.ComponentType<{
     onWidthChange: (width: number) => void;
   }> | null;
   init: unknown;
@@ -47,7 +47,7 @@ const PLUGIN_NAMES = [
   "CollaboratorsTab",
   "CollaboratorsTabTrigger",
   "WorkspaceSelector",
-  "OllieSidebar",
+  "AssistantSidebar",
   "init",
 ];
 
@@ -65,7 +65,7 @@ const usePluginsStore = create<PluginStore>((set) => ({
   CollaboratorsTab: null,
   CollaboratorsTabTrigger: null,
   WorkspaceSelector: null,
-  OllieSidebar: null,
+  AssistantSidebar: null,
   init: null,
   setupPlugins: async (folderName: string) => {
     if (!VALID_PLUGIN_FOLDER_NAMES.includes(folderName)) {
