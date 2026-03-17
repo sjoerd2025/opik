@@ -133,10 +133,16 @@ export class EvaluationResultProcessor {
   private static async displayExperimentLink(
     experiment: Experiment
   ): Promise<void> {
-    const experimentUrl = await experiment.getUrl();
-    logger.info(
-      `View the results ${createLink(experimentUrl, "in your Opik dashboard")}`
-    );
+    try {
+      const experimentUrl = await experiment.getUrl();
+      logger.info(
+        `View the results ${createLink(experimentUrl, "in your Opik dashboard")}`
+      );
+    } catch {
+      logger.info(
+        "View the results in your Opik dashboard (dataset has been deleted)"
+      );
+    }
   }
 
   public static async processResults(
