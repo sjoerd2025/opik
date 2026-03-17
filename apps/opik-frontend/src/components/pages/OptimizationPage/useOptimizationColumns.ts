@@ -24,6 +24,7 @@ type UseOptimizationColumnsParams = {
   selectedColumns: string[];
   sortableBy: string[];
   bestCandidateId?: string;
+  baselineCandidate?: AggregatedCandidate;
   isEvaluationSuite?: boolean;
   isInProgress?: boolean;
   inProgressInfo?: {
@@ -40,6 +41,7 @@ export const useOptimizationColumns = ({
   selectedColumns,
   sortableBy,
   bestCandidateId,
+  baselineCandidate,
   isEvaluationSuite,
   isInProgress,
   inProgressInfo,
@@ -69,17 +71,13 @@ export const useOptimizationColumns = ({
       },
       {
         id: "objective_name",
-        label: isEvaluationSuite
-          ? "Pass rate"
-          : objectiveName
-            ? `Accuracy (${objectiveName})`
-            : "Accuracy",
+        label: isEvaluationSuite ? "Pass rate" : objectiveName ?? "Accuracy",
         type: COLUMN_TYPE.numberDictionary,
         size: 160,
         accessorFn: (row) => row.score,
         cell: TrialAccuracyCell as never,
         customMeta: {
-          candidates,
+          baselineCandidate,
           isEvaluationSuite,
         },
       },
@@ -91,7 +89,7 @@ export const useOptimizationColumns = ({
         accessorFn: (row) => row.runtimeCost,
         cell: TrialCandidateCostCell as never,
         customMeta: {
-          candidates,
+          baselineCandidate,
         },
       },
       {
@@ -102,7 +100,7 @@ export const useOptimizationColumns = ({
         accessorFn: (row) => row.latencyP50,
         cell: TrialCandidateLatencyCell as never,
         customMeta: {
-          candidates,
+          baselineCandidate,
         },
       },
       {
@@ -140,6 +138,7 @@ export const useOptimizationColumns = ({
   }, [
     candidates,
     bestCandidateId,
+    baselineCandidate,
     isEvaluationSuite,
     isInProgress,
     inProgressInfo,

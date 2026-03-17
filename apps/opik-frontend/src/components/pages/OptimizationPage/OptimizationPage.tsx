@@ -114,6 +114,7 @@ const OptimizationPage: React.FC = () => {
     selectedColumns,
     sortableBy,
     bestCandidateId: bestCandidate?.candidateId,
+    baselineCandidate,
     isEvaluationSuite,
     isInProgress,
     inProgressInfo,
@@ -167,6 +168,7 @@ const OptimizationPage: React.FC = () => {
               baselineCandidate={baselineCandidate}
               bestCandidate={bestCandidate}
               isEvaluationSuite={isEvaluationSuite}
+              objectiveName={optimization?.objective_name}
               optimizationCreatedAt={optimization?.created_at}
               isInProgress={
                 !!optimization?.status &&

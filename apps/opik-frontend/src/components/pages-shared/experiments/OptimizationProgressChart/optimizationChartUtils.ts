@@ -140,19 +140,19 @@ const computeInProgressStatus = (
 
 const computeCompletedStatus = (
   c: AggregatedCandidate,
-  hasDescendants: Set<string>,
+  ancestorSet: Set<string>,
   bestCandidate: AggregatedCandidate | undefined,
 ): TrialStatus => {
   const isBest = bestCandidate?.candidateId === c.candidateId;
-  const isDescendant = hasDescendants.has(c.candidateId);
+  const isDescendant = ancestorSet.has(c.candidateId);
   return isDescendant || isBest ? "passed" : "pruned";
 };
 
-const buildDescendantsSet = (
+const buildAncestorSet = (
   candidates: AggregatedCandidate[],
   hasChildren: Set<string>,
 ): Set<string> => {
-  const hasDescendants = new Set<string>();
+  const ancestorSet = new Set<string>();
   const parentOf = new Map<string, string[]>();
   for (const c of candidates) {
     for (const pid of c.parentCandidateIds) {
@@ -163,12 +163,12 @@ const buildDescendantsSet = (
   }
   const queue = [...hasChildren];
   for (const id of queue) {
-    if (hasDescendants.has(id)) continue;
-    hasDescendants.add(id);
+    if (ancestorSet.has(id)) continue;
+    ancestorSet.add(id);
     const parents = parentOf.get(id);
     if (parents) queue.push(...parents);
   }
-  return hasDescendants;
+  return ancestorSet;
 };
 
 /**
@@ -188,9 +188,9 @@ export const computeCandidateStatuses = (
   if (!candidates.length) return statusMap;
 
   const lookups = buildCandidateLookups(candidates, inProgressInfo);
-  const hasDescendants = isInProgress
+  const ancestorSet = isInProgress
     ? undefined
-    : buildDescendantsSet(candidates, lookups.hasChildren);
+    : buildAncestorSet(candidates, lookups.hasChildren);
 
   for (const c of candidates) {
     if (c.stepIndex === 0) {
@@ -204,7 +204,7 @@ export const computeCandidateStatuses = (
     } else {
       statusMap.set(
         c.candidateId,
-        computeCompletedStatus(c, hasDescendants!, lookups.bestCandidate),
+        computeCompletedStatus(c, ancestorSet!, lookups.bestCandidate),
       );
     }
   }

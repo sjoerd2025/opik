@@ -51,6 +51,7 @@ type OptimizationKPICardsProps = {
   baselineCandidate?: AggregatedCandidate;
   bestCandidate?: AggregatedCandidate;
   isEvaluationSuite?: boolean;
+  objectiveName?: string;
   optimizationCreatedAt?: string;
   isInProgress?: boolean;
 };
@@ -62,6 +63,7 @@ const OptimizationKPICards: React.FunctionComponent<
   baselineCandidate,
   bestCandidate,
   isEvaluationSuite,
+  objectiveName,
   optimizationCreatedAt,
   isInProgress,
 }) => {
@@ -91,7 +93,7 @@ const OptimizationKPICards: React.FunctionComponent<
     return new Date(optimizationCreatedAt).getTime();
   }, [optimizationCreatedAt]);
 
-  const configs = getMetricKPICardConfigs({ isEvaluationSuite });
+  const configs = getMetricKPICardConfigs({ isEvaluationSuite, objectiveName });
 
   return (
     <div className="grid grid-cols-4 gap-4">

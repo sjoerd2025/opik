@@ -14,24 +14,21 @@ import PercentageTrend, {
   PercentageTrendType,
 } from "@/components/shared/PercentageTrend/PercentageTrend";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
-import { getBaselineCandidate } from "@/lib/optimizations";
-
 const useBaselinePercentage = (
-  candidates: AggregatedCandidate[] | undefined,
+  baseline: AggregatedCandidate | undefined,
   candidateId: string,
   value: number | undefined,
   baselineAccessor: (c: AggregatedCandidate) => number | undefined,
   formatter?: (v: number) => string,
 ): number | undefined => {
   return useMemo(() => {
-    const b = getBaselineCandidate(candidates);
-    if (candidateId === b?.candidateId) return undefined;
+    if (candidateId === baseline?.candidateId) return undefined;
     return calcFormatterAwarePercentage(
       value,
-      b ? baselineAccessor(b) : undefined,
+      baseline ? baselineAccessor(baseline) : undefined,
       formatter,
     );
-  }, [candidates, candidateId, value, baselineAccessor, formatter]);
+  }, [baseline, candidateId, value, baselineAccessor, formatter]);
 };
 
 type TrialMetricCellProps = {
@@ -91,13 +88,13 @@ export const TrialStepCell = (context: CellContext<unknown, unknown>) => {
 export const TrialAccuracyCell = (context: CellContext<unknown, unknown>) => {
   const row = context.row.original as AggregatedCandidate;
   const { custom } = context.column.columnDef.meta ?? {};
-  const { candidates, isEvaluationSuite } = (custom ?? {}) as {
-    candidates: AggregatedCandidate[];
+  const { baselineCandidate, isEvaluationSuite } = (custom ?? {}) as {
+    baselineCandidate?: AggregatedCandidate;
     isEvaluationSuite?: boolean;
   };
 
   const percentage = useBaselinePercentage(
-    candidates,
+    baselineCandidate,
     row.candidateId,
     row.score,
     (b) => b.score,
@@ -130,12 +127,12 @@ export const TrialCandidateCostCell = (
 ) => {
   const row = context.row.original as AggregatedCandidate;
   const { custom } = context.column.columnDef.meta ?? {};
-  const { candidates } = (custom ?? {}) as {
-    candidates: AggregatedCandidate[];
+  const { baselineCandidate } = (custom ?? {}) as {
+    baselineCandidate?: AggregatedCandidate;
   };
 
   const percentage = useBaselinePercentage(
-    candidates,
+    baselineCandidate,
     row.candidateId,
     row.runtimeCost,
     (b) => b.runtimeCost,
@@ -163,12 +160,12 @@ export const TrialCandidateLatencyCell = (
 ) => {
   const row = context.row.original as AggregatedCandidate;
   const { custom } = context.column.columnDef.meta ?? {};
-  const { candidates } = (custom ?? {}) as {
-    candidates: AggregatedCandidate[];
+  const { baselineCandidate } = (custom ?? {}) as {
+    baselineCandidate?: AggregatedCandidate;
   };
 
   const percentage = useBaselinePercentage(
-    candidates,
+    baselineCandidate,
     row.candidateId,
     row.latencyP50,
     (b) => b.latencyP50,
