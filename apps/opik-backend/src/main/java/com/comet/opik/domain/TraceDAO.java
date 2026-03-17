@@ -1739,7 +1739,7 @@ class TraceDAOImpl implements TraceDAO {
             DELETE FROM traces
             WHERE workspace_id IN :workspace_ids
             AND id \\< :cutoff_id
-            SETTINGS log_comment = '<log_comment>'
+            SETTINGS log_comment = '<log_comment>', lightweight_deletes_sync = 0
             ;
             """;
 
@@ -1747,7 +1747,7 @@ class TraceDAOImpl implements TraceDAO {
             DELETE FROM traces
             WHERE id \\< :cutoff_id
             AND (<workspace_bounds:{wb | (workspace_id = :ws_<i0> AND id >= :min_<i0>)};separator=" OR ">)
-            SETTINGS log_comment = '<log_comment>'
+            SETTINGS log_comment = '<log_comment>', lightweight_deletes_sync = 0
             ;
             """;
 

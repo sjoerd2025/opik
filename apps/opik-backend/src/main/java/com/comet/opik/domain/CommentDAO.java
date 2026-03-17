@@ -152,7 +152,7 @@ class CommentDAOImpl implements CommentDAO {
             DELETE FROM comments
             WHERE workspace_id IN :workspace_ids
             AND entity_id \\< :cutoff_id
-            SETTINGS log_comment = '<log_comment>'
+            SETTINGS log_comment = '<log_comment>', lightweight_deletes_sync = 0
             ;
             """;
 
@@ -160,7 +160,7 @@ class CommentDAOImpl implements CommentDAO {
             DELETE FROM comments
             WHERE entity_id \\< :cutoff_id
             AND (<workspace_bounds:{wb | (workspace_id = :ws_<i0> AND entity_id >= :min_<i0>)};separator=" OR ">)
-            SETTINGS log_comment = '<log_comment>'
+            SETTINGS log_comment = '<log_comment>', lightweight_deletes_sync = 0
             ;
             """;
 

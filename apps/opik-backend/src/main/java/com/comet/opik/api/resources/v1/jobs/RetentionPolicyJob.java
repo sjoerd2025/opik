@@ -60,7 +60,7 @@ public class RetentionPolicyJob implements Managed {
                     .onBackpressureDrop(tick -> log.debug("Retention policy backpressure drop, tick '{}'", tick))
                     .concatMap(tick -> executeTick(tick)
                             .onErrorResume(error -> {
-                                log.error("Retention policy tick failed, will retry next interval", error);
+                                log.warn("Retention policy tick failed, will retry next interval", error);
                                 return Mono.empty();
                             }))
                     .subscribe();

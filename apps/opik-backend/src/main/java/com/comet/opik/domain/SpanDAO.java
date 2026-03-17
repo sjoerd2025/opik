@@ -1169,19 +1169,21 @@ class SpanDAO {
             ;
             """;
 
+    // Use trace_id (not span id) for cutoff/bounds — spans can arrive late with newer UUIDs
+    // than their parent trace, so filtering by span id would leave orphan spans behind.
     private static final String DELETE_FOR_RETENTION = """
             DELETE FROM spans
             WHERE workspace_id IN :workspace_ids
-            AND id \\< :cutoff_id
-            SETTINGS log_comment = '<log_comment>'
+            AND trace_id \\< :cutoff_id
+            SETTINGS log_comment = '<log_comment>', lightweight_deletes_sync = 0
             ;
             """;
 
     private static final String DELETE_FOR_RETENTION_BOUNDED = """
             DELETE FROM spans
-            WHERE id \\< :cutoff_id
-            AND (<workspace_bounds:{wb | (workspace_id = :ws_<i0> AND id >= :min_<i0>)};separator=" OR ">)
-            SETTINGS log_comment = '<log_comment>'
+            WHERE trace_id \\< :cutoff_id
+            AND (<workspace_bounds:{wb | (workspace_id = :ws_<i0> AND trace_id >= :min_<i0>)};separator=" OR ">)
+            SETTINGS log_comment = '<log_comment>', lightweight_deletes_sync = 0
             ;
             """;
 

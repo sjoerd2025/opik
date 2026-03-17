@@ -9,7 +9,6 @@ import com.google.common.collect.Lists;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -30,16 +29,33 @@ import static com.comet.opik.infrastructure.db.TransactionTemplateAsync.READ_ONL
 
 @Slf4j
 @Singleton
-@RequiredArgsConstructor(onConstructor_ = @Inject)
 public class RetentionPolicyService {
 
-    private final @NonNull TransactionTemplate template;
-    private final @NonNull TraceDAO traceDAO;
-    private final @NonNull SpanDAO spanDAO;
-    private final @NonNull FeedbackScoreDAO feedbackScoreDAO;
-    private final @NonNull CommentDAO commentDAO;
-    private final @NonNull InstantToUUIDMapper uuidMapper;
-    private final @NonNull @Config("retention") RetentionConfig config;
+    private final TransactionTemplate template;
+    private final TraceDAO traceDAO;
+    private final SpanDAO spanDAO;
+    private final FeedbackScoreDAO feedbackScoreDAO;
+    private final CommentDAO commentDAO;
+    private final InstantToUUIDMapper uuidMapper;
+    private final RetentionConfig config;
+
+    @Inject
+    public RetentionPolicyService(
+            @NonNull TransactionTemplate template,
+            @NonNull TraceDAO traceDAO,
+            @NonNull SpanDAO spanDAO,
+            @NonNull FeedbackScoreDAO feedbackScoreDAO,
+            @NonNull CommentDAO commentDAO,
+            @NonNull InstantToUUIDMapper uuidMapper,
+            @NonNull @Config("retention") RetentionConfig config) {
+        this.template = template;
+        this.traceDAO = traceDAO;
+        this.spanDAO = spanDAO;
+        this.feedbackScoreDAO = feedbackScoreDAO;
+        this.commentDAO = commentDAO;
+        this.uuidMapper = uuidMapper;
+        this.config = config;
+    }
 
     /**
      * Resolved retention parameters for a single workspace.

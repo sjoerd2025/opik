@@ -581,6 +581,8 @@ retention:
   # Default: 48
   # Description: How many times per day the retention job runs (min 1 = once/day, max 288 = every 5 min).
   #              Each run processes a 1/N fraction of workspaces, so all workspaces are covered once per day.
+  #              Pick a value that divides 1440 evenly to avoid skipping fractions:
+  #              1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 18, 20, 24, 30, 32, 36, 48, 60, 72, 80, 96, 144, 160, 180, 240, 288
   executionsPerDay: ${RETENTION_EXECUTIONS_PER_DAY:-48}
   # Default: 1000
   # Description: Maximum number of workspace_ids per DELETE statement
