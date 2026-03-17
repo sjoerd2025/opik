@@ -105,13 +105,13 @@ class TestMessageAdapter:
         assert system_text is None
         assert len(non_system) == 1
 
-    def test_converts_pydantic_model(self):
-        schema = message_adapter.pydantic_to_tool_schema(SampleFormat)
-        assert schema["name"] == "structured_output"
-        assert "input_schema" in schema
-        assert "score" in schema["input_schema"]["properties"]
-        assert "reason" in schema["input_schema"]["properties"]
-        assert "title" not in schema["input_schema"]
+    def test_converts_pydantic_model_to_output_config(self):
+        config = message_adapter.pydantic_to_output_config(SampleFormat)
+        assert config["format"]["type"] == "json_schema"
+        schema = config["format"]["schema"]
+        assert "score" in schema["properties"]
+        assert "reason" in schema["properties"]
+        assert "title" not in schema
 
     def test_strips_prefix(self):
         assert message_adapter.strip_anthropic_prefix("anthropic/claude-sonnet-4-20250514") == "claude-sonnet-4-20250514"
@@ -157,9 +157,11 @@ class TestAnthropicChatModelGenerateString:
         _install_anthropic_stub(monkeypatch)
         monkeypatch.setenv("OPIK_ENABLE_LITELLM_MODELS_MONITORING", "false")
 
+        json_text = json.dumps({"score": 10, "reason": "good"})
+
         @contextmanager
         def fake_provider_response(model_provider, messages, **kwargs):
-            yield _make_tool_use_response({"score": 10, "reason": "good"})
+            yield _make_text_response(json_text)
 
         monkeypatch.setattr(base_model, "get_provider_response", fake_provider_response)
 
@@ -193,8 +195,9 @@ class TestAnthropicChatModelProviderResponse:
             m["role"] != "system" for m in call_kwargs.kwargs["messages"]
         )
 
-    def test_response_format_adds_tools(self, monkeypatch):
+    def test_response_format_uses_parse(self, monkeypatch):
         _, mock_client, _ = _install_anthropic_stub(monkeypatch)
+        mock_client.messages.parse = MagicMock(return_value=_make_text_response())
         monkeypatch.setenv("OPIK_ENABLE_LITELLM_MODELS_MONITORING", "false")
 
         model = anthropic_chat_model.AnthropicChatModel(
@@ -204,13 +207,11 @@ class TestAnthropicChatModelProviderResponse:
         messages = [{"role": "user", "content": "Score this"}]
         model.generate_provider_response(messages, response_format=SampleFormat)
 
-        call_kwargs = mock_client.messages.create.call_args.kwargs
-        assert "tools" in call_kwargs
-        assert call_kwargs["tools"][0]["name"] == "structured_output"
-        assert call_kwargs["tool_choice"] == {
-            "type": "tool",
-            "name": "structured_output",
-        }
+        mock_client.messages.parse.assert_called_once()
+        call_kwargs = mock_client.messages.parse.call_args.kwargs
+        assert call_kwargs["output_format"] is SampleFormat
+        assert "tools" not in call_kwargs
+        assert "tool_choice" not in call_kwargs
 
     def test_default_max_tokens(self, monkeypatch):
         _, mock_client, _ = _install_anthropic_stub(monkeypatch)

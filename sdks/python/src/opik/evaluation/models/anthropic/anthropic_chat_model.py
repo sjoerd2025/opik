@@ -73,10 +73,7 @@ class AnthropicChatModel(base_model.OpikBaseModel):
             messages=request,
             **kwargs,
         ) as response:
-            if response_format is not None:
-                content = response_parser.extract_tool_use_content(response)
-            else:
-                content = response_parser.extract_text_content(response)
+            content = response_parser.extract_text_content(response)
             return base_model.check_model_output_string(content)
 
     def generate_provider_response(
@@ -91,13 +88,17 @@ class AnthropicChatModel(base_model.OpikBaseModel):
             max_attempts = 1
 
         response_format = kwargs.pop("response_format", None)
-        call_kwargs = self._build_call_kwargs(messages, response_format, kwargs)
+        call_kwargs = self._build_call_kwargs(messages, kwargs)
 
         retrying = tenacity.Retrying(
             reraise=True,
             stop=tenacity.stop_after_attempt(max_attempts),
             wait=tenacity.wait_exponential(multiplier=0.5, min=0.5, max=8.0),
         )
+
+        if response_format is not None:
+            call_kwargs["output_format"] = response_format
+            return retrying(self._client.messages.parse, **call_kwargs)
 
         return retrying(self._client.messages.create, **call_kwargs)
 
@@ -115,10 +116,7 @@ class AnthropicChatModel(base_model.OpikBaseModel):
         async with base_model.aget_provider_response(
             model_provider=self, messages=request, **kwargs
         ) as response:
-            if response_format is not None:
-                content = response_parser.extract_tool_use_content(response)
-            else:
-                content = response_parser.extract_text_content(response)
+            content = response_parser.extract_text_content(response)
             return base_model.check_model_output_string(content)
 
     async def agenerate_provider_response(
@@ -133,7 +131,7 @@ class AnthropicChatModel(base_model.OpikBaseModel):
             max_attempts = 1
 
         response_format = kwargs.pop("response_format", None)
-        call_kwargs = self._build_call_kwargs(messages, response_format, kwargs)
+        call_kwargs = self._build_call_kwargs(messages, kwargs)
 
         retrying = tenacity.AsyncRetrying(
             reraise=True,
@@ -141,9 +139,15 @@ class AnthropicChatModel(base_model.OpikBaseModel):
             wait=tenacity.wait_exponential(multiplier=0.5, min=0.5, max=8.0),
         )
 
-        async for attempt in retrying:
-            with attempt:
-                return await self._async_client.messages.create(**call_kwargs)
+        if response_format is not None:
+            call_kwargs["output_format"] = response_format
+            async for attempt in retrying:
+                with attempt:
+                    return await self._async_client.messages.parse(**call_kwargs)
+        else:
+            async for attempt in retrying:
+                with attempt:
+                    return await self._async_client.messages.create(**call_kwargs)
 
         raise exceptions.BaseLLMError(
             "Async Anthropic completion failed without raising an exception"
@@ -152,7 +156,6 @@ class AnthropicChatModel(base_model.OpikBaseModel):
     def _build_call_kwargs(
         self,
         messages: List[Dict[str, Any]],
-        response_format: Optional[Type[pydantic.BaseModel]],
         extra_kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         system_text, non_system_messages = message_adapter.extract_system_messages(
@@ -173,10 +176,5 @@ class AnthropicChatModel(base_model.OpikBaseModel):
 
         if system_text:
             call_kwargs["system"] = system_text
-
-        if response_format is not None:
-            tool_schema = message_adapter.pydantic_to_tool_schema(response_format)
-            call_kwargs["tools"] = [tool_schema]
-            call_kwargs["tool_choice"] = {"type": "tool", "name": "structured_output"}
 
         return call_kwargs

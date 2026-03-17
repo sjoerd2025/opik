@@ -45,17 +45,20 @@ def extract_system_messages(
     return system_text, non_system
 
 
-def pydantic_to_tool_schema(model: Type[pydantic.BaseModel]) -> Dict[str, Any]:
-    """Convert a pydantic model to an Anthropic tool definition.
+def pydantic_to_output_config(model: Type[pydantic.BaseModel]) -> Dict[str, Any]:
+    """Build an Anthropic ``output_config`` dict from a pydantic model.
 
-    Used to implement structured output via forced tool use.
+    Uses the native ``json_schema`` output format (SDK >=0.85) which
+    constrains the model to produce JSON matching the schema directly,
+    without the tool_use indirection.
     """
     schema = model.model_json_schema()
     schema.pop("title", None)
     return {
-        "name": "structured_output",
-        "description": "Return structured output matching the required schema.",
-        "input_schema": schema,
+        "format": {
+            "type": "json_schema",
+            "schema": schema,
+        },
     }
 
 
