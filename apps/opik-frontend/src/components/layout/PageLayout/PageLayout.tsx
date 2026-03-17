@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import SideBar from "@/components/layout/SideBar/SideBar";
 import TopBar from "@/components/layout/TopBar/TopBar";
@@ -13,6 +13,11 @@ import QuickstartDialog from "@/components/pages-shared/onboarding/QuickstartDia
 
 const MOBILE_BREAKPOINT = 1024; // lg breakpoint in Tailwind
 
+// Fallback: load OllieSidebar directly when plugin system is not active (dev mode)
+const OllieSidebarFallback = lazy(() =>
+  import("@/plugins/comet/OllieSidebar"),
+);
+
 const PageLayout = () => {
   const [storedExpanded = true, setStoredExpanded] =
     useLocalStorageState<boolean>("sidebar-expanded");
@@ -24,12 +29,19 @@ const PageLayout = () => {
     FeatureToggleKeys.WELCOME_WIZARD_ENABLED,
   );
 
+  const ollieEnabled = useIsFeatureEnabled(
+    FeatureToggleKeys.OLLIE_CONSOLE_ENABLED,
+  );
+
   const { data: wizardStatus } = useWelcomeWizardStatus({
     enabled: welcomeWizardEnabled,
   });
 
   const RetentionBanner = usePluginsStore((state) => state.RetentionBanner);
-  const OllieSidebar = usePluginsStore((state) => state.OllieSidebar);
+  const OllieSidebarPlugin = usePluginsStore((state) => state.OllieSidebar);
+
+  // Use plugin if available, otherwise fall back to direct lazy import
+  const OllieSidebar = OllieSidebarPlugin || (ollieEnabled ? OllieSidebarFallback : null);
 
   // Force sidebar collapsed on mobile, use stored preference on desktop
   const isMobile =
@@ -85,7 +97,9 @@ const PageLayout = () => {
       </main>
 
       {OllieSidebar ? (
-        <OllieSidebar onWidthChange={setOllieSidebarWidth} />
+        <Suspense>
+          <OllieSidebar onWidthChange={setOllieSidebarWidth} />
+        </Suspense>
       ) : null}
 
       {/* Welcome Wizard Dialog */}
