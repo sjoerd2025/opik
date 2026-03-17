@@ -446,7 +446,7 @@ class TestInjectTraceMetadataProjectCheck:
         cfg = AgentConfig._from_blueprint(bp, service=service)
         return cfg
 
-    @mock.patch("opik.context_storage.get_trace_data")
+    @mock.patch("opik.opik_context.get_current_trace_data")
     def test_matching_project__no_error(self, mock_get_trace):
         trace_data = mock.Mock()
         trace_data.project_name = "my-project"
@@ -456,17 +456,17 @@ class TestInjectTraceMetadataProjectCheck:
         # Should not raise
         cfg._inject_trace_metadata("temp", 0.6)
 
-    @mock.patch("opik.context_storage.get_trace_data")
-    def test_mismatched_project__raises_value_error(self, mock_get_trace):
+    @mock.patch("opik.opik_context.get_current_trace_data")
+    def test_mismatched_project__skips_silently(self, mock_get_trace):
         trace_data = mock.Mock()
         trace_data.project_name = "other-project"
         mock_get_trace.return_value = trace_data
 
         cfg = self._make_config_with_service("my-project")
-        with pytest.raises(ValueError, match="my-project.*other-project"):
-            cfg._inject_trace_metadata("temp", 0.6)
+        # Should not raise – logs a warning and returns
+        cfg._inject_trace_metadata("temp", 0.6)
 
-    @mock.patch("opik.context_storage.get_trace_data")
+    @mock.patch("opik.opik_context.get_current_trace_data")
     def test_no_active_trace__no_error(self, mock_get_trace):
         mock_get_trace.return_value = None
 
@@ -474,7 +474,7 @@ class TestInjectTraceMetadataProjectCheck:
         # Should not raise
         cfg._inject_trace_metadata("temp", 0.6)
 
-    @mock.patch("opik.context_storage.get_trace_data")
+    @mock.patch("opik.opik_context.get_current_trace_data")
     def test_no_service__no_error(self, mock_get_trace):
         trace_data = mock.Mock()
         trace_data.project_name = "other-project"
@@ -485,7 +485,7 @@ class TestInjectTraceMetadataProjectCheck:
         # Should not raise – no service means no project to compare
         cfg._inject_trace_metadata("temp", 0.6)
 
-    @mock.patch("opik.context_storage.get_trace_data")
+    @mock.patch("opik.opik_context.get_current_trace_data")
     def test_trace_project_none__no_error(self, mock_get_trace):
         trace_data = mock.Mock()
         trace_data.project_name = None

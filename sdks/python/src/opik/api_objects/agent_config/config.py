@@ -192,13 +192,12 @@ class AgentConfig:
     ) -> None:
         """Attach the accessed config value to the active trace's metadata.
 
-        No-ops silently when there is no active trace or on any error.
-        Raises ``ValueError`` if the active trace belongs to a different
-        project than the agent config.
+        No-ops silently when there is no active trace, on project mismatch,
+        or on any error.
         """
-        from opik import exceptions, opik_context, context_storage
+        from opik import exceptions, opik_context
 
-        trace_data = context_storage.get_trace_data()
+        trace_data = opik_context.get_current_trace_data()
         if trace_data is None:
             return
 
@@ -207,12 +206,13 @@ class AgentConfig:
             and trace_data.project_name is not None
             and trace_data.project_name != self._service.project_name
         ):
-            raise ValueError(
-                f"Agent config belongs to project "
-                f"'{self._service.project_name}', but the active trace "
-                f"belongs to project '{trace_data.project_name}'. "
-                f"Use the same project for both."
+            logger.warning(
+                "Agent config belongs to project '%s', but the active trace "
+                "belongs to project '%s'. Skipping metadata injection.",
+                self._service.project_name,
+                trace_data.project_name,
             )
+            return
 
         try:
             # ALEX
@@ -255,7 +255,7 @@ class AgentConfig:
             self._inject_trace_metadata(key, masked, mask_id=self._effective_mask_id())
             return masked
         value = self._values.get(key, default)
-        self._inject_trace_metadata(key, value, mask_id=self._effective_mask_id())
+        self._inject_trace_metadata(key, value)
         return value
 
     def __getitem__(self, key: str) -> typing.Any:
@@ -264,7 +264,7 @@ class AgentConfig:
             self._inject_trace_metadata(key, masked, mask_id=self._effective_mask_id())
             return masked
         value = self._values[key]
-        self._inject_trace_metadata(key, value, mask_id=self._effective_mask_id())
+        self._inject_trace_metadata(key, value)
         return value
 
     def __getattr__(self, name: str) -> typing.Any:
