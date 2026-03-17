@@ -143,6 +143,7 @@ type ExperimentItemContentProps = {
   description?: string;
   experiments?: Experiment[];
   datasetId?: string;
+  datasetItemId?: string;
   experimentsIds: string[];
   runSummariesByExperiment?: Record<string, ExperimentRunSummary>;
 };
@@ -154,6 +155,7 @@ export const ExperimentItemContent: React.FC<ExperimentItemContentProps> = ({
   description,
   experiments,
   datasetId,
+  datasetItemId,
   experimentsIds,
   runSummariesByExperiment,
 }) => {
@@ -179,6 +181,7 @@ export const ExperimentItemContent: React.FC<ExperimentItemContentProps> = ({
             <Link
               to="/$workspaceName/evaluation-suites/$suiteId/items"
               params={{ workspaceName, suiteId: datasetId }}
+              search={datasetItemId ? { row: datasetItemId } : {}}
               onClick={(e) => e.stopPropagation()}
             >
               <Tag

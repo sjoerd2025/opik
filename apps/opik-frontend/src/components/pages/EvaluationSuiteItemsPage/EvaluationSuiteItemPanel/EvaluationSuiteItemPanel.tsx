@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from "react";
+import React, { useCallback } from "react";
 import { Copy, MoreHorizontal, Share, Trash } from "lucide-react";
 import copy from "clipboard-copy";
 import {
@@ -96,7 +96,6 @@ const EvaluationSuiteItemPanelLayout: React.FC<
   const editItem = useEditItem();
   const updateItemAssertions = useUpdateItemAssertions();
   const suiteId = useSuiteIdFromURL();
-  const serverAssertionsRef = useRef(extractAssertions(serverEvaluators));
 
   const description = datasetItem?.description ?? "";
   const data = (datasetItem?.data as Record<string, unknown>) ?? {};
@@ -146,11 +145,11 @@ const EvaluationSuiteItemPanelLayout: React.FC<
         updateItemAssertions(
           datasetItemId,
           assertions,
-          serverAssertionsRef.current,
+          extractAssertions(serverEvaluators),
         );
       }
     },
-    [datasetItemId, columns, editItem, updateItemAssertions],
+    [datasetItemId, columns, editItem, updateItemAssertions, serverEvaluators],
   );
 
   const headerContent = isNewItem ? null : (

@@ -140,6 +140,7 @@ export const EvaluationSuiteExperimentPanel: React.FC<
             description={description}
             experiments={experiments}
             datasetId={datasetId}
+            datasetItemId={datasetItemId}
             experimentsIds={experimentsIds}
             runSummariesByExperiment={
               activeExperimentsCompare?.run_summaries_by_experiment
