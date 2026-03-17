@@ -3,7 +3,6 @@ import dataclasses
 import logging
 import typing
 
-from opik.rest_api import core as rest_api_core
 from .blueprint import Blueprint
 from .context import get_active_config_mask
 from . import type_helpers
@@ -64,8 +63,7 @@ class AgentConfig:
         instance._service = service
         instance._mask_cache = {}
         instance._field_metadata = {
-            v.key: (v.type, v.description)
-            for v in blueprint._raw.values
+            v.key: (v.type, v.description) for v in blueprint._raw.values
         }
         instance._is_fallback = False
         return instance
@@ -114,7 +112,8 @@ class AgentConfig:
         # AgentConfigService is a forward ref on private fields (skipped below),
         # stub it so get_type_hints doesn't raise NameError.
         hints = typing.get_type_hints(
-            type(self), include_extras=True,
+            type(self),
+            include_extras=True,
             localns={"AgentConfigService": typing.Any},
         )
         result: typing.Dict[
@@ -129,9 +128,7 @@ class AgentConfig:
             if typing.get_origin(raw_hint) is typing.Annotated:
                 args = typing.get_args(raw_hint)
                 py_type = args[0]
-                description = next(
-                    (a for a in args[1:] if isinstance(a, str)), None
-                )
+                description = next((a for a in args[1:] if isinstance(a, str)), None)
             else:
                 py_type = raw_hint
 
@@ -231,11 +228,7 @@ class AgentConfig:
                         value, type(value)
                     ),
                     "type": backend_type,
-                    **(
-                        {"description": description}
-                        if description is not None
-                        else {}
-                    ),
+                    **({"description": description} if description is not None else {}),
                 }
             agent_config_metadata["values"] = values
 
@@ -275,7 +268,7 @@ class AgentConfig:
             raise AttributeError(name)
 
     # ALEX
-    # to do: remove 
+    # to do: remove
     def create_mask(
         self,
         parameters: typing.Dict[str, typing.Any],

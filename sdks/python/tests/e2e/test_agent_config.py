@@ -129,9 +129,7 @@ def test_get_agent_config__not_found_with_fallback__returns_fallback(
     project_name: str,
 ):
     fallback = MyFallback()
-    result = opik_client.get_agent_config(
-        project_name=project_name, fallback=fallback
-    )
+    result = opik_client.get_agent_config(project_name=project_name, fallback=fallback)
 
     assert result is fallback
     assert result.is_fallback is True
@@ -177,9 +175,7 @@ def test_get_agent_config__with_mask_id(
         description="low-temp",
     )
 
-    masked = opik_client.get_agent_config(
-        project_name=project_name, mask_id=mask_id
-    )
+    masked = opik_client.get_agent_config(project_name=project_name, mask_id=mask_id)
     assert masked is not None
     assert masked["temperature"] == 0.1
 
@@ -219,9 +215,7 @@ def test_agent_config__create_mask__happyflow(
     )
     assert isinstance(mask_id, str)
 
-    masked = opik_client.get_agent_config(
-        project_name=project_name, mask_id=mask_id
-    )
+    masked = opik_client.get_agent_config(project_name=project_name, mask_id=mask_id)
     assert masked["temperature"] == 0.2
 
 

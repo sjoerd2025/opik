@@ -62,7 +62,9 @@ class AgentConfigService:
                 AgentConfigValueWrite(
                     key=field_name,
                     type=type_helpers.python_type_to_backend_type(py_type),
-                    value=type_helpers.python_value_to_backend_value(value, py_type) if value is not None else None,
+                    value=type_helpers.python_value_to_backend_value(value, py_type)
+                    if value is not None
+                    else None,
                     description=field_desc,
                 )
             )
@@ -239,15 +241,13 @@ class AgentConfigService:
                 )
                 return existing
 
-            new_fields = {
-                k: v for k, v in fields_with_values.items() if k in new_keys
-            }
-            
+            new_fields = {k: v for k, v in fields_with_values.items() if k in new_keys}
+
             logger.info(
                 "Creating new config version with new fields: %s",
                 ", ".join(sorted(new_keys)),
             )
-            
+
             blueprint = self.create_blueprint(
                 fields_with_values=new_fields,
                 description=description,
@@ -258,7 +258,7 @@ class AgentConfigService:
                 fields_with_values=fields_with_values,
                 description=description,
             )
-            
+
             if blueprint.id is not None:
                 self.tag_blueprint_with_env(
                     env=constants.DEFAULT_AGENT_CONFIG_ENV,
@@ -277,7 +277,9 @@ class AgentConfigService:
         if latest:
             return self.get_blueprint(mask_id=mask_id)
         elif not any([id, version, env]):
-            return self.get_blueprint(env=constants.DEFAULT_AGENT_CONFIG_ENV, mask_id=mask_id)
+            return self.get_blueprint(
+                env=constants.DEFAULT_AGENT_CONFIG_ENV, mask_id=mask_id
+            )
         else:
             return self.get_blueprint(
                 id=id,

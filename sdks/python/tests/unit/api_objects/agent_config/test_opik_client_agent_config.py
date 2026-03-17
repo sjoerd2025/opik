@@ -5,7 +5,6 @@ import pytest
 from opik.api_objects.agent_config.config import AgentConfig
 from opik.api_objects.agent_config.blueprint import Blueprint
 from opik.api_objects.agent_config.service import AgentConfigService
-from opik.api_objects import constants
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
 from opik.rest_api.types.agent_config_value_public import AgentConfigValuePublic
 
@@ -17,7 +16,10 @@ def _make_raw_blueprint(blueprint_id="bp-1", values=None, envs=None):
             AgentConfigValuePublic(key="model", type="string", value="gpt-4"),
         ]
     return AgentBlueprintPublic(
-        id=blueprint_id, type="blueprint", values=values, envs=envs,
+        id=blueprint_id,
+        type="blueprint",
+        values=values,
+        envs=envs,
     )
 
 
@@ -105,9 +107,7 @@ class TestCreateAgentConfig:
     @mock.patch("opik.api_objects.opik_client.AgentConfigService")
     @mock.patch("opik.api_objects.opik_client.rest_client_configurator")
     @mock.patch("opik.api_objects.opik_client.httpx_client")
-    def test_with_custom_project_name(
-        self, mock_httpx, mock_configurator, MockService
-    ):
+    def test_with_custom_project_name(self, mock_httpx, mock_configurator, MockService):
         bp = _make_blueprint()
         mock_service_instance = mock.Mock(spec=AgentConfigService)
         mock_service_instance.create_or_update_blueprint.return_value = bp
@@ -288,9 +288,7 @@ class TestGetAgentConfig:
     @mock.patch("opik.api_objects.opik_client.AgentConfigService")
     @mock.patch("opik.api_objects.opik_client.rest_client_configurator")
     @mock.patch("opik.api_objects.opik_client.httpx_client")
-    def test_with_custom_project_name(
-        self, mock_httpx, mock_configurator, MockService
-    ):
+    def test_with_custom_project_name(self, mock_httpx, mock_configurator, MockService):
         bp = _make_blueprint()
         mock_service_instance = mock.Mock(spec=AgentConfigService)
         mock_service_instance.resolve_blueprint.return_value = bp

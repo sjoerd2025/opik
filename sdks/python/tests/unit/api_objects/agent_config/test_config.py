@@ -6,7 +6,6 @@ from opik.api_objects.agent_config.config import AgentConfig
 from opik.api_objects.agent_config.service import AgentConfigService
 from opik.api_objects.agent_config.blueprint import Blueprint
 from opik.api_objects.agent_config.context import agent_config_context
-from opik.rest_api import core as rest_api_core
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
 from opik.rest_api.types.agent_config_value_public import AgentConfigValuePublic
 
@@ -20,7 +19,10 @@ def _make_raw_blueprint(blueprint_id="bp-1", values=None, description=None, envs
             AgentConfigValuePublic(key="name", type="string", value="agent"),
         ]
     return AgentBlueprintPublic(
-        id=blueprint_id, type="blueprint", values=values, description=description,
+        id=blueprint_id,
+        type="blueprint",
+        values=values,
+        description=description,
         envs=envs,
     )
 
@@ -349,6 +351,7 @@ class TestInitSubclass:
             temperature: float = 0.7
 
         import dataclasses
+
         assert dataclasses.is_dataclass(MyConfig)
 
     def test_subclass_instance_has_fields(self):

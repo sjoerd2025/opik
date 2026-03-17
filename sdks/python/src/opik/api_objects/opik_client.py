@@ -2308,7 +2308,7 @@ class Opik:
         )
 
     @staticmethod
-    def     _validate_agent_config(config: AgentConfig, param_name: str = "config") -> None:
+    def _validate_agent_config(config: AgentConfig, param_name: str = "config") -> None:
         if not isinstance(config, AgentConfig):
             raise TypeError(
                 f"{param_name} must be an instance of a class that inherits from AgentConfig, "
@@ -2355,7 +2355,7 @@ class Opik:
         """Retrieve an agent config.
 
         If ``latest`` is True, returns the most recent blueprint.
-        If none of ``id``, ``version``, or ``env`` are provided, 
+        If none of ``id``, ``version``, or ``env`` are provided,
         defaults to the ``"prod"`` environment.
 
         Args:

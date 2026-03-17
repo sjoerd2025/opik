@@ -18,7 +18,10 @@ def _make_raw_blueprint(blueprint_id="bp-1", values=None, description=None, envs
             AgentConfigValuePublic(key="name", type="string", value="agent"),
         ]
     return AgentBlueprintPublic(
-        id=blueprint_id, type="blueprint", values=values, description=description,
+        id=blueprint_id,
+        type="blueprint",
+        values=values,
+        description=description,
         envs=envs,
     )
 
@@ -256,7 +259,9 @@ class TestCreateBlueprint:
         call_kwargs = mock_rest_client.agent_configs.create_agent_config.call_args[1]
         assert call_kwargs["blueprint"].description == "v1"
 
-    def test_none_value_in_fields_with_values__passes_none_value(self, service, mock_rest_client):
+    def test_none_value_in_fields_with_values__passes_none_value(
+        self, service, mock_rest_client
+    ):
         mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
             _make_raw_blueprint()
         )
@@ -369,10 +374,12 @@ class TestCreateOrUpdateBlueprint:
             _make_raw_blueprint(blueprint_id="bp-new")
         )
 
-        config = self._make_config_instance({
-            "temp": (float, 0.7, None),
-            "model": (str, "gpt-4", None),
-        })
+        config = self._make_config_instance(
+            {
+                "temp": (float, 0.7, None),
+                "model": (str, "gpt-4", None),
+            }
+        )
 
         result = service.create_or_update_blueprint(config=config)
 
@@ -396,10 +403,12 @@ class TestCreateOrUpdateBlueprint:
             )
         )
 
-        config = self._make_config_instance({
-            "temp": (float, 0.7, None),
-            "model": (str, "gpt-4", None),
-        })
+        config = self._make_config_instance(
+            {
+                "temp": (float, 0.7, None),
+                "model": (str, "gpt-4", None),
+            }
+        )
 
         result = service.create_or_update_blueprint(config=config)
 
@@ -423,11 +432,13 @@ class TestCreateOrUpdateBlueprint:
             _make_raw_blueprint(blueprint_id="bp-v2")
         )
 
-        config = self._make_config_instance({
-            "temp": (float, 0.7, None),
-            "model": (str, "gpt-4", None),
-            "max_tokens": (int, 100, None),
-        })
+        config = self._make_config_instance(
+            {
+                "temp": (float, 0.7, None),
+                "model": (str, "gpt-4", None),
+                "max_tokens": (int, 100, None),
+            }
+        )
 
         result = service.create_or_update_blueprint(config=config)
 
