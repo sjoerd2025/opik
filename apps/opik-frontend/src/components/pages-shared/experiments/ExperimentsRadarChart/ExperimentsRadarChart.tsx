@@ -6,6 +6,7 @@ import useChartConfig from "@/hooks/useChartConfig";
 import { ExperimentLabelsMap } from "@/components/pages/CompareExperimentsPage/CompareExperimentsDetails/useCompareExperimentsChartsData";
 import RadarChart from "@/components/shared/Charts/RadarChart/RadarChart";
 import { renderScoreTooltipValue } from "@/lib/feedback-scores";
+import { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 interface ExperimentsRadarChartProps {
   name: string;
@@ -13,11 +14,19 @@ interface ExperimentsRadarChartProps {
   data: RadarDataPoint[];
   keys: string[];
   experimentLabelsMap: ExperimentLabelsMap;
+  renderTooltipValue?: (data: { value: ValueType }) => ValueType;
 }
 
 const ExperimentsRadarChart: React.FunctionComponent<
   ExperimentsRadarChartProps
-> = ({ name, chartId, data, keys, experimentLabelsMap }) => {
+> = ({
+  name,
+  chartId,
+  data,
+  keys,
+  experimentLabelsMap,
+  renderTooltipValue,
+}) => {
   const config = useChartConfig(keys, experimentLabelsMap);
 
   return (
@@ -32,7 +41,7 @@ const ExperimentsRadarChart: React.FunctionComponent<
           data={data}
           angleAxisKey="name"
           showLegend
-          renderTooltipValue={renderScoreTooltipValue}
+          renderTooltipValue={renderTooltipValue ?? renderScoreTooltipValue}
         />
       </CardContent>
     </Card>
