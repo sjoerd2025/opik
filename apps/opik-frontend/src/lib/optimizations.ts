@@ -59,6 +59,11 @@ export const extractMetricNameFromCode = (code: string): string => {
   return extractMetricNameFromPythonCode(code) || "code";
 };
 
+export const getObjectiveLabel = (
+  isEvaluationSuite?: boolean,
+  objectiveName?: string,
+): string => (isEvaluationSuite ? "Pass rate" : objectiveName ?? "Accuracy");
+
 export const MAX_EXPERIMENTS_LOADED = 1000;
 
 export const IN_PROGRESS_OPTIMIZATION_STATUSES: OPTIMIZATION_STATUS[] = [

@@ -17,6 +17,7 @@ import {
   TrialCandidateCostCell,
   TrialCandidateLatencyCell,
 } from "@/components/pages/OptimizationPage/TrialMetricCells";
+import { getObjectiveLabel } from "@/lib/optimizations";
 
 type UseOptimizationColumnsParams = {
   candidates: AggregatedCandidate[];
@@ -71,7 +72,7 @@ export const useOptimizationColumns = ({
       },
       {
         id: "objective_name",
-        label: isEvaluationSuite ? "Pass rate" : objectiveName ?? "Accuracy",
+        label: getObjectiveLabel(isEvaluationSuite, objectiveName),
         type: COLUMN_TYPE.numberDictionary,
         size: 160,
         accessorFn: (row) => row.score,

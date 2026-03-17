@@ -8,6 +8,7 @@ import {
   formatAsDuration,
   formatAsCurrency,
 } from "@/lib/optimization-formatters";
+import { getObjectiveLabel } from "@/lib/optimizations";
 
 type KPICardProps = {
   icon: LucideIcon;
@@ -71,9 +72,10 @@ export const getMetricKPICardConfigs = (options?: {
   {
     key: "score",
     icon: PenLine,
-    label: options?.isEvaluationSuite
-      ? "Pass rate"
-      : options?.objectiveName ?? "Accuracy",
+    label: getObjectiveLabel(
+      options?.isEvaluationSuite,
+      options?.objectiveName,
+    ),
     formatter: formatAsPercentage,
   },
   {
