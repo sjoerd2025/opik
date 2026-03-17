@@ -174,7 +174,8 @@ class ExperimentDAO {
                 status,
                 experiment_scores,
                 dataset_version_id,
-                execution_policy
+                execution_policy,
+                project_id
             )
             SELECT
                 if(
@@ -198,7 +199,8 @@ class ExperimentDAO {
                 new.status,
                 new.experiment_scores,
                 new.dataset_version_id,
-                new.execution_policy
+                new.execution_policy,
+                new.project_id
             FROM (
                 SELECT
                 :id AS id,
@@ -218,7 +220,8 @@ class ExperimentDAO {
                 :status AS status,
                 :experiment_scores AS experiment_scores,
                 :dataset_version_id AS dataset_version_id,
-                :execution_policy AS execution_policy
+                :execution_policy AS execution_policy,
+                :project_id AS project_id
             ) AS new
             LEFT JOIN (
                 SELECT
@@ -569,7 +572,7 @@ class ExperimentDAO {
                 SELECT
                     e.workspace_id as workspace_id,
                     e.dataset_id as dataset_id,
-                    if(empty(agg.project_ids), '', agg.project_ids[1]) as project_id,
+                    coalesce(e.project_id, if(empty(agg.project_ids), '', agg.project_ids[1])) as project_id,
                     e.id as id,
                     e.name as name,
                     e.metadata as metadata,
@@ -597,7 +600,8 @@ class ExperimentDAO {
                     agg.comments_array_agg as comments_array_agg,
                     if(agg.total_count = 0, NULL, agg.pass_rate) AS pass_rate,
                     if(agg.total_count = 0, NULL, agg.passed_count) AS passed_count,
-                    if(agg.total_count = 0, NULL, agg.total_count) AS total_count
+                    if(agg.total_count = 0, NULL, agg.total_count) AS total_count,
+                    arrayConcat(agg.project_ids, [ifNull(toString(e.project_id), '')]) as combined_project_ids
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
                 WHERE 1=1
@@ -613,9 +617,6 @@ class ExperimentDAO {
                 <if(experiment_scores_agg_empty_filters)>
                 AND (<experiment_scores_agg_empty_filters>)
                 <endif>
-                <if(project_id)>
-                AND has(agg.project_ids, :project_id)
-                <endif>
                 <if(project_deleted)>
                 AND (has(agg.project_ids, '') OR empty(agg.project_ids))
                 <endif>
@@ -627,7 +628,7 @@ class ExperimentDAO {
                 SELECT
                     e.workspace_id as workspace_id,
                     e.dataset_id as dataset_id,
-                    if(empty(ed.project_ids), '', ed.project_ids[1]) as project_id,
+                    coalesce(e.project_id, if(empty(ed.project_ids), '', ed.project_ids[1])) as project_id,
                     e.id as id,
                     e.name as name,
                     e.metadata as metadata,
@@ -655,7 +656,8 @@ class ExperimentDAO {
                     toJSONString(ca.comments_array_agg) as comments_array_agg,
                     pra.pass_rate as pass_rate,
                     pra.passed_count as passed_count,
-                    pra.total_count as total_count
+                    pra.total_count as total_count,
+                    arrayConcat(ed.project_ids, [ifNull(toString(e.project_id), '')]) as combined_project_ids
                 FROM experiments_final AS e
                 LEFT JOIN experiment_durations AS ed ON e.id = ed.experiment_id
                 LEFT JOIN feedback_scores_agg AS fs ON e.id = fs.experiment_id
@@ -683,7 +685,7 @@ class ExperimentDAO {
                 <if(experiment_scores_filters)>
                 AND e.id IN (
                     SELECT experiment_id
-                    FROM experiment_scores_final
+                    From experiment_scores_final
                     GROUP BY experiment_id
                     HAVING <experiment_scores_filters>
                 )
@@ -691,14 +693,14 @@ class ExperimentDAO {
                 <if(experiment_scores_empty_filters)>
                 AND e.id NOT IN (SELECT experiment_id FROM esc)
                 <endif>
-                <if(project_id)>
-                AND has(ed.project_ids, :project_id)
-                <endif>
                 <if(project_deleted)>
                 AND (has(ed.project_ids, '') OR empty(ed.project_ids))
                 <endif>
                 <endif>
             )
+            <if(project_id)>
+            WHERE has(combined_project_ids, :project_id)
+            <endif>
             ORDER BY <if(sort_fields)><sort_fields>,<endif> id DESC
             <if(limit && (
                 feedback_scores_filters ||
@@ -720,7 +722,7 @@ class ExperimentDAO {
 
     private static final String FIND_COUNT = """
             WITH experiments_initial AS (
-                SELECT id, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids, experiment_scores
+                SELECT id, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids, experiment_scores, project_id
                 FROM experiments
                 WHERE workspace_id = :workspace_id
                 <if(dataset_id)> AND dataset_id = :dataset_id <endif>
@@ -897,7 +899,7 @@ class ExperimentDAO {
                 AND (<experiment_scores_agg_empty_filters>)
                 <endif>
                 <if(project_id)>
-                AND has(agg.project_ids, :project_id)
+                AND has(arrayConcat(agg.project_ids, [ifNull(toString(e.project_id), '')]), :project_id)
                 <endif>
                 <if(project_deleted)>
                 AND (has(agg.project_ids, '') OR empty(agg.project_ids))
@@ -948,7 +950,7 @@ class ExperimentDAO {
                 AND e.id NOT IN (SELECT experiment_id FROM esc)
                 <endif>
                 <if(project_id)>
-                AND has(ep.project_ids, :project_id)
+                AND has(arrayConcat(ep.project_ids, [ifNull(toString(e.project_id), '')]), :project_id)
                 <endif>
                 <if(project_deleted)>
                 AND (has(ep.project_ids, '') OR empty(ep.project_ids))
@@ -967,7 +969,8 @@ class ExperimentDAO {
                     metadata,
                     tags,
                     arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids,
-                    created_at
+                    created_at,
+                    project_id AS experiment_project_id
                 FROM experiments final
                 WHERE workspace_id = :workspace_id
                 <if(types)> AND type IN :types <endif>
@@ -1010,8 +1013,8 @@ class ExperimentDAO {
                     ef.tags,
                     ef.prompt_ids,
                     ef.created_at,
-                    agg.project_ids,
-                    if(empty(agg.project_ids), '', agg.project_ids[1]) as project_id
+                    arrayConcat(agg.project_ids, [ifNull(toString(ef.experiment_project_id), '')]) as project_ids,
+                    coalesce(ef.experiment_project_id, if(empty(agg.project_ids), '', agg.project_ids[1])) as project_id
                 FROM experiments_filtered ef
                 INNER JOIN experiments_from_aggregates_final agg ON ef.id = agg.experiment_id
                 <endif>
@@ -1024,8 +1027,8 @@ class ExperimentDAO {
                     ef.tags,
                     ef.prompt_ids,
                     ef.created_at,
-                    ep.project_ids,
-                    if(empty(ep.project_ids), '', ep.project_ids[1]) as project_id
+                    arrayConcat(ep.project_ids, [ifNull(toString(ef.experiment_project_id), '')]) as project_ids,
+                    coalesce(ef.experiment_project_id, if(empty(ep.project_ids), '', ep.project_ids[1])) as project_id
                 FROM experiments_final ef
                 LEFT JOIN (
                     SELECT
@@ -1095,7 +1098,7 @@ class ExperimentDAO {
     private static final String FIND_GROUPS_AGGREGATIONS = """
             WITH experiments_resolved AS (
                 SELECT
-                    id, dataset_id, dataset_version_id, metadata, tags, experiment_scores, evaluation_method, execution_policy, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids
+                    id, dataset_id, dataset_version_id, metadata, tags, experiment_scores, evaluation_method, execution_policy, arrayConcat([prompt_id], mapKeys(prompt_versions)) AS prompt_ids, project_id AS experiment_project_id
                 FROM experiments final
                 WHERE workspace_id = :workspace_id
                 <if(types)> AND type IN :types <endif>
@@ -1354,8 +1357,8 @@ class ExperimentDAO {
                     agg.duration_values AS duration,
                     agg.total_estimated_cost_sum as total_estimated_cost,
                     agg.total_estimated_cost_avg as total_estimated_cost_avg,
-                    agg.project_ids as project_ids,
-                    if(empty(agg.project_ids), '', agg.project_ids[1]) as project_id,
+                    arrayConcat(agg.project_ids, [ifNull(toString(e.experiment_project_id), '')]) as project_ids,
+                    coalesce(e.experiment_project_id, if(empty(agg.project_ids), '', agg.project_ids[1])) as project_id,
                     agg.pass_rate as pass_rate,
                     agg.passed_count as passed_count,
                     agg.total_count as total_count
@@ -1382,8 +1385,8 @@ class ExperimentDAO {
                     ed.duration_values AS duration,
                     ed.total_estimated_cost_sum as total_estimated_cost,
                     ed.total_estimated_cost_avg as total_estimated_cost_avg,
-                    ed.project_ids as project_ids,
-                    if(empty(ed.project_ids), '', ed.project_ids[1]) as project_id,
+                    arrayConcat(ed.project_ids, [ifNull(toString(e.experiment_project_id), '')]) as project_ids,
+                    coalesce(e.experiment_project_id, if(empty(ed.project_ids), '', ed.project_ids[1])) as project_id,
                     pra.pass_rate as pass_rate,
                     pra.passed_count as passed_count,
                     pra.total_count as total_count
@@ -1514,6 +1517,7 @@ class ExperimentDAO {
                 experiment_scores,
                 dataset_version_id,
                 execution_policy,
+                project_id,
                 created_at,
                 last_updated_at
             )
@@ -1537,6 +1541,7 @@ class ExperimentDAO {
                 <if(experiment_scores)> :experiment_scores <else> experiment_scores <endif> as experiment_scores,
                 dataset_version_id,
                 execution_policy,
+                project_id,
                 created_at,
                 now64(9) as last_updated_at
             FROM experiments
@@ -1583,6 +1588,12 @@ class ExperimentDAO {
                         .map(UUID::toString)
                         .orElse(""))
                 .bind("execution_policy", executionPolicyJson);
+
+        if (experiment.projectId() != null) {
+            statement.bind("project_id", experiment.projectId().toString());
+        } else {
+            statement.bindNull("project_id", String.class);
+        }
 
         if (CollectionUtils.isNotEmpty(experiment.tags())) {
             statement.bind("tags", experiment.tags().toArray(String[]::new));
