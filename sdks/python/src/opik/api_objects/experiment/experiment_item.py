@@ -12,6 +12,7 @@ class ExperimentItemReferences:
     dataset_item_id: str
     trace_id: str
     project_name: Optional[str] = None
+    execution_policy: Optional[Dict[str, Any]] = None
 
 
 @dataclasses.dataclass
@@ -46,9 +47,15 @@ class ExperimentItemContent:
             ]
 
         raw_assertions = _extract_extra_field(value, "assertion_results")
-        assertion_results: List[AssertionResultDict] = (
-            raw_assertions if raw_assertions else []
-        )
+        if raw_assertions is None:
+            assertion_results: List[AssertionResultDict] = []
+        else:
+            assertion_results = [
+                ar
+                if isinstance(ar, dict)
+                else {"value": ar.value, "passed": ar.passed, "reason": ar.reason}
+                for ar in raw_assertions
+            ]
 
         return ExperimentItemContent(
             id=value.id,
