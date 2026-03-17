@@ -6,8 +6,6 @@ Test 2 (mask):  register echo_config agent, create mask, create job with
 """
 
 import os
-import re
-import shutil
 import subprocess
 import sys
 import time
@@ -15,18 +13,15 @@ from typing import Optional
 
 import pytest
 
-from opik import Opik, synchronization
+from opik import synchronization
 import opik.rest_api.client as rest_api_client
-from opik.api_objects import rest_helpers
-from opik.rest_api import core as rest_api_core
 from ..conftest import OPIK_E2E_TESTS_PROJECT_NAME
+from .conftest import RunnerInfo
 
 
 ECHO_APP = os.path.join(os.path.dirname(__file__), "echo_app.py")
 ECHO_CONFIG_APP = os.path.join(os.path.dirname(__file__), "echo_config_app.py")
-OPIK_CLI = shutil.which("opik") or "opik"
 
-RUNNER_STARTUP_TIMEOUT = 15
 JOB_COMPLETION_TIMEOUT = 30
 TRACE_PROPAGATION_TIMEOUT = 30
 AGENT_REGISTRATION_TIMEOUT = 10
@@ -70,28 +65,32 @@ def wait_for_completed_job(
     api: rest_api_client.OpikApi, runner_id: str, match_text: str
 ):
     """Poll list_jobs until a completed job whose inputs contain *match_text* appears."""
+    result = []
 
     def _find():
         page = api.runners.list_jobs(runner_id=runner_id, size=20)
         if page.content:
             for j in page.content:
                 if j.status == "completed" and j.inputs and match_text in str(j.inputs):
-                    return j
-        return None
+                    result.clear()
+                    result.append(j)
+                    return True
+        return False
 
     assert synchronization.until(
-        lambda: _find() is not None,
+        _find,
         max_try_seconds=JOB_COMPLETION_TIMEOUT,
         allow_errors=True,
     ), f"No completed job with '{match_text}' found within {JOB_COMPLETION_TIMEOUT}s"
 
-    return _find()
+    return result[0]
 
 
 def find_trace_by_input(
     api: rest_api_client.OpikApi, project_name: str, match_text: str
 ):
     """Poll until a trace whose input contains *match_text* appears and has output."""
+    result = []
 
     def _find():
         page = api.traces.get_traces_by_project(
@@ -101,25 +100,24 @@ def find_trace_by_input(
         if page.content:
             for t in page.content:
                 if t.input and match_text in str(t.input) and t.output:
-                    return t
-        return None
+                    result.clear()
+                    result.append(t)
+                    return True
+        return False
 
     assert synchronization.until(
-        lambda: _find() is not None,
+        _find,
         max_try_seconds=TRACE_PROPAGATION_TIMEOUT,
         allow_errors=True,
     ), f"No trace with '{match_text}' found within {TRACE_PROPAGATION_TIMEOUT}s"
 
-    return _find()
+    return result[0]
 
 
 def wait_for_agent_registration(
     api: rest_api_client.OpikApi, agent_name: str, project_id: str
 ) -> None:
-    """Poll until the agent is registered with any runner in the project.
-
-    Raises a pytest.fail if the agent is not registered within the timeout.
-    """
+    """Poll until the agent is registered with any runner in the project."""
 
     def _is_agent_registered():
         runners_page = api.runners.list_runners(project_id=project_id, size=50)
@@ -136,102 +134,9 @@ def wait_for_agent_registration(
         max_try_seconds=AGENT_REGISTRATION_TIMEOUT,
         allow_errors=True,
     ):
-        pytest.fail(
+        raise AssertionError(
             f"Agent '{agent_name}' was not registered within {AGENT_REGISTRATION_TIMEOUT}s"
         )
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture()
-def api_client():
-    opik_client = Opik()
-    yield opik_client.rest_client
-    opik_client.end()
-
-
-@pytest.fixture()
-def subprocess_env():
-    """Environment variables for subprocesses to reach the same Opik backend."""
-    opik_client = Opik()
-    try:
-        cfg = opik_client.config
-    finally:
-        opik_client.end()
-
-    env = os.environ.copy()
-    env["OPIK_URL_OVERRIDE"] = cfg.url_override
-    if cfg.api_key:
-        env["OPIK_API_KEY"] = cfg.api_key
-    if cfg.workspace:
-        env["OPIK_WORKSPACE"] = cfg.workspace
-    return env
-
-
-@pytest.fixture()
-def project_id(api_client):
-    """Create or resolve the e2e tests project and yield its ID."""
-    try:
-        api_client.projects.create_project(name=OPIK_E2E_TESTS_PROJECT_NAME)
-    except rest_api_core.ApiError:
-        pass
-    pid = rest_helpers.resolve_project_id_by_name(
-        api_client, OPIK_E2E_TESTS_PROJECT_NAME
-    )
-    yield pid
-
-
-@pytest.fixture()
-def runner_process(api_client, subprocess_env, project_id, request):
-    """Start ``opik connect --pair <code> <python> <app>`` and yield the runner_id."""
-    app_path = getattr(request, "param", ECHO_APP)
-    pair = api_client.runners.generate_pairing_code(project_id=project_id)
-
-    proc = subprocess.Popen(
-        [OPIK_CLI, "connect", "--pair", pair.pairing_code, sys.executable, app_path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        env=subprocess_env,
-    )
-
-    runner_id = None
-    deadline = time.monotonic() + RUNNER_STARTUP_TIMEOUT
-    output_lines = []
-
-    while time.monotonic() < deadline:
-        line = proc.stdout.readline()
-        if not line:
-            if proc.poll() is not None:
-                break
-            time.sleep(0.1)
-            continue
-
-        output_lines.append(line.rstrip())
-        match = re.search(r"Runner connected \(ID: ([^)]+)\)", line)
-        if match:
-            runner_id = match.group(1)
-            break
-
-    if runner_id is None:
-        proc.terminate()
-        proc.wait(timeout=5)
-        pytest.fail(
-            f"Runner did not start within {RUNNER_STARTUP_TIMEOUT}s.\n"
-            f"Output:\n" + "\n".join(output_lines)
-        )
-
-    yield runner_id
-
-    proc.terminate()
-    try:
-        proc.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +144,7 @@ def runner_process(api_client, subprocess_env, project_id, request):
 # ---------------------------------------------------------------------------
 
 
-def test_runner_happy_path(api_client, runner_process, project_id):
+def test_runner_happy_path(api_client, runner_process: RunnerInfo, project_id):
     """Basic: register echo agent, run job, verify job result and trace output."""
     register_agent(ECHO_APP)
     message = f"hello-e2e-{int(time.time())}"
@@ -248,7 +153,7 @@ def test_runner_happy_path(api_client, runner_process, project_id):
 
     submit_job(api_client, "echo", message, project_id)
 
-    job = wait_for_completed_job(api_client, runner_process, message)
+    job = wait_for_completed_job(api_client, runner_process.runner_id, message)
     assert job.result is not None, "Completed job should have a result"
     assert f"echo: {message}" in str(job.result)
 
@@ -257,7 +162,9 @@ def test_runner_happy_path(api_client, runner_process, project_id):
 
 
 @pytest.mark.parametrize("runner_process", [ECHO_CONFIG_APP], indirect=True)
-def test_runner_with_mask(api_client, runner_process, project_id):
+def test_runner_with_mask(
+    opik_client, api_client, runner_process: RunnerInfo, project_id
+):
     """Mask: register echo_config agent, create mask, verify mask value in job result and trace."""
     register_agent(ECHO_CONFIG_APP)
     message = f"mask-e2e-{int(time.time())}"
@@ -265,20 +172,16 @@ def test_runner_with_mask(api_client, runner_process, project_id):
 
     wait_for_agent_registration(api_client, "echo_config", project_id)
 
-    opik_client = Opik()
-    try:
-        agent_config = opik_client.get_agent_config(
-            project_name=OPIK_E2E_TESTS_PROJECT_NAME
-        )
-        mask_id = agent_config.create_mask(
-            parameters={"EchoConfig.greeting": custom_greeting},
-        )
-    finally:
-        opik_client.end()
+    agent_config = opik_client.get_agent_config(
+        project_name=OPIK_E2E_TESTS_PROJECT_NAME
+    )
+    mask_id = agent_config.create_mask(
+        parameters={"EchoConfig.greeting": custom_greeting},
+    )
 
     submit_job(api_client, "echo_config", message, project_id, mask_id=mask_id)
 
-    job = wait_for_completed_job(api_client, runner_process, message)
+    job = wait_for_completed_job(api_client, runner_process.runner_id, message)
     assert job.result is not None, "Completed job should have a result"
     assert custom_greeting in str(job.result)
 
