@@ -10,6 +10,7 @@ import com.comet.opik.infrastructure.auth.RequestContext;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
 import ru.vyarus.dropwizard.guice.test.ClientSupport;
 
@@ -74,6 +75,18 @@ public class AnnotationQueuesResourceClient {
 
             assertThat(response.getStatus()).isEqualTo(expectedStatus);
         }
+    }
+
+    public Response callAddItemsToAnnotationQueue(UUID queueId, Set<UUID> itemIds, String apiKey,
+            String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .path(queueId.toString())
+                .path("items")
+                .path("add")
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(AnnotationQueueItemIds.builder().ids(itemIds).build()));
     }
 
     public void removeItemsFromAnnotationQueue(UUID queueId, Set<UUID> itemIds, String apiKey,
