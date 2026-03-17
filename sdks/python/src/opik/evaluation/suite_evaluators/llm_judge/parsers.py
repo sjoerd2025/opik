@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Type
 import pydantic
 
 from opik.evaluation.metrics import score_result
+from opik.exceptions import LLMJudgeParseError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -116,15 +117,16 @@ class ResponseSchema:
         )
 
     def parse(self, content: str) -> List[score_result.ScoreResult]:
-        """Parse the LLM model output JSON into a list of ScoreResult objects.
+        """Parse and validate the LLM model output JSON into ScoreResult objects.
 
-        Returns ScoreResult objects with scoring_failed=True if parsing fails.
+        Raises LLMJudgeParseError (with partial results attached) when parsing
+        or validation fails, so callers can retry or fall back gracefully.
         """
         try:
             parsed = json.loads(content)
             validated = self._response_model(**parsed)
 
-            return [
+            results = [
                 score_result.ScoreResult(
                     name=assertion,
                     value=item.score,
@@ -142,7 +144,7 @@ class ResponseSchema:
                 e,
                 content,
             )
-            return [
+            results = [
                 score_result.ScoreResult(
                     name=assertion,
                     value=0.0,
@@ -153,3 +155,21 @@ class ResponseSchema:
                 )
                 for assertion in self._field_mapping.values()
             ]
+
+        expected = len(self._field_mapping)
+
+        if len(results) != expected:
+            raise LLMJudgeParseError(
+                results=results,
+                message=f"Expected {expected} results, got {len(results)}",
+            )
+
+        failed = [r for r in results if r.scoring_failed]
+        if failed:
+            names = [r.name for r in failed]
+            raise LLMJudgeParseError(
+                results=results,
+                message=f"{len(failed)} of {expected} assertions failed to parse: {names}",
+            )
+
+        return results

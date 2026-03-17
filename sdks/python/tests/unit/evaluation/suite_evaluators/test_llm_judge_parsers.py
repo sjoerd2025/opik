@@ -3,6 +3,7 @@ import json
 import pytest
 
 from opik.evaluation.suite_evaluators.llm_judge import parsers as llm_judge_parsers
+from opik.exceptions import LLMJudgeParseError
 
 
 _INLINED_ASSERTION = {
@@ -160,12 +161,14 @@ class TestResponseSchema:
         assert results[2].value is True
         assert results[2].metadata == {"confidence": 0.7}
 
-    def test_parse__invalid_json__returns_failed_results(self):
+    def test_parse__invalid_json__raises_with_failed_results(self):
         schema = llm_judge_parsers.ResponseSchema(["Response is accurate"])
         content = "not valid json"
 
-        results = schema.parse(content)
+        with pytest.raises(LLMJudgeParseError) as exc_info:
+            schema.parse(content)
 
+        results = exc_info.value.results
         assert len(results) == 1
         assert results[0].name == "Response is accurate"
         assert results[0].value == 0.0
@@ -174,7 +177,7 @@ class TestResponseSchema:
         assert "Failed to parse model output" in results[0].reason
         assert results[0].metadata["raw_output"] == content
 
-    def test_parse__missing_assertion__returns_failed_results(self):
+    def test_parse__missing_assertion__raises_with_failed_results(self):
         schema = llm_judge_parsers.ResponseSchema(
             ["Response is accurate", "Response is helpful"]
         )
@@ -188,14 +191,16 @@ class TestResponseSchema:
             }
         )
 
-        results = schema.parse(content)
+        with pytest.raises(LLMJudgeParseError) as exc_info:
+            schema.parse(content)
 
+        results = exc_info.value.results
         assert len(results) == 2
         assert all(r.scoring_failed is True for r in results)
         assert all(r.value == 0.0 for r in results)
         assert all(r.category_name == "suite_assertion" for r in results)
 
-    def test_parse__missing_required_field__returns_failed_results(self):
+    def test_parse__missing_required_field__raises_with_failed_results(self):
         schema = llm_judge_parsers.ResponseSchema(["Response is accurate"])
         content = json.dumps(
             {
@@ -205,8 +210,10 @@ class TestResponseSchema:
             }
         )
 
-        results = schema.parse(content)
+        with pytest.raises(LLMJudgeParseError) as exc_info:
+            schema.parse(content)
 
+        results = exc_info.value.results
         assert len(results) == 1
         assert results[0].scoring_failed is True
         assert results[0].value == 0.0
