@@ -2262,7 +2262,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
 
         // assertion_scores_avg is Map(String, Float64), convert to List<FeedbackScoreAverage>
         Map<String, Double> assertionScoresAvgRaw = row.get("assertion_scores_avg", Map.class);
-        List<FeedbackScoreAverage> assertionAggregations = Optional.ofNullable(assertionScoresAvgRaw)
+        List<FeedbackScoreAverage> assertionScores = Optional.ofNullable(assertionScoresAvgRaw)
                 .filter(raw -> !raw.isEmpty())
                 .map(raw -> raw.entrySet().stream()
                         .map(e -> new FeedbackScoreAverage(e.getKey(),
@@ -2303,7 +2303,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 hasPassRate ? row.get("pass_rate", BigDecimal.class) : null,
                 hasPassRate ? row.get("passed_count", Long.class) : null,
                 hasPassRate ? totalCount : null,
-                assertionAggregations);
+                assertionScores);
     }
 
     /**
