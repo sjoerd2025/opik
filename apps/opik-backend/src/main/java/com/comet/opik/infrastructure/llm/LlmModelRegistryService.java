@@ -39,7 +39,7 @@ public class LlmModelRegistryService {
         try {
             registry = load();
             log.info("LLM model registry reloaded successfully");
-        } catch (Exception e) {
+        } catch (UncheckedIOException | IllegalStateException e) {
             log.error("Failed to reload LLM model registry, keeping previous version", e);
         }
     }
@@ -88,6 +88,9 @@ public class LlmModelRegistryService {
         var result = new LinkedHashMap<>(defaults);
 
         overrides.forEach((provider, overrideModels) -> {
+            if (overrideModels == null || overrideModels.isEmpty()) {
+                return;
+            }
             var existing = result.getOrDefault(provider, List.of());
             var existingIds = new LinkedHashMap<String, LlmModelDefinition>();
             existing.forEach(m -> existingIds.put(m.id(), m));
