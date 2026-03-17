@@ -21,6 +21,7 @@ import {
   useDashboardStore,
   selectUpdateLayout,
   selectWidgetResolver,
+  selectReadOnly,
 } from "@/store/DashboardStore";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { applyWidgetPermissions } from "@/components/shared/Dashboard/widgets/widgetRegistry";
@@ -38,6 +39,7 @@ interface DashboardWidgetGridProps {
 const DashboardWidgetGrid: React.FunctionComponent<
   DashboardWidgetGridProps
 > = ({ sectionId, widgets, layout }) => {
+  const readOnly = useDashboardStore(selectReadOnly);
   const onAddEditWidgetCallback = useDashboardStore(
     (state) => state.onAddEditWidgetCallback,
   );
@@ -59,6 +61,7 @@ const DashboardWidgetGrid: React.FunctionComponent<
   );
 
   if (isEmpty(widgets)) {
+    if (readOnly) return null;
     return <DashboardWidgetGridEmpty onAddWidget={handleAddWidget} />;
   }
 
@@ -78,6 +81,8 @@ const DashboardWidgetGrid: React.FunctionComponent<
       isBounded={true}
       maxRows={Infinity}
       autoSize={true}
+      isDraggable={!readOnly}
+      isResizable={!readOnly}
     >
       {widgets.map((widget) => {
         const widgetType = widget.type || WIDGET_TYPE.PROJECT_METRICS;

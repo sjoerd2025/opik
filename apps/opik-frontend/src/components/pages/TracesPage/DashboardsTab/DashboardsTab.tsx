@@ -18,7 +18,9 @@ import {
   selectConfig,
   selectSetRuntimeConfig,
   selectHasUnsavedChanges,
+  selectSetReadOnly,
 } from "@/store/DashboardStore";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 import PageBodyStickyContainer from "@/components/layout/PageBodyStickyContainer/PageBodyStickyContainer";
 import { PROJECT_TEMPLATE_LIST } from "@/lib/dashboard/templates";
@@ -59,7 +61,22 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
       enabled: Boolean(dashboardId),
     });
 
+  const {
+    permissions: { canCreateDashboards },
+  } = usePermissions();
+
   const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
+  const setReadOnly = useDashboardStore(selectSetReadOnly);
+
+  const isTemplateReadOnly = isTemplate && !canCreateDashboards;
+  const shouldDisableDashboardSelect = hasUnsavedChanges && !isTemplateReadOnly;
+
+  useEffect(() => {
+    setReadOnly(isTemplateReadOnly);
+    return () => {
+      setReadOnly(false);
+    };
+  }, [isTemplateReadOnly, setReadOnly]);
 
   const config = useDashboardStore(selectConfig);
   const setConfig = useDashboardStore(selectSetConfig);
@@ -113,7 +130,7 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
       onDashboardCreated={handleDashboardCreated}
       onDashboardDeleted={handleDashboardDeleted}
       defaultProjectId={projectId}
-      disabled={hasUnsavedChanges}
+      disabled={shouldDisableDashboardSelect}
       templates={PROJECT_TEMPLATE_LIST}
     />
   );
@@ -125,7 +142,7 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
         direction="bidirectional"
         limitWidth
       >
-        {hasUnsavedChanges ? (
+        {shouldDisableDashboardSelect ? (
           <TooltipWrapper content="Save or discard your changes before switching">
             <div>{dashboardSelectBox}</div>
           </TooltipWrapper>
@@ -134,7 +151,7 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
         )}
 
         <div className="flex shrink-0 items-center gap-2">
-          {dashboard && (
+          {dashboard && !isTemplateReadOnly && (
             <DashboardSaveActions
               onSave={save}
               onDiscard={discard}
@@ -153,7 +170,9 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
           <ShareDashboardButton />
-          <DashboardConfigButton disableProjectSelector />
+          {!isTemplateReadOnly && (
+            <DashboardConfigButton disableProjectSelector />
+          )}
         </div>
       </PageBodyStickyContainer>
 

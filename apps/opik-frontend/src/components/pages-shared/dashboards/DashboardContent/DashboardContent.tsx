@@ -4,6 +4,7 @@ import {
   useDashboardStore,
   selectAddWidget,
   selectUpdateWidget,
+  selectReadOnly,
 } from "@/store/DashboardStore";
 import DashboardSectionsContainer from "@/components/shared/Dashboard/Dashboard";
 import AddSectionButton from "@/components/shared/Dashboard/DashboardSection/AddSectionButton";
@@ -15,11 +16,17 @@ const DashboardContent: React.FunctionComponent = () => {
   const [targetSectionId, setTargetSectionId] = useState<string | null>(null);
   const [targetWidgetId, setTargetWidgetId] = useState<string | null>(null);
 
+  const readOnly = useDashboardStore(selectReadOnly);
   const addSection = useDashboardStore((state) => state.addSection);
   const addWidget = useDashboardStore(selectAddWidget);
   const updateWidget = useDashboardStore(selectUpdateWidget);
 
   useEffect(() => {
+    if (readOnly) {
+      useDashboardStore.getState().setOnAddEditWidgetCallback(null);
+      return;
+    }
+
     useDashboardStore
       .getState()
       .setOnAddEditWidgetCallback(({ sectionId, widgetId }) => {
@@ -31,7 +38,7 @@ const DashboardContent: React.FunctionComponent = () => {
     return () => {
       useDashboardStore.getState().setOnAddEditWidgetCallback(null);
     };
-  }, []);
+  }, [readOnly]);
 
   const handleSaveWidget = useCallback(
     (widgetData: DashboardWidget) => {
@@ -50,17 +57,20 @@ const DashboardContent: React.FunctionComponent = () => {
     <>
       <DashboardSectionsContainer />
 
-      <div className="text-clip rounded-md">
-        <AddSectionButton onAddSection={addSection} />
-      </div>
-
-      <WidgetConfigDialog
-        open={widgetDialogOpen}
-        onOpenChange={setWidgetDialogOpen}
-        sectionId={targetSectionId || ""}
-        widgetId={targetWidgetId || undefined}
-        onSave={handleSaveWidget}
-      />
+      {!readOnly && (
+        <>
+          <div className="text-clip rounded-md">
+            <AddSectionButton onAddSection={addSection} />
+          </div>
+          <WidgetConfigDialog
+            open={widgetDialogOpen}
+            onOpenChange={setWidgetDialogOpen}
+            sectionId={targetSectionId || ""}
+            widgetId={targetWidgetId || undefined}
+            onSave={handleSaveWidget}
+          />
+        </>
+      )}
     </>
   );
 };

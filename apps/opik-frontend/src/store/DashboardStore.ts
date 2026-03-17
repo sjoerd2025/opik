@@ -40,6 +40,7 @@ interface DashboardStoreState<TConfig = BaseDashboardConfig> {
   widgetResolver: WidgetResolver | null;
   previewWidget: DashboardWidget | null;
   hasUnsavedChanges: boolean;
+  readOnly: boolean;
 }
 
 interface DashboardActions<TConfig = BaseDashboardConfig> {
@@ -86,6 +87,8 @@ interface DashboardActions<TConfig = BaseDashboardConfig> {
   updatePreviewWidget: (data: Partial<DashboardWidget>) => void;
 
   setHasUnsavedChanges: (hasChanges: boolean) => void;
+
+  setReadOnly: (readOnly: boolean) => void;
 
   clearDashboard: () => void;
 
@@ -134,6 +137,7 @@ export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
         widgetResolver: null,
         previewWidget: null,
         hasUnsavedChanges: false,
+        readOnly: false,
 
         addSection: (title?: string) => {
           const newSection = generateEmptySection(title);
@@ -439,6 +443,10 @@ export const useDashboardStore = create<DashboardStore<BaseDashboardConfig>>()(
           set({ hasUnsavedChanges: hasChanges }, false, "setHasUnsavedChanges");
         },
 
+        setReadOnly: (readOnly) => {
+          set({ readOnly }, false, "setReadOnly");
+        },
+
         clearDashboard: () => {
           const emptyDashboard = generateEmptyDashboard();
           set(
@@ -576,3 +584,8 @@ export const selectHasUnsavedChanges = (
 export const selectSetHasUnsavedChanges = (
   state: DashboardStore<BaseDashboardConfig>,
 ) => state.setHasUnsavedChanges;
+
+export const selectReadOnly = (state: DashboardStore<BaseDashboardConfig>) =>
+  state.readOnly;
+export const selectSetReadOnly = (state: DashboardStore<BaseDashboardConfig>) =>
+  state.setReadOnly;

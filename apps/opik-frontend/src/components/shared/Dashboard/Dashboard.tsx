@@ -19,6 +19,7 @@ import { useShallow } from "zustand/react/shallow";
 import {
   selectAddSectionAtPosition,
   selectDeleteSection,
+  selectReadOnly,
   selectReorderSections,
   selectSectionIds,
   selectUpdateSection,
@@ -32,6 +33,7 @@ const Dashboard: React.FunctionComponent = () => {
   const [active, setActive] = useState<Active | null>(null);
   const dragTopCoordinate = React.useRef<number>(0);
 
+  const readOnly = useDashboardStore(selectReadOnly);
   const sectionIds = useDashboardStore(useShallow(selectSectionIds));
 
   const reorderSections = useDashboardStore(selectReorderSections);
@@ -121,7 +123,7 @@ const Dashboard: React.FunctionComponent = () => {
 
   return (
     <DndContext
-      sensors={sensors}
+      sensors={readOnly ? [] : sensors}
       measuring={measuringConfig}
       collisionDetection={closestCenter}
       modifiers={[restrictToVerticalAxis]}

@@ -18,7 +18,9 @@ import {
   selectConfig,
   selectSetRuntimeConfig,
   selectHasUnsavedChanges,
+  selectSetReadOnly,
 } from "@/store/DashboardStore";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 import PageBodyStickyContainer from "@/components/layout/PageBodyStickyContainer/PageBodyStickyContainer";
 import { EXPERIMENTS_TEMPLATE_LIST } from "@/lib/dashboard/templates";
@@ -61,11 +63,25 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
       enabled: Boolean(dashboardId),
     });
 
-  const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
+  const {
+    permissions: { canCreateDashboards },
+  } = usePermissions();
 
+  const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
   const config = useDashboardStore(selectConfig);
   const setConfig = useDashboardStore(selectSetConfig);
   const setRuntimeConfig = useDashboardStore(selectSetRuntimeConfig);
+  const setReadOnly = useDashboardStore(selectSetReadOnly);
+
+  const isTemplateReadOnly = isTemplate && !canCreateDashboards;
+  const shouldDisableDashboardSelect = hasUnsavedChanges && !isTemplateReadOnly;
+
+  useEffect(() => {
+    setReadOnly(isTemplateReadOnly);
+    return () => {
+      setReadOnly(false);
+    };
+  }, [isTemplateReadOnly, setReadOnly]);
 
   useEffect(() => {
     setRuntimeConfig({
@@ -118,7 +134,7 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
       onDashboardCreated={handleDashboardCreated}
       onDashboardDeleted={handleDashboardDeleted}
       defaultExperimentIds={experimentsIds}
-      disabled={hasUnsavedChanges}
+      disabled={shouldDisableDashboardSelect}
       templates={EXPERIMENTS_TEMPLATE_LIST}
     />
   );
@@ -130,7 +146,7 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
         direction="bidirectional"
         limitWidth
       >
-        {hasUnsavedChanges ? (
+        {shouldDisableDashboardSelect ? (
           <TooltipWrapper content="Save or discard your changes before switching">
             <div>{dashboardSelectBox}</div>
           </TooltipWrapper>
@@ -144,7 +160,7 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
             tooltipContent="Select experiments to compare"
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
-          {dashboard && (
+          {dashboard && !isTemplateReadOnly && (
             <DashboardSaveActions
               onSave={save}
               onDiscard={discard}
@@ -163,7 +179,9 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
           <ShareDashboardButton />
-          <DashboardConfigButton disableExperimentsSelector />
+          {!isTemplateReadOnly && (
+            <DashboardConfigButton disableExperimentsSelector />
+          )}
         </div>
       </PageBodyStickyContainer>
 
