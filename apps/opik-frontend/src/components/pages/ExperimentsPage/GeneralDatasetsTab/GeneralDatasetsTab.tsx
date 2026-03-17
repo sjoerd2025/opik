@@ -11,6 +11,7 @@ import {
 } from "use-query-params";
 import get from "lodash/get";
 import uniq from "lodash/uniq";
+import isNumber from "lodash/isNumber";
 import isObject from "lodash/isObject";
 
 import DataTable from "@/components/shared/DataTable/DataTable";
@@ -600,7 +601,7 @@ const GeneralDatasetsTab: React.FC = () => {
         (experiment.experiment_scores ?? []).forEach((s) => {
           scores[s.name] = s.value;
         });
-        if (isEvalSuiteExperiment(experiment)) {
+        if (isEvalSuiteExperiment(experiment) && isNumber(experiment.pass_rate)) {
           scores[PASS_RATE_LABEL] = experiment.pass_rate;
         }
 

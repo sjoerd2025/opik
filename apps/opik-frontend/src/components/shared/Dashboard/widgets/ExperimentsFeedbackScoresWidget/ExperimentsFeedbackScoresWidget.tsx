@@ -203,7 +203,7 @@ function transformUngroupedExperimentsToChartData(
     });
 
     // pass_rate is a top-level metric, not subject to feedbackScores filtering
-    if (isEvalSuiteExperiment(experiment)) {
+    if (isEvalSuiteExperiment(experiment) && isNumber(experiment.pass_rate)) {
       scores[PASS_RATE_LABEL] = experiment.pass_rate;
       allLines.push(PASS_RATE_LABEL);
     }
