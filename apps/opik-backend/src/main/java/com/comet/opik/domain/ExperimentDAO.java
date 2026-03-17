@@ -688,7 +688,7 @@ class ExperimentDAO {
                 <if(experiment_scores_filters)>
                 AND e.id IN (
                     SELECT experiment_id
-                    From experiment_scores_final
+                    FROM experiment_scores_final
                     GROUP BY experiment_id
                     HAVING <experiment_scores_filters>
                 )
