@@ -601,7 +601,7 @@ class ExperimentDAO {
                     if(agg.total_count = 0, NULL, agg.pass_rate) AS pass_rate,
                     if(agg.total_count = 0, NULL, agg.passed_count) AS passed_count,
                     if(agg.total_count = 0, NULL, agg.total_count) AS total_count,
-                    arrayConcat(agg.project_ids, [ifNull(toString(e.project_id), '')]) as combined_project_ids
+                    agg.project_ids as combined_project_ids
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
                 WHERE 1=1
@@ -616,6 +616,9 @@ class ExperimentDAO {
                 <endif>
                 <if(experiment_scores_agg_empty_filters)>
                 AND (<experiment_scores_agg_empty_filters>)
+                <endif>
+                <if(project_id)>
+                AND has(agg.project_ids, :project_id)
                 <endif>
                 <if(project_deleted)>
                 AND (has(agg.project_ids, '') OR empty(agg.project_ids))
@@ -657,7 +660,7 @@ class ExperimentDAO {
                     pra.pass_rate as pass_rate,
                     pra.passed_count as passed_count,
                     pra.total_count as total_count,
-                    arrayConcat(ed.project_ids, [ifNull(toString(e.project_id), '')]) as combined_project_ids
+                    arrayConcat(ed.project_ids, if(isNull(e.project_id), [], [toString(e.project_id)])) as combined_project_ids
                 FROM experiments_final AS e
                 LEFT JOIN experiment_durations AS ed ON e.id = ed.experiment_id
                 LEFT JOIN feedback_scores_agg AS fs ON e.id = fs.experiment_id
@@ -693,14 +696,14 @@ class ExperimentDAO {
                 <if(experiment_scores_empty_filters)>
                 AND e.id NOT IN (SELECT experiment_id FROM esc)
                 <endif>
+                <if(project_id)>
+                AND has(arrayConcat(ed.project_ids, if(isNull(e.project_id), [], [toString(e.project_id)])), :project_id)
+                <endif>
                 <if(project_deleted)>
                 AND (has(ed.project_ids, '') OR empty(ed.project_ids))
                 <endif>
                 <endif>
             )
-            <if(project_id)>
-            WHERE has(combined_project_ids, :project_id)
-            <endif>
             ORDER BY <if(sort_fields)><sort_fields>,<endif> id DESC
             <if(limit && (
                 feedback_scores_filters ||
@@ -899,7 +902,7 @@ class ExperimentDAO {
                 AND (<experiment_scores_agg_empty_filters>)
                 <endif>
                 <if(project_id)>
-                AND has(arrayConcat(agg.project_ids, [ifNull(toString(e.project_id), '')]), :project_id)
+                AND has(agg.project_ids, :project_id)
                 <endif>
                 <if(project_deleted)>
                 AND (has(agg.project_ids, '') OR empty(agg.project_ids))
@@ -950,7 +953,7 @@ class ExperimentDAO {
                 AND e.id NOT IN (SELECT experiment_id FROM esc)
                 <endif>
                 <if(project_id)>
-                AND has(arrayConcat(ep.project_ids, [ifNull(toString(e.project_id), '')]), :project_id)
+                AND has(arrayConcat(ep.project_ids, if(isNull(e.project_id), [], [toString(e.project_id)])), :project_id)
                 <endif>
                 <if(project_deleted)>
                 AND (has(ep.project_ids, '') OR empty(ep.project_ids))
@@ -1013,10 +1016,17 @@ class ExperimentDAO {
                     ef.tags,
                     ef.prompt_ids,
                     ef.created_at,
-                    arrayConcat(agg.project_ids, [ifNull(toString(ef.experiment_project_id), '')]) as project_ids,
+                    agg.project_ids as project_ids,
                     coalesce(ef.experiment_project_id, if(empty(agg.project_ids), '', agg.project_ids[1])) as project_id
                 FROM experiments_filtered ef
                 INNER JOIN experiments_from_aggregates_final agg ON ef.id = agg.experiment_id
+                WHERE 1=1
+                <if(project_id)>
+                AND has(agg.project_ids, :project_id)
+                <endif>
+                <if(project_deleted)>
+                AND (has(agg.project_ids, '') OR empty(agg.project_ids))
+                <endif>
                 <endif>
                 <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
                 <if(has_raw)>
@@ -1027,7 +1037,7 @@ class ExperimentDAO {
                     ef.tags,
                     ef.prompt_ids,
                     ef.created_at,
-                    arrayConcat(ep.project_ids, [ifNull(toString(ef.experiment_project_id), '')]) as project_ids,
+                    arrayConcat(ep.project_ids, if(isNull(ef.experiment_project_id), [], [toString(ef.experiment_project_id)])) as project_ids,
                     coalesce(ef.experiment_project_id, if(empty(ep.project_ids), '', ep.project_ids[1])) as project_id
                 FROM experiments_final ef
                 LEFT JOIN (
@@ -1048,15 +1058,15 @@ class ExperimentDAO {
                     ) t ON ei.trace_id = t.id
                     GROUP BY ei.experiment_id
                 ) ep ON ef.id = ep.experiment_id
+                WHERE 1=1
+                <if(project_id)>
+                AND has(arrayConcat(ep.project_ids, if(isNull(ef.experiment_project_id), [], [toString(ef.experiment_project_id)])), :project_id)
+                <endif>
+                <if(project_deleted)>
+                AND (has(ep.project_ids, '') OR empty(ep.project_ids))
+                <endif>
                 <endif>
             ) experiments_with_projects
-            WHERE 1=1
-            <if(project_id)>
-            AND has(project_ids, :project_id)
-            <endif>
-            <if(project_deleted)>
-            AND (has(project_ids, '') OR empty(project_ids))
-            <endif>
             GROUP BY <groupBy>
             SETTINGS log_comment = '<log_comment>'
             ;
@@ -1357,7 +1367,7 @@ class ExperimentDAO {
                     agg.duration_values AS duration,
                     agg.total_estimated_cost_sum as total_estimated_cost,
                     agg.total_estimated_cost_avg as total_estimated_cost_avg,
-                    arrayConcat(agg.project_ids, [ifNull(toString(e.experiment_project_id), '')]) as project_ids,
+                    agg.project_ids as project_ids,
                     coalesce(e.experiment_project_id, if(empty(agg.project_ids), '', agg.project_ids[1])) as project_id,
                     agg.pass_rate as pass_rate,
                     agg.passed_count as passed_count,
@@ -1366,10 +1376,10 @@ class ExperimentDAO {
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
                 WHERE 1=1
                 <if(project_id)>
-                AND has(project_ids, :project_id)
+                AND has(agg.project_ids, :project_id)
                 <endif>
                 <if(project_deleted)>
-                AND (has(project_ids, '') OR empty(project_ids))
+                AND (has(agg.project_ids, '') OR empty(agg.project_ids))
                 <endif>
                 <endif>
                 <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
@@ -1385,7 +1395,7 @@ class ExperimentDAO {
                     ed.duration_values AS duration,
                     ed.total_estimated_cost_sum as total_estimated_cost,
                     ed.total_estimated_cost_avg as total_estimated_cost_avg,
-                    arrayConcat(ed.project_ids, [ifNull(toString(e.experiment_project_id), '')]) as project_ids,
+                    arrayConcat(ed.project_ids, if(isNull(e.experiment_project_id), [], [toString(e.experiment_project_id)])) as project_ids,
                     coalesce(e.experiment_project_id, if(empty(ed.project_ids), '', ed.project_ids[1])) as project_id,
                     pra.pass_rate as pass_rate,
                     pra.passed_count as passed_count,
