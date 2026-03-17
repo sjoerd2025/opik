@@ -122,9 +122,9 @@ class AgentConfigService:
                         mask_id=mask_id,
                     )
         except rest_api_core.ApiError as e:
-            if e.status_code == 404:
-                return None
-            raise
+            if e.status_code != 404:
+                raise
+            return None
         return Blueprint(
             raw_blueprint=raw,
             field_types=field_types,

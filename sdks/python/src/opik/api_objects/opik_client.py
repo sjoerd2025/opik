@@ -2292,7 +2292,7 @@ class Opik:
 
         return annotation_queue_rest_operations.get_threads_annotation_queues(
             rest_client=self._rest_client,
-            project_id='project_id',
+            project_id=project_id,
             max_results=max_results,
         )
 
@@ -2365,11 +2365,14 @@ class Opik:
             mask_id: Mask blueprint ID to overlay on the result.
             project_name: Project to look in. Defaults to the client's project.
             latest: If True, return the most recent blueprint regardless of env.
-            fallback: An AgentConfig instance to return if the backend is unreachable.
+            fallback: An AgentConfig instance to return if the backend is
+                unreachable or the blueprint is not found.
 
         Returns:
-            An AgentConfig populated from the blueprint, or the fallback on error,
-            or ``None`` if not found.
+            An AgentConfig populated from the blueprint. If a fallback is
+            provided, it is returned (with ``_is_fallback=True``) when the
+            backend is unreachable or the blueprint is missing. ``None`` is
+            returned only when no blueprint exists and no fallback was given.
         """
         if fallback is not None:
             self._validate_agent_config(fallback, "fallback")
@@ -2392,12 +2395,14 @@ class Opik:
                     "Failed to get agent config from backend, using fallback.",
                     exc_info=True,
                 )
+                fallback._ensure_internal_state()
                 fallback._is_fallback = True
                 return fallback
             raise
 
         if blueprint is None:
             if fallback is not None:
+                fallback._ensure_internal_state()
                 fallback._is_fallback = True
             return fallback
 

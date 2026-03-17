@@ -3,6 +3,7 @@ import dataclasses
 import logging
 import typing
 
+from opik.rest_api import core as rest_api_core
 from .blueprint import Blueprint
 from .context import get_active_config_mask
 from . import type_helpers
@@ -41,6 +42,7 @@ class AgentConfig:
     _blueprint_envs: typing.Optional[typing.List[str]]
     _service: typing.Optional["AgentConfigService"]
     _mask_cache: typing.Dict[str, typing.Dict[str, typing.Any]]
+    _field_metadata: typing.Dict[str, typing.Tuple[str, typing.Optional[str]]]
     _is_fallback: bool
 
     def __init_subclass__(cls, **kwargs: typing.Any) -> None:
@@ -61,6 +63,10 @@ class AgentConfig:
         instance._blueprint_envs = blueprint.envs
         instance._service = service
         instance._mask_cache = {}
+        instance._field_metadata = {
+            v.key: (v.type, v.description)
+            for v in blueprint._raw.values
+        }
         instance._is_fallback = False
         return instance
 
@@ -86,8 +92,14 @@ class AgentConfig:
             masked_values = self._mask_cache[context_mask]
             if key in masked_values:
                 return masked_values[key]
-        except Exception:
-            logger.debug("Failed to get masked config value", exc_info=True)
+        except (rest_api_core.ApiError, TypeError, KeyError) as e:
+            logger.warning(
+                "Failed to resolve masked config value for mask_id=%s, key=%s: %s",
+                context_mask,
+                key,
+                e,
+                exc_info=True,
+            )
 
         return _MISSING
 
@@ -136,6 +148,21 @@ class AgentConfig:
 
         return result
 
+    def _ensure_internal_state(self) -> None:
+        """Populate internal attrs from dataclass fields if not already set."""
+        if hasattr(self, "_values"):
+            return
+        fields = self._extract_fields_with_values()
+        self._values = {k: v for k, (_, v, _) in fields.items()}
+        self._blueprint_id = None
+        self._blueprint_envs = None
+        self._service = None
+        self._mask_cache = {}
+        self._field_metadata = {
+            k: (type_helpers.python_type_to_backend_type(py_type), desc)
+            for k, (py_type, _, desc) in fields.items()
+        }
+
     @property
     def values(self) -> typing.Dict[str, typing.Any]:
         """All config values as a dict."""
@@ -176,8 +203,23 @@ class AgentConfig:
             }
             if mask_id is not None:
                 agent_config_metadata["_mask_id"] = mask_id
-            if value is not _MISSING:
-                agent_config_metadata["values"] = {key: {"value": value}}
+
+            values: typing.Dict[str, typing.Any] = {}
+            field_meta = self._field_metadata.get(key)
+            if value is not _MISSING and field_meta is not None:
+                backend_type, description = field_meta
+                values[key] = {
+                    "value": type_helpers.python_value_to_metadata_value(
+                        value, type(value)
+                    ),
+                    "type": backend_type,
+                    **(
+                        {"description": description}
+                        if description is not None
+                        else {}
+                    ),
+                }
+            agent_config_metadata["values"] = values
 
             opik_context.update_current_trace(
                 metadata={"agent_configuration": agent_config_metadata}
