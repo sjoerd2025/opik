@@ -205,7 +205,6 @@ class ExperimentsResourceTest {
             "id", "datasetId", "name", "feedbackScores", "traceCount", "createdAt", "lastUpdatedAt", "createdBy",
             "lastUpdatedBy", "comments", "projectName", "datasetItemCount"};
 
-
     private static final String WORKSPACE_ID = UUID.randomUUID().toString();
     private static final String USER = "user-" + RandomStringUtils.secure().nextAlphanumeric(36);
     private static final String TEST_WORKSPACE = "workspace" + RandomStringUtils.secure().nextAlphanumeric(36);
