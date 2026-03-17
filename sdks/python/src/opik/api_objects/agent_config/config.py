@@ -248,24 +248,21 @@ class AgentConfig:
         """Return the active context mask, falling back to the fetch-time mask."""
         return get_active_config_mask() or self._mask_id
 
+    def _resolve_and_track(self, key: str, fallback_value: typing.Any) -> typing.Any:
+        """Resolve a config value (checking masks) and inject trace metadata."""
+        masked = self._resolve_masked_value(key)
+        if masked is not _MISSING:
+            self._inject_trace_metadata(key, masked, mask_id=self._effective_mask_id())
+            return masked
+        self._inject_trace_metadata(key, fallback_value)
+        return fallback_value
+
     def get(self, key: str, default: typing.Any = None) -> typing.Any:
         """Get a config value by key, with an optional default."""
-        masked = self._resolve_masked_value(key)
-        if masked is not _MISSING:
-            self._inject_trace_metadata(key, masked, mask_id=self._effective_mask_id())
-            return masked
-        value = self._values.get(key, default)
-        self._inject_trace_metadata(key, value)
-        return value
+        return self._resolve_and_track(key, self._values.get(key, default))
 
     def __getitem__(self, key: str) -> typing.Any:
-        masked = self._resolve_masked_value(key)
-        if masked is not _MISSING:
-            self._inject_trace_metadata(key, masked, mask_id=self._effective_mask_id())
-            return masked
-        value = self._values[key]
-        self._inject_trace_metadata(key, value)
-        return value
+        return self._resolve_and_track(key, self._values[key])
 
     def __getattr__(self, name: str) -> typing.Any:
         if name.startswith("_"):
